@@ -51,17 +51,17 @@ export default function RelationshipRanking({ students, relationships }: Relatio
   };
 
   return (
-    <div className="bg-white rounded-lg shadow p-3 overflow-y-auto">
-      <h3 className="text-base font-semibold mb-2 border-b pb-1 text-gray-700">관계 순위 Top 3</h3>
+    <div className="bg-white rounded-lg shadow p-3 overflow-y-auto h-full">
+      <h3 className="text-base font-semibold mb-2 border-b pb-1 text-[#6366f1]">관계 순위 Top 3</h3>
       <div className="space-y-3">
         {Object.entries(RELATIONSHIP_TYPES).map(([key, label]) => {
           const rankType = key as keyof typeof RELATIONSHIP_TYPES;
           const topStudents = getSortedRank(rankType);
           return (
             <div key={key}>
-              <h4 className="text-sm font-medium text-gray-600 mb-1">{label} 많은 학생</h4>
+              <h4 className="text-sm font-semibold text-[#6366f1] mb-1">{label} 많은 학생</h4>
               {topStudents.length > 0 ? (
-                <ul className="list-decimal list-inside text-xs space-y-0.5 pl-1">
+                <ul className="list-decimal list-inside text-xs space-y-0.5 pl-1 text-black">
                   {topStudents.map((student, index) => (
                     <li key={student.name}>
                       <span className="font-medium">{student.name}</span> ({student.counts[rankType]}명)
@@ -69,7 +69,7 @@ export default function RelationshipRanking({ students, relationships }: Relatio
                   ))}
                 </ul>
               ) : (
-                <p className="text-xs text-gray-400 italic pl-1">해당 관계 없음</p>
+                <p className="text-xs text-black italic pl-1">해당 관계 없음</p>
               )}
             </div>
           );

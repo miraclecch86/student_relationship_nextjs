@@ -7,10 +7,12 @@ import { supabase, Student, Relationship, Class, Question, Answer } from '@/lib/
 import RelationshipGraph, { RelationshipGraphRef } from '@/components/RelationshipGraph';
 import ConfirmModal from '@/components/ConfirmModal';
 import StudentListItem from '@/components/StudentListItem';
-import RelationshipRanking from '@/components/RelationshipRanking';
+import RelationshipTypeRankBox from '@/components/RelationshipTypeRankBox';
+import WeeklyAnswersBox from '@/components/WeeklyAnswersBox';
 import { RELATIONSHIP_TYPES, RELATIONSHIP_COLORS } from '@/lib/constants';
 import { ArrowPathIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { motion, AnimatePresence } from 'framer-motion';
 
 // 데이터 타입 정의 (D3.js용 노드 및 링크)
 export interface NodeData extends Student {
@@ -44,7 +46,8 @@ async function fetchStudents(classId: string): Promise<NodeData[]> {
   const { data, error } = await supabase
     .from('students')
     .select('*, position_x, position_y')
-    .eq('class_id', classId);
+    .eq('class_id', classId)
+    .order('created_at', { ascending: true });
   if (error) {
     console.error('Error fetching students:', error);
     return [];
@@ -231,6 +234,37 @@ export default function ClassRelationshipPage() {
       enabled: !!classId,
   });
 
+  // --- 관계 유형별 랭킹 데이터 계산 ---
+  const rankedStudentsByType = useMemo(() => {
+    if (!students || !relationships) return {};
+
+    const rankings: { [key: string]: (Student & { count: number })[] } = {};
+    const studentMap = new Map(students.map(s => [s.id, s]));
+
+    // 각 관계 유형별로 계산
+    Object.keys(RELATIONSHIP_TYPES).forEach(type => {
+      const counts = new Map<string, number>();
+      relationships
+        .filter(link => link.type === type)
+        .forEach(link => {
+          counts.set(link.target, (counts.get(link.target) || 0) + 1);
+        });
+
+      // 득표 수에 따라 정렬된 학생 목록 생성
+      const ranked = Array.from(counts.entries())
+        .sort(([, countA], [, countB]) => countB - countA) // 내림차순 정렬
+        .map(([studentId, count]) => {
+            const studentData = studentMap.get(studentId);
+            return studentData ? { ...studentData, count } : null;
+        })
+        .filter((s): s is Student & { count: number } => s !== null); // null 제거 및 타입 단언
+
+      rankings[type] = ranked;
+    });
+
+    return rankings;
+  }, [students, relationships]);
+
   // --- 학생 추가 Mutation ---
   const addStudentMutation = useMutation<Student, Error, string>({
     mutationFn: (name) => addStudent(classId, name),
@@ -343,12 +377,13 @@ export default function ClassRelationshipPage() {
   console.log('Students data:', students);
   console.log('Relationships data from query:', relationships); // fetchRelationships 결과
   console.log('Filtered relationships before passing to graph:', filteredRelationships);
+  console.log('Ranked students by type:', rankedStudentsByType); // 랭킹 데이터 로그 추가
 
   if (isLoading) {
     return (
         <div className="flex flex-col justify-center items-center min-h-screen bg-gray-100">
             <ArrowPathIcon className="w-12 h-12 text-blue-500 animate-spin mb-4" />
-            <p className="text-lg text-gray-600">데이터를 불러오는 중입니다...</p>
+            <p className="text-lg text-black">데이터를 불러오는 중입니다...</p>
         </div>
     );
   }
@@ -358,7 +393,7 @@ export default function ClassRelationshipPage() {
         <div className="flex flex-col justify-center items-center min-h-screen bg-gray-100 p-4">
             <ExclamationCircleIcon className="w-16 h-16 text-red-500 mb-4" />
             <h2 className="text-xl font-semibold text-red-700 mb-2">오류 발생</h2>
-            <p className="text-gray-600 mb-4 text-center">데이터를 불러오는 중 문제가 발생했습니다. 네트워크 연결을 확인하거나 잠시 후 다시 시도해주세요.</p>
+            <p className="text-black mb-4 text-center">데이터를 불러오는 중 문제가 발생했습니다. 네트워크 연결을 확인하거나 잠시 후 다시 시도해주세요.</p>
             <pre className="text-xs text-red-400 bg-red-50 p-2 rounded overflow-x-auto max-w-lg">
                 {combinedError?.message || '알 수 없는 오류'}
             </pre>
@@ -371,8 +406,8 @@ export default function ClassRelationshipPage() {
     return (
         <div className="flex flex-col justify-center items-center min-h-screen bg-gray-100">
             <ExclamationCircleIcon className="w-16 h-16 text-yellow-500 mb-4" />
-            <p className="text-lg text-gray-600">해당 학급 정보를 찾을 수 없습니다.</p>
-            <button onClick={() => router.push('/')} className="mt-4 text-blue-600 hover:underline">
+            <p className="text-lg text-black">해당 학급 정보를 찾을 수 없습니다.</p>
+            <button onClick={() => router.push('/')} className="mt-4 text-[#6366f1] hover:underline">
                 학급 목록으로 돌아가기
             </button>
         </div>
@@ -380,170 +415,164 @@ export default function ClassRelationshipPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen p-4 bg-gray-100">
-      {/* 상단 헤더 */}
-      <header className="mb-4 flex justify-between items-center bg-white p-3 rounded-lg shadow">
-        <div className="flex items-center gap-4">
-          <button onClick={() => router.push('/')} className="text-blue-600 hover:underline">
-            &larr; 학급 목록
-          </button>
-          <h1 className="text-xl font-bold text-gray-800">{classDetails.name}</h1>
-        </div>
-        {/* --- 학생 추가 Input/Button --- */}
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={newStudentName}
-            onChange={(e) => setNewStudentName(e.target.value)}
-            onKeyPress={handleAddStudentKeyPress}
-            placeholder="추가할 학생 이름"
-            className="px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm shadow-sm"
-          />
-          <button
-            onClick={handleAddStudent}
-            disabled={!newStudentName.trim() || addStudentMutation.isPending}
-            className="px-4 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600 shadow disabled:opacity-50"
-           >
-            {addStudentMutation.isPending ? '추가중...' : '추가'}
-          </button>
-        </div>
-      </header>
+    <div className="min-h-screen bg-gray-100">
+      <div className="max-w-screen-xl mx-auto px-4 py-8 flex flex-col h-screen">
 
-      {/* 컨트롤 패널 (배치 변경, 학생 초기화 버튼 추가) */} 
-      <div className="mb-4 flex flex-wrap justify-between items-center gap-4 bg-white p-3 rounded-lg shadow">
-        {/* 관계 필터 */}
-        <div className="flex gap-2 items-center">
-          <span className="font-medium text-sm mr-2">관계 필터:</span>
-          <button onClick={() => setFilterType('ALL')} className={`px-3 py-1 text-xs rounded ${filterType === 'ALL' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'}`}>전체</button>
-          {Object.entries(RELATIONSHIP_TYPES).map(([key, label]) => (
+        {/* 상단 헤더: 수정 */}
+        <header className="mb-4 flex justify-between items-center bg-white p-3 rounded-lg shadow-md flex-shrink-0">
+          <div className="flex items-center gap-4">
             <button
-              key={key}
-              onClick={() => setFilterType(key as keyof typeof RELATIONSHIP_TYPES)}
-              className={`px-3 py-1 text-xs rounded ${filterType === key ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'}`}
-              style={filterType === key ? { backgroundColor: RELATIONSHIP_COLORS[key as keyof typeof RELATIONSHIP_COLORS] } : {}}
+              onClick={() => router.push('/')}
+              className="px-4 py-2 text-sm bg-[#6366f1] text-white rounded-md hover:bg-[#4f46e5] shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:ring-offset-1 transition-all duration-200 cursor-pointer font-semibold hover:-translate-y-0.5 hover:shadow-md"
             >
-              {label}
+              교실 선택
             </button>
-          ))}
-        </div>
-        {/* 기타 컨트롤 버튼 */}
-        <div className="flex gap-2">
-          <button onClick={handleChangeLayout} className="px-3 py-1 text-sm bg-indigo-500 text-white rounded hover:bg-indigo-600 shadow">배치 변경</button>
-          <button
-            onClick={handleResetStudents}
-            disabled={resetStudentsMutation.isPending}
-            className="px-3 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600 shadow disabled:opacity-50"
-          >
-            {resetStudentsMutation.isPending ? '초기화중...' : '학생 초기화'}
-          </button>
-        </div>
-      </div>
+            <h1 className="text-xl font-bold text-black">{classDetails.name}</h1>
+          </div>
+        </header>
 
-      {/* 메인 영역 (그래프 + 학생 정보) */}
-      <div className="flex-grow flex gap-4 overflow-hidden">
-        {/* 관계도 그래프 영역 */}
-        <div className="flex-grow bg-white rounded-lg shadow overflow-hidden relative">
-          {students && relationships ? (
-            <RelationshipGraph
-              ref={graphRef}
-              nodes={students}
-              links={filteredRelationships}
-              onNodeClick={handleSelectStudent}
-              selectedNodeId={selectedStudent?.id}
-              classId={classId}
-            />
-          ) : (
-            <div className="flex justify-center items-center h-full">학생 또는 관계 데이터가 없습니다.</div>
-          )}
+        {/* 컨트롤 패널 */}
+        <div className="mb-4 flex flex-wrap justify-between items-center gap-4 bg-white p-3 rounded-lg shadow-md flex-shrink-0">
+          <div className="flex gap-2 items-center flex-wrap">
+            <span className="font-semibold text-sm mr-2 text-[#6366f1]">관계 필터:</span>
+            <button onClick={() => setFilterType('ALL')} className={`px-3 py-1 text-xs rounded transition-all duration-200 ${filterType === 'ALL' ? 'bg-[#6366f1] text-white shadow' : 'bg-gray-100 text-gray-700 hover:bg-[#e0e7ff]'}`}>전체</button>
+            {Object.entries(RELATIONSHIP_TYPES).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setFilterType(key as keyof typeof RELATIONSHIP_TYPES)}
+                className={`px-3 py-1 text-xs rounded transition-all duration-200 ${filterType === key ? 'text-white shadow' : 'bg-gray-100 text-gray-700 hover:bg-[#e0e7ff]'}`}
+                style={filterType === key ? { backgroundColor: RELATIONSHIP_COLORS[key as keyof typeof RELATIONSHIP_COLORS] } : {}}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <button 
+              onClick={handleChangeLayout} 
+              className="px-4 py-2 text-sm bg-[#6366f1] text-white rounded-md hover:bg-[#4f46e5] shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:ring-offset-1 transition-all duration-200 cursor-pointer font-semibold hover:-translate-y-0.5 hover:shadow-md"
+            >
+              배치 변경
+            </button>
+            <button
+              onClick={handleResetStudents}
+              disabled={resetStudentsMutation.isPending}
+              className="px-4 py-2 text-sm bg-red-500 text-white rounded-md hover:bg-red-600 shadow focus:outline-none focus:ring-2 focus:ring-red-300 focus:ring-offset-1 transition-all duration-200 cursor-pointer font-semibold disabled:opacity-70 disabled:cursor-not-allowed hover:disabled:-translate-y-0 hover:disabled:shadow hover:-translate-y-0.5 hover:shadow-md"
+            >
+              {resetStudentsMutation.isPending ? '초기화중...' : '학생 초기화'}
+            </button>
+          </div>
         </div>
 
-        {/* 학생 정보 사이드바 (질문 목록 추가) */}
-        <aside className="w-80 flex flex-col gap-4"> {/* 너비 살짝 증가 */}
-          {/* 학생 리스트 */}
-          <div className="bg-white rounded-lg shadow p-3 flex-shrink-0 h-1/4 overflow-y-auto"> {/* 높이 조정 */} 
-            <h3 className="text-base font-semibold mb-2 border-b pb-1 text-gray-700">학생 목록 ({students?.length || 0}명)</h3>
-            {students && students.length > 0 ? (
-              <ul className="space-y-1">
-                {students.map(student => (
-                  <StudentListItem
-                    key={student.id}
-                    student={student}
-                    classId={classId}
-                    onSelect={handleSelectStudent}
-                    isSelected={selectedStudent?.id === student.id}
-                    onUpdateStudent={handleUpdateStudent}
-                    onDeleteStudent={handleDeleteStudent}
-                  />
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-gray-500">등록된 학생이 없습니다.</p>
-            )}
+        <div className="flex-grow flex flex-col md:flex-row gap-4 overflow-hidden">
+
+          <div className="w-full md:w-[250px] bg-white rounded-lg shadow-md flex flex-col flex-shrink-0">
+            <h3 className="text-base font-semibold p-3 border-b text-[#6366f1] flex-shrink-0">
+              학생 목록 ({students?.length || 0}명)
+            </h3>
+            <div className="p-3 border-b">
+              <div className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  value={newStudentName}
+                  onChange={(e) => setNewStudentName(e.target.value)}
+                  onKeyPress={handleAddStudentKeyPress}
+                  placeholder="학생 이름 입력"
+                  className="flex-grow min-w-0 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-300 text-sm shadow-sm text-black placeholder:text-gray-500"
+                />
+                <button
+                  onClick={handleAddStudent}
+                  disabled={!newStudentName.trim() || addStudentMutation.isPending}
+                  className="px-3 py-1 text-sm bg-[#6366f1] text-white rounded-md shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:ring-offset-1 transition-all duration-200 cursor-pointer font-semibold disabled:opacity-70 disabled:cursor-not-allowed flex-shrink-0"
+                >
+                  {addStudentMutation.isPending ? '추가중...' : '추가'}
+                </button>
+              </div>
+            </div>
+            <div className="flex-grow overflow-y-auto p-2 space-y-2">
+              <AnimatePresence mode='popLayout'>
+                {students && students.length > 0 ? (
+                  students.map(student => (
+                    <motion.div
+                      key={student.id}
+                      layout
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.2, type: "spring", stiffness: 100, damping: 15 }}
+                    >
+                      <StudentListItem
+                        student={student}
+                        classId={classId}
+                        onSelect={handleSelectStudent}
+                        isSelected={selectedStudent?.id === student.id}
+                        onUpdateStudent={handleUpdateStudent}
+                        onDeleteStudent={handleDeleteStudent}
+                      />
+                    </motion.div>
+                  ))
+                ) : (
+                  <p className="text-sm text-gray-500 p-3 italic text-center">등록된 학생이 없습니다.</p>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
 
-          {/* 관계 순위 */}
-          <div className="flex-shrink-0 h-1/4"> {/* 높이 조정 */} 
-            {students && relationships ? (
-              <RelationshipRanking students={students} relationships={relationships} />
-            ) : (
-              <div className="bg-white rounded-lg shadow p-3 h-full flex items-center justify-center text-sm text-gray-400">랭킹 데이터 로딩 중...</div>
-            )}
-          </div>
-
-          {/* --- 주관식 질문 목록 --- */}
-          <div className="bg-white rounded-lg shadow p-3 flex-shrink-0 h-1/4 overflow-y-auto"> {/* 높이 조정 */} 
-            <h3 className="text-base font-semibold mb-2 border-b pb-1 text-gray-700">주관식 질문</h3>
-            {(questions && questions.length > 0) ? (
-              <ul className="space-y-1 text-sm text-gray-700">
-                {questions.map((q, index) => (
-                  <li key={q.id} className="pl-2">{index + 1}. {q.question_text}</li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-gray-400 italic">등록된 질문이 없습니다.</p>
-            )}
-          </div>
-
-          {/* 주관식 답변 */}
-          <div className="bg-white rounded-lg shadow p-3 flex-grow overflow-y-auto"> {/* 높이 조정 */} 
-            <h3 className="text-base font-semibold mb-2 border-b pb-1 text-gray-700">선택 학생 답변</h3>
-            {selectedStudent ? (
-              isLoadingAnswers ? (
-                <p className="text-sm text-gray-500">답변 로딩 중...</p>
+          <div className="flex-1 flex flex-col gap-4">
+            <div className="bg-white rounded-lg shadow-md overflow-hidden relative h-[500px] flex-shrink-0">
+              {students && relationships ? (
+                <RelationshipGraph
+                  ref={graphRef}
+                  nodes={students}
+                  links={filteredRelationships}
+                  onNodeClick={handleSelectStudent}
+                  selectedNodeId={selectedStudent?.id}
+                  classId={classId}
+                />
               ) : (
-                <div className="text-sm space-y-3">
-                  <p><span className="font-semibold text-gray-800">선택 학생:</span> {selectedStudent.name}</p>
-                  <div className="text-gray-600 space-y-2">
-                    {(answers && answers.length > 0) ? (
-                      answers.map((answer) => (
-                        <div key={answer.id}>
-                          <p className="font-medium text-xs text-gray-500">
-                            Q: {answer.questions?.question_text || '질문 불러오기 실패'}
-                          </p>
-                          <p className="text-sm pl-2">A: {answer.answer_text || '-'}</p>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-gray-400 italic">저장된 답변이 없습니다.</p>
-                    )}
+                <div className="flex justify-center items-center h-full text-gray-500 italic">학생 또는 관계 데이터가 없습니다.</div>
+              )}
+            </div>
+
+            <div className="w-full flex-shrink-0">
+              <WeeklyAnswersBox
+                  questions={questions}
+                  answers={answers}
+                  selectedStudent={selectedStudent}
+                  isLoadingAnswers={isLoadingAnswers}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 flex-shrink-0">
+              {Object.entries(RELATIONSHIP_TYPES).map(([type, title]) => (
+                  <div key={type} className="min-h-[180px]">
+                      {students && relationships ? (
+                          <RelationshipTypeRankBox
+                              title={title}
+                              students={rankedStudentsByType[type]}
+                              relationshipType={type}
+                          />
+                      ) : (
+                          <div className="bg-white rounded-lg shadow-md p-3 h-full flex items-center justify-center text-sm text-gray-500 italic">
+                              랭킹 데이터 로딩 중...
+                          </div>
+                      )}
                   </div>
-                </div>
-              )
-            ) : (
-              <p className="text-sm text-gray-500">학생을 선택하세요.</p>
-            )}
+              ))}
+            </div>
           </div>
-        </aside>
+        </div>
+
+        {/* 확인 모달 */}
+        <ConfirmModal
+          isOpen={isResetModalOpen}
+          onClose={() => setIsResetModalOpen(false)}
+          onConfirm={confirmResetStudents}
+          title="학생 데이터 초기화"
+          message={`'${classDetails.name}' 학급의 모든 학생 및 관계 데이터를 초기화하시겠습니까? 이 작업은 되돌릴 수 없습니다.`}
+          confirmText="초기화"
+        />
       </div>
-      {/* 학생 초기화 확인 모달 */} 
-      <ConfirmModal
-        isOpen={isResetModalOpen}
-        onClose={() => setIsResetModalOpen(false)}
-        onConfirm={confirmResetStudents}
-        title="학생 데이터 초기화"
-        message={`'${classDetails.name}' 학급의 모든 학생 및 관계 데이터를 초기화하시겠습니까? 이 작업은 되돌릴 수 없습니다.`}
-        confirmText="초기화"
-      />
     </div>
   );
 }

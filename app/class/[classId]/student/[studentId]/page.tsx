@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, Student, Relationship, Question, Answer } from '@/lib/supabase';
 import { RELATIONSHIP_TYPES, RELATIONSHIP_COLORS } from '@/lib/constants';
 import ConfirmModal from '@/components/ConfirmModal';
-import { ArrowUturnLeftIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { ArrowUturnLeftIcon, PlusIcon, TrashIcon, ExclamationCircleIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
 // 학생 데이터 타입 (간단 버전)
@@ -22,9 +22,16 @@ type AnswerSetting = {
     [questionId: string]: string;
 };
 
+// Student 타입에 gender 추가 (Supabase 스키마에 gender 컬럼 필요)
+type CurrentStudentData = Student & { gender?: 'MALE' | 'FEMALE' | null }; 
+
 // --- 데이터 Fetching 함수 ---
-async function fetchCurrentStudent(studentId: string): Promise<Student | null> {
-    const { data, error } = await supabase.from('students').select('*').eq('id', studentId).single();
+async function fetchCurrentStudent(studentId: string): Promise<CurrentStudentData | null> {
+    const { data, error } = await supabase
+        .from('students')
+        .select('*, gender') // gender 필드 조회 추가
+        .eq('id', studentId)
+        .single();
     if (error) { console.error('Error fetching current student:', error); return null; }
     return data;
 }
@@ -32,9 +39,10 @@ async function fetchCurrentStudent(studentId: string): Promise<Student | null> {
 async function fetchOtherStudents(classId: string, currentStudentId: string): Promise<TargetStudent[]> {
     const { data, error } = await supabase
         .from('students')
-        .select('id, name')
+        .select('id, name') // 다른 학생은 gender 필요 없음
         .eq('class_id', classId)
-        .neq('id', currentStudentId); // 본인 제외
+        .neq('id', currentStudentId)
+        .order('name'); // 이름순 정렬
     if (error) { console.error('Error fetching other students:', error); return []; }
     return data;
 }
@@ -152,6 +160,16 @@ async function deleteQuestionAndAnswers(questionId: string): Promise<void> {
     if (qError) throw new Error(`질문 삭제 실패: ${qError.message}`);
 }
 
+// 학생 성별 업데이트 함수 수정
+async function updateStudentGender(studentId: string, gender: 'MALE' | 'FEMALE' | null): Promise<void> {
+    // DB에 저장하기 전에 소문자로 변환 (또는 DB 제약조건에 맞는 다른 값으로)
+    const valueToSave = gender ? gender.toLowerCase() : null;
+    const { error } = await supabase
+        .from('students')
+        .update({ gender: valueToSave }) // 소문자 또는 null 값으로 업데이트
+        .eq('id', studentId);
+    if (error) throw new Error(`성별 업데이트 실패: ${error.message}`);
+}
 
 export default function StudentRelationshipEditorPage() {
     const params = useParams();
@@ -166,15 +184,17 @@ export default function StudentRelationshipEditorPage() {
     const [newQuestionText, setNewQuestionText] = useState('');
     const [questionToDelete, setQuestionToDelete] = useState<Question | null>(null);
     const [initialRelationshipsData, setInitialRelationshipsData] = useState<RelationshipSetting>({}); // 초기 관계 데이터 저장용
+    const [selectedGender, setSelectedGender] = useState<'MALE' | 'FEMALE' | null>(null); // 성별 상태 추가
+    const [initialGender, setInitialGender] = useState<'MALE' | 'FEMALE' | null>(null); // 초기 성별 저장용
 
     // --- 데이터 조회 Queries ---
-    const { data: currentStudent, isLoading: isLoadingStudent } = useQuery({
+    const { data: currentStudent, isLoading: isLoadingStudent } = useQuery<CurrentStudentData | null, Error>({
         queryKey: ['student', studentId],
         queryFn: () => fetchCurrentStudent(studentId),
         enabled: !!studentId,
     });
 
-    const { data: otherStudents, isLoading: isLoadingOthers } = useQuery({
+    const { data: otherStudents, isLoading: isLoadingOthers } = useQuery<TargetStudent[], Error>({
         queryKey: ['otherStudents', classId, studentId],
         queryFn: () => fetchOtherStudents(classId, studentId),
         enabled: !!classId && !!studentId,
@@ -198,16 +218,40 @@ export default function StudentRelationshipEditorPage() {
         enabled: !!studentId,
     });
 
-    // onSuccess 로직을 useEffect로 이동
+    // --- 데이터 로딩 및 상태 초기화 ---
     useEffect(() => {
-        if (initialRelationships) {
+        if (currentStudent) {
+            const genderFromDB = currentStudent.gender; // 타입은 'male' | 'female' | null | undefined 일 수 있음
+
+            // DB 값이 문자열 'male' 또는 'female'일 때만 대문자로 변환하여 상태 설정
+            let genderForState: 'MALE' | 'FEMALE' | null = null;
+            if (typeof genderFromDB === 'string') {
+                 // toUpperCase() 호출 전 타입 가드 강화
+                 if (genderFromDB === 'male' || genderFromDB === 'female') {
+                     genderForState = genderFromDB.toUpperCase() as 'MALE' | 'FEMALE';
+                 }
+            }
+
+            console.log("Fetched student gender:", genderFromDB);
+            console.log("Setting state gender to:", genderForState); // 대문자 또는 null
+
+            setSelectedGender(genderForState);
+            setInitialGender(genderForState);
+        } else {
+             setSelectedGender(null);
+             setInitialGender(null);
+        }
+    }, [currentStudent]);
+
+    useEffect(() => {
+        if (initialRelationships != null && typeof initialRelationships === 'object') {
             setRelationshipSettings(initialRelationships);
-            setInitialRelationshipsData(initialRelationships); // 초기 데이터 백업
+            setInitialRelationshipsData(initialRelationships);
         }
     }, [initialRelationships]);
 
     useEffect(() => {
-        if (initialAnswers) {
+        if (initialAnswers != null && typeof initialAnswers === 'object') {
             setAnswerSettings(initialAnswers);
         }
     }, [initialAnswers]);
@@ -257,6 +301,17 @@ export default function StudentRelationshipEditorPage() {
         }
     });
 
+    // 성별 업데이트 Mutation 추가
+    const updateStudentGenderMutation = useMutation<void, Error, {"gender": 'MALE' | 'FEMALE' | null}>({
+        mutationFn: ({ gender }) => updateStudentGender(studentId, gender),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['student', studentId] });
+        },
+        onError: (error) => {
+            toast.error(`성별 업데이트 실패: ${error.message}`);
+        }
+    });
+
     // --- 핸들러 함수들 ---
     const handleRelationshipChange = (targetId: string, type: keyof typeof RELATIONSHIP_TYPES | null) => {
         setRelationshipSettings(prev => ({ ...prev, [targetId]: type }));
@@ -269,6 +324,13 @@ export default function StudentRelationshipEditorPage() {
     const handleAddQuestion = () => {
         if (newQuestionText.trim()) {
             addQuestionMutation.mutate(newQuestionText.trim());
+        }
+    };
+
+    // Enter 키 핸들러 추가
+    const handleAddQuestionKeyPress = (event: React.KeyboardEvent<HTMLInputElement>) => {
+        if (event.key === 'Enter') {
+            handleAddQuestion();
         }
     };
 
@@ -290,21 +352,39 @@ export default function StudentRelationshipEditorPage() {
         });
     };
 
-    const handleGoBack = () => {
-        saveSettingsMutation.mutate();
+    // 돌아가기 핸들러 수정 (성별 업데이트 조건 강화)
+    const handleGoBack = async () => {
+        try {
+            // 1. 관계/답변 저장 먼저 실행
+            await saveSettingsMutation.mutateAsync();
+
+            // 2. 성별 변경 시 성별 업데이트 실행 (MALE 또는 FEMALE일 때만)
+            if (selectedGender !== initialGender && (selectedGender === 'MALE' || selectedGender === 'FEMALE')) {
+                await updateStudentGenderMutation.mutateAsync({ gender: selectedGender });
+            }
+            // 참고: 만약 성별을 null로 되돌리는 기능이 필요하고 DB 제약조건이 NULL을 허용한다면,
+            // else if (selectedGender !== initialGender && selectedGender === null) {
+            //     await updateStudentGenderMutation.mutateAsync({ gender: null });
+            // }
+
+            // 모든 저장이 성공하면 페이지 이동
+            router.push(`/class/${classId}`);
+        } catch (error) {
+            console.error("저장 중 오류 발생:", error);
+        }
     };
 
     // --- 로딩 / 에러 처리 ---
-    const isLoading = isLoadingStudent || isLoadingOthers || isLoadingRels || isLoadingQuestions || isLoadingAnswers || saveSettingsMutation.isPending || addQuestionMutation.isPending || deleteQuestionMutation.isPending;
+    const isLoading = isLoadingStudent || isLoadingOthers || isLoadingRels || isLoadingQuestions || isLoadingAnswers || saveSettingsMutation.isPending || addQuestionMutation.isPending || deleteQuestionMutation.isPending || updateStudentGenderMutation.isPending;
 
     if (!studentId || !classId) {
         return <div>잘못된 접근입니다.</div>; // ID가 없는 경우
     }
 
-    if (isLoading && !(saveSettingsMutation.isPending || addQuestionMutation.isPending || deleteQuestionMutation.isPending)) {
+    if (isLoading && !(saveSettingsMutation.isPending || addQuestionMutation.isPending || deleteQuestionMutation.isPending || updateStudentGenderMutation.isPending)) {
         return (
-            <div className="flex justify-center items-center h-screen">
-                <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div>
+            <div className="flex justify-center items-center h-screen bg-gray-50">
+                <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-indigo-500"></div>
             </div>
         );
     }
@@ -315,133 +395,161 @@ export default function StudentRelationshipEditorPage() {
     }
 
     return (
-        <div className="p-6 bg-gray-50 min-h-screen">
-            {/* 상단 헤더 & 돌아가기 버튼 */}
-            <div className="flex justify-between items-center mb-6 pb-4 border-b">
-                <h1 className="text-2xl font-bold text-gray-800">{currentStudent.name} 학생 관계 설정</h1>
-                <button
-                    onClick={handleGoBack}
-                    disabled={saveSettingsMutation.isPending}
-                    className={`flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${saveSettingsMutation.isPending ? 'animate-pulse' : ''}`}
-                >
-                    {saveSettingsMutation.isPending ? (
-                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                    ) : (
-                        <ArrowUturnLeftIcon className="h-4 w-4 mr-2" />
-                    )}
-                    {saveSettingsMutation.isPending ? '저장 중...' : '저장하고 돌아가기'}
-                </button>
-            </div>
+        <div className="min-h-screen bg-white p-6">
+            <div className="max-w-screen-lg mx-auto">
+                <header className="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
+                    <div className="flex items-center gap-4">
+                        <h1 className="text-xl font-bold text-gray-800">
+                            {currentStudent.name}의 관계 설정
+                        </h1>
+                        {/* 성별 선택 버튼 그룹 */}
+                        <div className="flex items-center space-x-1 bg-gray-100 p-0.5 rounded-lg">
+                            <button
+                                onClick={() => setSelectedGender('MALE')}
+                                className={`px-3 py-1 text-xs rounded-md transition-colors duration-150 ${selectedGender === 'MALE' ? 'bg-[#6366f1] text-white shadow-sm font-semibold' : 'text-gray-500 hover:text-gray-700'}`}
+                            >
+                                남학생
+                            </button>
+                            <button
+                                onClick={() => setSelectedGender('FEMALE')}
+                                className={`px-3 py-1 text-xs rounded-md transition-colors duration-150 ${selectedGender === 'FEMALE' ? 'bg-[#6366f1] text-white shadow-sm font-semibold' : 'text-gray-500 hover:text-gray-700'}`}
+                            >
+                                여학생
+                            </button>
+                        </div>
+                    </div>
+                    <button
+                        onClick={handleGoBack}
+                        disabled={saveSettingsMutation.isPending || updateStudentGenderMutation.isPending} // 성별 저장 중에도 비활성화
+                        className="px-4 py-2 text-sm bg-[#6366f1] text-white rounded-lg hover:bg-[#4f46e5] transition-colors duration-200 font-semibold flex items-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                        {(saveSettingsMutation.isPending || updateStudentGenderMutation.isPending) ? (
+                           <svg className="animate-spin -ml-1 mr-1 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                           </svg>
+                        ) : <ArrowUturnLeftIcon className="w-4 h-4" />}
+                        {(saveSettingsMutation.isPending || updateStudentGenderMutation.isPending) ? '저장중...' : '돌아가기'}
+                    </button>
+                </header>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* 관계 설정 영역 */}
-                <div className="bg-white p-4 rounded-lg shadow">
-                    <h2 className="text-lg font-semibold mb-4 border-b pb-2 text-gray-700">친구 관계 설정</h2>
-                    <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
+                <div className="mb-8 bg-white p-4 rounded-xl shadow-md">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                         {otherStudents && otherStudents.length > 0 ? (
-                            otherStudents.map(target => (
-                                <div key={target.id} className="p-3 border rounded-md hover:shadow-md transition-shadow">
-                                    <p className="font-medium mb-2 text-gray-800">{target.name}</p>
-                                    <div className="flex gap-2 flex-wrap">
-                                        {(Object.keys(RELATIONSHIP_TYPES) as Array<keyof typeof RELATIONSHIP_TYPES>).map(type => (
-                                            <button
-                                                key={type}
-                                                onClick={() => handleRelationshipChange(target.id, type === relationshipSettings[target.id] ? null : type)}
-                                                className={`px-3 py-1 text-xs rounded-full border transition-colors ${relationshipSettings[target.id] === type ? 'text-white shadow-inner' : 'text-gray-600 bg-gray-50 hover:bg-gray-100'}`}
-                                                style={relationshipSettings[target.id] === type ? { backgroundColor: RELATIONSHIP_COLORS[type] || '#CCCCCC' } : {}}
-                                            >
-                                                {RELATIONSHIP_TYPES[type]}
-                                            </button>
-                                        ))}
+                            otherStudents.map(target => {
+                                const currentRelation = relationshipSettings[target.id] || null;
+                                return (
+                                    <div key={target.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 flex flex-col justify-between">
+                                        <p className="font-semibold text-center mb-3 text-black truncate">{target.name}</p>
+                                        <div className="flex justify-center gap-1.5">
+                                            {(Object.keys(RELATIONSHIP_TYPES) as Array<keyof typeof RELATIONSHIP_TYPES>).map(type => {
+                                                const isSelected = currentRelation === type;
+                                                // 이미지 기반 색상 조정 (예시)
+                                                const selectedBgColor = RELATIONSHIP_COLORS[type] || 'bg-indigo-500'; // 기본 색상 제공
+                                                const selectedTextColor = 'text-white';
+                                                const defaultBgColor = 'bg-gray-100';
+                                                const defaultTextColor = 'text-gray-600';
+                                                const hoverBgColor = `hover:brightness-95`;
+
+                                                return (
+                                                    <button
+                                                        key={type}
+                                                        onClick={() => handleRelationshipChange(target.id, isSelected ? null : type)}
+                                                        className={`px-3 py-1 text-xs rounded-full transition-all duration-150 ${hoverBgColor} ${isSelected ? `${selectedTextColor}` : `${defaultBgColor} ${defaultTextColor}`}`}
+                                                        style={isSelected ? { backgroundColor: selectedBgColor } : {}}
+                                                    >
+                                                        {RELATIONSHIP_TYPES[type]}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
-                                </div>
-                            ))
+                                );
+                            })
                         ) : (
-                            <p className="text-gray-500 text-sm">같은 반에 다른 학생이 없습니다.</p>
+                            <p className="text-gray-500 italic col-span-full text-center py-4">같은 반에 다른 학생이 없습니다.</p>
                         )}
                     </div>
                 </div>
 
-                {/* 주관식 질문/답변 영역 */}
-                <div className="space-y-6">
-                    {/* 질문 추가 영역 */}
-                    <div className="bg-white p-4 rounded-lg shadow">
-                        <h3 className="text-md font-semibold mb-3 text-gray-700">새 질문 추가 (선생님용)</h3>
-                        <div className="flex items-center space-x-2">
-                            <input
-                                type="text"
-                                value={newQuestionText}
-                                onChange={(e) => setNewQuestionText(e.target.value)}
-                                placeholder="질문 내용을 입력하세요..."
-                                className="flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                                disabled={addQuestionMutation.isPending}
-                            />
-                            <button
-                                onClick={handleAddQuestion}
-                                disabled={addQuestionMutation.isPending || !newQuestionText.trim()}
-                                className={`inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed ${addQuestionMutation.isPending ? 'animate-pulse' : ''}`}
-                            >
-                                {addQuestionMutation.isPending ? (
-                                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                ) : (
-                                    <PlusIcon className="h-4 w-4" />
-                                )}
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* 답변 영역 */}
-                    <div className="bg-white p-4 rounded-lg shadow">
-                        <h2 className="text-lg font-semibold mb-4 border-b pb-2 text-gray-700">주관식 답변 작성</h2>
-                        <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2">
-                            {questions && questions.length > 0 ? (
-                                questions.map(question => (
-                                    <div key={question.id} className="border-b pb-3 last:border-b-0">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <label htmlFor={`answer-${question.id}`} className="block text-sm font-medium text-gray-700 flex-1 mr-2">{question.question_text}</label>
-                                            <button
-                                                onClick={() => handleDeleteQuestionClick(question)}
-                                                disabled={deleteQuestionMutation.isPending && questionToDelete?.id === question.id}
-                                                className={`text-red-500 hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed p-1 rounded-full hover:bg-red-100 transition-colors ${deleteQuestionMutation.isPending && questionToDelete?.id === question.id ? 'animate-pulse' : ''}`}
-                                            >
-                                                <TrashIcon className="h-4 w-4" />
-                                            </button>
-                                        </div>
-                                        <textarea
-                                            id={`answer-${question.id}`}
-                                            rows={3}
-                                            value={answerSettings[question.id] || ''}
-                                            onChange={(e) => handleAnswerChange(question.id, e.target.value)}
-                                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                                            placeholder="답변을 입력하세요..."
-                                        />
-                                    </div>
-                                ))
-                            ) : (
-                                <p className="text-gray-500 text-sm">등록된 질문이 없습니다.</p>
-                            )}
-                        </div>
+                <div className="mb-8 bg-white p-4 rounded-xl shadow-md">
+                    <h2 className="text-lg font-semibold mb-3 text-[#6366f1] border-b pb-2">주관식 질문 추가</h2>
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            value={newQuestionText}
+                            onChange={(e) => setNewQuestionText(e.target.value)}
+                            onKeyPress={handleAddQuestionKeyPress}
+                            placeholder="새로운 주관식 질문을 입력하세요"
+                            className="flex-grow min-w-0 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6366f1] text-sm text-black placeholder:text-gray-500"
+                            disabled={addQuestionMutation.isPending}
+                        />
+                        <button
+                            onClick={handleAddQuestion}
+                            disabled={!newQuestionText.trim() || addQuestionMutation.isPending}
+                            className="px-4 py-2 text-sm bg-[#6366f1] text-white rounded-lg hover:bg-[#4f46e5] disabled:opacity-60 transition-colors duration-200 flex-shrink-0 flex items-center gap-1"
+                        >
+                            {addQuestionMutation.isPending ? '추가중...' : '추가'}
+                        </button>
                     </div>
                 </div>
-            </div>
 
-            {/* 질문 삭제 확인 모달 */}
-            {questionToDelete && (
-                <ConfirmModal
-                    isOpen={!!questionToDelete}
-                    onClose={() => setQuestionToDelete(null)}
-                    onConfirm={confirmDeleteQuestion}
-                    title="질문 삭제 확인"
-                    message={`'${questionToDelete.question_text}' 질문을 정말 삭제하시겠습니까? 이 질문에 대한 모든 학생의 답변도 함께 삭제됩니다.`}
-                    confirmText="삭제"
-                />
-            )}
+                <div className="bg-white p-4 rounded-xl shadow-md">
+                    <h2 className="text-lg font-semibold mb-3 text-[#6366f1] border-b pb-2">주관식 내용 입력</h2>
+                    {questions && questions.length > 0 ? (
+                        <div className="space-y-4">
+                            {questions.map((q) => (
+                                <div key={q.id}>
+                                    <div className="flex justify-between items-center mb-1.5">
+                                        <label htmlFor={`answer-${q.id}`} className="block text-sm font-medium text-gray-700">
+                                            {q.question_text}
+                                        </label>
+                                        <button
+                                            onClick={() => handleDeleteQuestionClick(q)}
+                                            disabled={deleteQuestionMutation.isPending && questionToDelete?.id === q.id}
+                                            className="text-xs text-red-600 bg-red-100 hover:bg-red-200 px-2 py-1 rounded-md disabled:opacity-50 transition-colors duration-150 flex items-center gap-0.5"
+                                            title="질문 삭제"
+                                        >
+                                            <TrashIcon className="w-3 h-3" /> 삭제
+                                        </button>
+                                    </div>
+                                    <textarea
+                                        id={`answer-${q.id}`}
+                                        rows={3}
+                                        value={answerSettings[q.id] || ''}
+                                        onChange={(e) => handleAnswerChange(q.id, e.target.value)}
+                                        placeholder="답변을 입력하세요..."
+                                        className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#6366f1] text-sm text-black placeholder:text-gray-500 resize-none"
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-gray-500 italic text-center py-4">등록된 주관식 질문이 없습니다.</p>
+                    )}
+                </div>
+
+                <div className="mt-8 flex justify-center">
+                    <button
+                        onClick={handleGoBack}
+                        disabled={saveSettingsMutation.isPending || updateStudentGenderMutation.isPending}
+                        className="px-6 py-3 text-base bg-[#6366f1] text-white rounded-lg hover:bg-[#4f46e5] transition-colors duration-200 font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                        {(saveSettingsMutation.isPending || updateStudentGenderMutation.isPending) ? '저장중...' : '돌아가기'}
+                    </button>
+                </div>
+
+                {questionToDelete && (
+                    <ConfirmModal
+                        isOpen={!!questionToDelete}
+                        onClose={() => setQuestionToDelete(null)}
+                        onConfirm={confirmDeleteQuestion}
+                        title="질문 삭제 확인"
+                        message={`'${questionToDelete.question_text}' 질문과 이 질문에 대한 모든 학생들의 답변을 삭제하시겠습니까?`}
+                        confirmText="삭제"
+                    />
+                )}
+            </div>
         </div>
     );
 }

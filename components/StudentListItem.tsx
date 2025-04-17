@@ -79,63 +79,67 @@ export default function StudentListItem({
     } catch (error) {
       console.error("Student delete failed:", error);
       alert("학생 삭제에 실패했습니다.");
+    } finally {
       setIsDeleteDialogOpen(false);
     }
   };
 
-  const handleItemClick = () => {
+  const handleCardClick = () => {
     if (isEditing) return;
+    onSelect(student);
     router.push(`/class/${classId}/student/${student.id}`);
   };
 
   return (
-    <li
-      className={`group relative flex items-center justify-between text-sm p-2 rounded hover:bg-gray-100 cursor-pointer ${isSelected ? 'bg-blue-100 font-medium' : ''}`}
+    <div
+      className={`relative group rounded-lg shadow-md p-3 transition-transform duration-200 cursor-pointer text-sm ${isSelected ? 'bg-indigo-100 scale-[1.02] shadow-lg' : 'bg-white hover:shadow-lg hover:scale-[1.03]'}`}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
-      onClick={handleItemClick}
-      title={`클릭하여 ${student.name} 학생 정보 보기`}
+      onClick={handleCardClick}
+      title={student.name}
     >
       {isEditing ? (
-        <div className="flex-grow flex items-center gap-1 mr-2">
+        <div className="flex items-center gap-1 w-full">
           <input
             type="text"
             value={editedName}
             onChange={handleNameChange}
             onKeyDown={handleKeyPress}
-            className="flex-grow border-b border-blue-500 px-1 py-0.5 text-sm focus:outline-none"
+            className="flex-grow border-b border-[#6366f1] px-1 py-0.5 text-sm focus:outline-none bg-transparent text-black"
             autoFocus
             onClick={(e) => e.stopPropagation()}
           />
-          <button onClick={handleSaveClick} className="p-0.5 text-green-600 hover:text-green-800">
+          <button onClick={handleSaveClick} className="p-0.5 text-green-600 hover:text-green-800 flex-shrink-0">
             <CheckIcon className="w-4 h-4" />
           </button>
-          <button onClick={handleCancelClick} className="p-0.5 text-red-600 hover:text-red-800">
+          <button onClick={handleCancelClick} className="p-0.5 text-red-600 hover:text-red-800 flex-shrink-0">
             <XMarkIcon className="w-4 h-4" />
           </button>
         </div>
       ) : (
-        <span className="truncate flex-grow" title={student.name}>{student.name}</span>
+        <p className="text-center font-medium truncate text-black" title={student.name}>
+          {student.name}
+        </p>
       )}
 
-      {isHovering && !isEditing && (
-        <div className="flex-shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button
-            onClick={handleEditClick}
-            className="p-1 rounded hover:bg-gray-200 text-gray-500 hover:text-blue-600"
-            title="이름 수정"
-          >
-            <PencilIcon className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={handleDeleteClick}
-            className="p-1 rounded hover:bg-gray-200 text-gray-500 hover:text-red-600"
-            title="삭제"
-          >
-            <TrashIcon className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
+      <div
+        className={`absolute top-1 right-1 flex items-center gap-0.5 transition-opacity duration-150 ${isHovering && !isEditing ? 'opacity-100' : 'opacity-0 group-hover:opacity-50'}`}
+      >
+        <button
+          onClick={handleEditClick}
+          className="p-1 rounded-full hover:bg-gray-200 text-gray-400 hover:text-blue-600"
+          title="이름 수정"
+        >
+          <PencilIcon className="w-3 h-3" />
+        </button>
+        <button
+          onClick={handleDeleteClick}
+          className="p-1 rounded-full hover:bg-gray-200 text-gray-400 hover:text-red-600"
+          title="삭제"
+        >
+          <TrashIcon className="w-3 h-3" />
+        </button>
+      </div>
 
       <ConfirmModal
         isOpen={isDeleteDialogOpen}
@@ -145,6 +149,6 @@ export default function StudentListItem({
         message={`'${student.name}' 학생을 정말 삭제하시겠습니까? 관련된 모든 관계 및 답변 데이터도 삭제됩니다.`}
         confirmText="삭제"
       />
-    </li>
+    </div>
   );
 } 

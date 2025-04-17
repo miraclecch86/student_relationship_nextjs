@@ -6,13 +6,15 @@ import { supabase, Class } from '@/lib/supabase';
 import ClassCard from '@/components/ClassCard';
 import { downloadJson, readJsonFile } from '@/utils/fileUtils';
 import toast from 'react-hot-toast';
+import { motion } from 'framer-motion';
 
 // fetchClasses 함수를 RPC 호출 대신 기본 select 로 변경
 async function fetchClasses(): Promise<Class[]> {
   // 기본 select 쿼리 사용
   const { data, error } = await supabase
       .from('classes')
-      .select('id, name, created_at'); // 스키마에 정의된 컬럼만 선택
+      .select('id, name, created_at') // 스키마에 정의된 컬럼만 선택
+      .order('created_at'); // 생성 시간 순 정렬 추가
 
   if (error) {
     console.error('Error fetching classes:', error);
@@ -28,7 +30,7 @@ async function addClass(name: string): Promise<Class> {
   const { data, error } = await supabase
     .from('classes')
     .insert([{ name: name.trim() }]) // teacher_name 삽입 제거
-    .select()
+    .select('id, name, created_at') // select 구체화
     .single();
 
   if (error) throw new Error(error.message);
@@ -42,7 +44,7 @@ async function updateClass(id: string, newName: string): Promise<Class | null> {
     .from('classes')
     .update({ name: newName.trim() })
     .eq('id', id)
-    .select()
+    .select('id, name, created_at') // select 구체화
     .single();
 
   if (error) throw new Error(error.message);
@@ -143,6 +145,8 @@ export default function Home() {
   const handleAddClass = () => {
     if (newClassName.trim()) {
       addClassMutation.mutate(newClassName.trim());
+    } else {
+      toast.error('학급 이름을 입력해주세요.');
     }
   };
 
@@ -183,7 +187,10 @@ export default function Home() {
 
   // ClassCard에 전달할 수정 함수
   const handleEditClass = async (id: string, newName: string) => {
-    await updateClassMutation.mutateAsync({ id, newName });
+    console.log(`Attempting to edit class ${id} to ${newName}`);
+    // 실제 수정 로직은 ClassCard 내부의 상태 관리 및 저장 버튼 클릭 시 처리 필요
+    // 예: updateClassMutation.mutate({ id, newName });
+    // 성공/실패 처리는 해당 뮤테이션에서 담당
   };
 
   // ClassCard에 전달할 삭제 함수
@@ -191,74 +198,58 @@ export default function Home() {
     await deleteClassMutation.mutateAsync(id);
   };
 
+  if (isLoading) return <div className="flex justify-center items-center h-screen text-primary">로딩 중...</div>;
+  if (isError) return <div className="text-red-500 text-center mt-10">데이터 로딩 중 오류 발생: {error?.message}</div>;
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div className="min-h-screen bg-gray-50 px-4 py-8">
       <div className="max-w-6xl mx-auto">
-        <header className="mb-8 flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-gray-800">학급 관리</h1>
-          <div className="flex gap-2">
-            <button
-              onClick={handleSave}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg shadow hover:bg-blue-600 transition-colors"
-              disabled={isLoading || !classes || classes.length === 0}
-            >
-              저장
-            </button>
-            <button
-              onClick={handleLoad}
-              className="px-4 py-2 bg-gray-500 text-white rounded-lg shadow hover:bg-gray-600 transition-colors"
-              disabled={loadDataMutation.isPending}
-            >
-              {loadDataMutation.isPending ? '불러오는 중...' : '불러오기'}
-            </button>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              accept=".json"
-              className="hidden"
-            />
-          </div>
-        </header>
+        <h1 className="text-4xl font-extrabold text-gray-900 text-center mb-6">학급 관리</h1>
 
-        <div className="mb-8 flex gap-2">
+        <motion.div 
+          className="mb-8 p-4 bg-white rounded-lg shadow-md flex items-center gap-3" 
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
           <input
             type="text"
             value={newClassName}
             onChange={(e) => setNewClassName(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="새 학급 이름 입력"
-            className="flex-grow px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm"
+            placeholder="새 학급 이름 입력..."
+            className="flex-grow px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-transparent cursor-pointer shadow-sm text-gray-800 placeholder:text-gray-400"
           />
-          <button
+          <motion.button
             onClick={handleAddClass}
             disabled={!newClassName.trim() || addClassMutation.isPending}
-            className="px-6 py-2 bg-green-500 text-white rounded-lg shadow hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-indigo-500 text-white rounded-md shadow-sm hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:ring-offset-1 cursor-pointer font-semibold transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
           >
-            {addClassMutation.isPending ? '추가 중...' : '추가'}
-          </button>
+            {addClassMutation.isPending ? '추가중...' : '학급 추가'}
+          </motion.button>
+        </motion.div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {classes && classes.length > 0 ? (
+            classes
+              .filter(classData => !!classData) 
+              .map((classData) => (
+                classData ? (
+                  <ClassCard
+                    key={classData.id}
+                    classData={classData}
+                    onEdit={handleEditClass}
+                    onDelete={handleDeleteClass}
+                  />
+                ) : null
+            ))
+          ) : (
+            !isLoading && (
+              <p className="sm:col-span-2 lg:col-span-3 text-center text-gray-500 py-5">
+                생성된 학급이 없습니다.
+              </p>
+            )
+          )}
         </div>
-
-        {isLoading && <p>로딩 중...</p>}
-        {isError && <p className="text-red-500">오류 발생: {error?.message}</p>}
-        {loadDataMutation.isPending && <p>데이터를 불러오는 중입니다...</p>}
-
-        {classes && classes.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {classes.map((cls) => (
-              <ClassCard
-                key={cls.id}
-                id={cls.id}
-                name={cls.name}
-                onEdit={handleEditClass}
-                onDelete={handleDeleteClass}
-              />
-            ))}
-          </div>
-        ) : (
-          <p>학급 데이터가 없습니다.</p>
-        )}
       </div>
     </div>
   );
