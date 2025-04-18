@@ -2,14 +2,19 @@
 
 import React, { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase, Class } from '@/lib/supabase';
+import { supabase, Class as BaseClass } from '@/lib/supabase';
 import ClassCard from '@/components/ClassCard';
 import { downloadJson, readJsonFile } from '@/utils/fileUtils';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 
+// 주관식 질문 개수를 포함하는 새로운 인터페이스 정의
+interface ClassWithCount extends BaseClass {
+  subjectiveQuestionCount: number;
+}
+
 // fetchClasses 함수를 RPC 호출 대신 기본 select 로 변경
-async function fetchClasses(): Promise<Class[]> {
+async function fetchClasses(): Promise<ClassWithCount[]> {
   // 기본 select 쿼리 사용
   const { data, error } = await supabase
       .from('classes')
@@ -21,11 +26,28 @@ async function fetchClasses(): Promise<Class[]> {
     throw new Error('학급 정보를 불러오는 중 오류가 발생했습니다.');
   }
 
-  // 반환 타입은 Class[]와 호환됨
-  return data || [];
+  // 2. 각 학급별 주관식 질문 개수 가져오기
+  const classesWithCounts = await Promise.all(
+    data.map(async (cls) => {
+      const { count, error: countError } = await supabase
+        .from('questions')
+        .select('id', { count: 'exact', head: true }) // 개수만 필요
+        .eq('class_id', cls.id)
+        .eq('question_type', 'subjective'); // 주관식 필터링
+
+      if (countError) {
+        console.error(`Error fetching subjective question count for class ${cls.id}:`, countError);
+        // 오류 발생 시 개수를 0으로 처리하거나, 오류를 전파할 수 있음
+        return { ...cls, subjectiveQuestionCount: 0 };
+      }
+      return { ...cls, subjectiveQuestionCount: count ?? 0 };
+    })
+  );
+
+  return classesWithCounts;
 }
 
-async function addClass(name: string): Promise<Class> {
+async function addClass(name: string): Promise<BaseClass> {
   // teacher_name 제거
   const { data, error } = await supabase
     .from('classes')
@@ -39,7 +61,7 @@ async function addClass(name: string): Promise<Class> {
 }
 
 // 학급 수정 함수
-async function updateClass(id: string, newName: string): Promise<Class | null> {
+async function updateClass(id: string, newName: string): Promise<BaseClass | null> {
   const { data, error } = await supabase
     .from('classes')
     .update({ name: newName.trim() })
@@ -63,7 +85,7 @@ async function deleteClass(id: string): Promise<void> {
 }
 
 // 불러온 데이터로 학급 및 학생 데이터 교체 함수 (RPC 호출로 변경)
-async function replaceAllClasses(loadedClasses: Omit<Class, 'id' | 'created_at'>[]): Promise<void> {
+async function replaceAllClasses(loadedClasses: Omit<BaseClass, 'id' | 'created_at'>[]): Promise<void> {
     // RPC 함수 호출로 변경: 모든 클래스/학생 삭제 후 새 데이터 삽입
     // 참고: Supabase RPC는 기본적으로 JSON을 지원합니다.
     const classesToInsert = loadedClasses.map(cls => ({ name: cls.name }));
@@ -81,13 +103,13 @@ export default function Home() {
   const [newClassName, setNewClassName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: classes, isLoading, isError, error } = useQuery<Class[], Error>({
+  const { data: classes, isLoading, isError, error } = useQuery<ClassWithCount[], Error>({
     queryKey: ['classes'],
     queryFn: fetchClasses,
   });
 
   // 학급 추가 Mutation
-  const addClassMutation = useMutation<Class, Error, string>({
+  const addClassMutation = useMutation<BaseClass, Error, string>({
     mutationFn: addClass,
     onSuccess: (newClass) => {
       queryClient.invalidateQueries({ queryKey: ['classes'] });
@@ -100,7 +122,7 @@ export default function Home() {
   });
 
   // 학급 수정 Mutation
-  const updateClassMutation = useMutation<Class | null, Error, { id: string; newName: string }>({
+  const updateClassMutation = useMutation<BaseClass | null, Error, { id: string; newName: string }>({
     mutationFn: ({ id, newName }) => updateClass(id, newName),
     onSuccess: (updatedClass, variables) => {
       queryClient.invalidateQueries({ queryKey: ['classes'] });
@@ -131,7 +153,7 @@ export default function Home() {
               throw new Error('잘못된 파일 형식입니다. 학급 목록 배열이 필요합니다.');
           }
           // RPC 함수 호출
-          await replaceAllClasses(loadedData as Omit<Class, 'id' | 'created_at'>[]);
+          await replaceAllClasses(loadedData as Omit<BaseClass, 'id' | 'created_at'>[]);
       },
       onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ['classes'] });
@@ -205,6 +227,33 @@ export default function Home() {
     <div className="min-h-screen bg-gray-50 px-4 py-8">
       <div className="max-w-6xl mx-auto">
         <h1 className="text-4xl font-extrabold text-gray-900 text-center mb-6">학급 관리</h1>
+
+        {/* 저장하기 / 불러오기 버튼 추가 */}
+        <div className="flex gap-2 justify-end mb-4">
+          <motion.button
+            onClick={handleSave}
+            className="bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-150"
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            학급 정보 저장하기
+          </motion.button>
+          <motion.button
+            onClick={handleLoad}
+            className="bg-gray-100 text-gray-700 hover:bg-gray-200 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-150"
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            학급 정보 불러오기
+          </motion.button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept=".json"
+            style={{ display: 'none' }} // 숨김 처리
+          />
+        </div>
 
         <motion.div 
           className="mb-8 p-4 bg-white rounded-lg shadow-md flex items-center gap-3" 

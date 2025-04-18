@@ -23,7 +23,8 @@ type AnswerSetting = {
 };
 
 // Student 타입에 gender 추가 (Supabase 스키마에 gender 컬럼 필요)
-type CurrentStudentData = Student & { gender?: 'MALE' | 'FEMALE' | null }; 
+// 타입을 lib/supabase.ts 와 일치시킴 (소문자 사용)
+type CurrentStudentData = Student & { gender?: 'male' | 'female' | null };
 
 // --- 데이터 Fetching 함수 ---
 async function fetchCurrentStudent(studentId: string): Promise<CurrentStudentData | null> {
@@ -36,15 +37,17 @@ async function fetchCurrentStudent(studentId: string): Promise<CurrentStudentDat
     return data;
 }
 
-async function fetchOtherStudents(classId: string, currentStudentId: string): Promise<TargetStudent[]> {
+// 이름순 대신 생성순으로 모든 학생 조회하는 함수로 변경
+async function fetchAllStudentsOrdered(classId: string): Promise<Student[]> { // TargetStudent 대신 Student 사용 (created_at 필요)
     const { data, error } = await supabase
         .from('students')
-        .select('id, name') // 다른 학생은 gender 필요 없음
+        // Student 타입에 필요한 모든 필수 필드 선택
+        .select('id, name, class_id, created_at, gender, position_x, position_y') // 필요한 모든 필드 명시 (Student 타입 기준)
         .eq('class_id', classId)
-        .neq('id', currentStudentId)
-        .order('name'); // 이름순 정렬
-    if (error) { console.error('Error fetching other students:', error); return []; }
-    return data;
+        .order('created_at'); // 생성 시간 순서로 변경
+    if (error) { console.error('Error fetching all students:', error); return []; }
+    // 반환되는 데이터는 Student[] 타입과 호환됨
+    return (data as Student[]) || []; // 타입 단언 추가
 }
 
 async function fetchExistingRelationships(studentId: string): Promise<RelationshipSetting> {
@@ -161,7 +164,7 @@ async function deleteQuestionAndAnswers(questionId: string): Promise<void> {
 }
 
 // 학생 성별 업데이트 함수 수정
-async function updateStudentGender(studentId: string, gender: 'MALE' | 'FEMALE' | null): Promise<void> {
+async function updateStudentGender(studentId: string, gender: 'male' | 'female' | null): Promise<void> {
     // DB에 저장하기 전에 소문자로 변환 (또는 DB 제약조건에 맞는 다른 값으로)
     const valueToSave = gender ? gender.toLowerCase() : null;
     const { error } = await supabase
@@ -184,8 +187,8 @@ export default function StudentRelationshipEditorPage() {
     const [newQuestionText, setNewQuestionText] = useState('');
     const [questionToDelete, setQuestionToDelete] = useState<Question | null>(null);
     const [initialRelationshipsData, setInitialRelationshipsData] = useState<RelationshipSetting>({}); // 초기 관계 데이터 저장용
-    const [selectedGender, setSelectedGender] = useState<'MALE' | 'FEMALE' | null>(null); // 성별 상태 추가
-    const [initialGender, setInitialGender] = useState<'MALE' | 'FEMALE' | null>(null); // 초기 성별 저장용
+    const [selectedGender, setSelectedGender] = useState<'male' | 'female' | null>(null); // 성별 상태 추가
+    const [initialGender, setInitialGender] = useState<'male' | 'female' | null>(null); // 초기 성별 저장용
 
     // --- 데이터 조회 Queries ---
     const { data: currentStudent, isLoading: isLoadingStudent } = useQuery<CurrentStudentData | null, Error>({
@@ -194,11 +197,18 @@ export default function StudentRelationshipEditorPage() {
         enabled: !!studentId,
     });
 
-    const { data: otherStudents, isLoading: isLoadingOthers } = useQuery<TargetStudent[], Error>({
-        queryKey: ['otherStudents', classId, studentId],
-        queryFn: () => fetchOtherStudents(classId, studentId),
-        enabled: !!classId && !!studentId,
+    // otherStudents 대신 allStudentsOrdered 조회
+    const { data: allStudents, isLoading: isLoadingAllStudents } = useQuery<Student[], Error>({
+        queryKey: ['allStudentsOrdered', classId], // 쿼리 키 변경
+        queryFn: () => fetchAllStudentsOrdered(classId), // 새 함수 사용
+        enabled: !!classId,
     });
+
+    // allStudents에서 현재 학생 제외하여 otherStudents 생성
+    const otherStudents = useMemo(() => {
+        if (!allStudents) return [];
+        return allStudents.filter(student => student.id !== studentId);
+    }, [allStudents, studentId]);
 
     const { data: initialRelationships, isLoading: isLoadingRels } = useQuery<RelationshipSetting, Error>({
         queryKey: ['relations', studentId, 'settings'],
@@ -221,19 +231,16 @@ export default function StudentRelationshipEditorPage() {
     // --- 데이터 로딩 및 상태 초기화 ---
     useEffect(() => {
         if (currentStudent) {
-            const genderFromDB = currentStudent.gender; // 타입은 'male' | 'female' | null | undefined 일 수 있음
+            const genderFromDB = currentStudent.gender; // 'male' | 'female' | null | undefined
 
-            // DB 값이 문자열 'male' 또는 'female'일 때만 대문자로 변환하여 상태 설정
-            let genderForState: 'MALE' | 'FEMALE' | null = null;
-            if (typeof genderFromDB === 'string') {
-                 // toUpperCase() 호출 전 타입 가드 강화
-                 if (genderFromDB === 'male' || genderFromDB === 'female') {
-                     genderForState = genderFromDB.toUpperCase() as 'MALE' | 'FEMALE';
-                 }
+            // genderFromDB 값이 'male' 또는 'female'인지 확인 후 그대로 상태에 저장
+            let genderForState: 'male' | 'female' | null = null;
+            if (genderFromDB === 'male' || genderFromDB === 'female') {
+                genderForState = genderFromDB; // toUpperCase() 제거, 소문자 그대로 사용
             }
 
             console.log("Fetched student gender:", genderFromDB);
-            console.log("Setting state gender to:", genderForState); // 대문자 또는 null
+            console.log("Setting state gender to:", genderForState); // 소문자 또는 null
 
             setSelectedGender(genderForState);
             setInitialGender(genderForState);
@@ -302,7 +309,7 @@ export default function StudentRelationshipEditorPage() {
     });
 
     // 성별 업데이트 Mutation 추가
-    const updateStudentGenderMutation = useMutation<void, Error, {"gender": 'MALE' | 'FEMALE' | null}>({
+    const updateStudentGenderMutation = useMutation<void, Error, {"gender": 'male' | 'female' | null}>({
         mutationFn: ({ gender }) => updateStudentGender(studentId, gender),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['student', studentId] });
@@ -359,7 +366,7 @@ export default function StudentRelationshipEditorPage() {
             await saveSettingsMutation.mutateAsync();
 
             // 2. 성별 변경 시 성별 업데이트 실행 (MALE 또는 FEMALE일 때만)
-            if (selectedGender !== initialGender && (selectedGender === 'MALE' || selectedGender === 'FEMALE')) {
+            if (selectedGender !== initialGender && (selectedGender === 'male' || selectedGender === 'female')) {
                 await updateStudentGenderMutation.mutateAsync({ gender: selectedGender });
             }
             // 참고: 만약 성별을 null로 되돌리는 기능이 필요하고 DB 제약조건이 NULL을 허용한다면,
@@ -375,7 +382,7 @@ export default function StudentRelationshipEditorPage() {
     };
 
     // --- 로딩 / 에러 처리 ---
-    const isLoading = isLoadingStudent || isLoadingOthers || isLoadingRels || isLoadingQuestions || isLoadingAnswers || saveSettingsMutation.isPending || addQuestionMutation.isPending || deleteQuestionMutation.isPending || updateStudentGenderMutation.isPending;
+    const isLoading = isLoadingStudent || isLoadingAllStudents || isLoadingRels || isLoadingQuestions || isLoadingAnswers || saveSettingsMutation.isPending || addQuestionMutation.isPending || deleteQuestionMutation.isPending || updateStudentGenderMutation.isPending;
 
     if (!studentId || !classId) {
         return <div>잘못된 접근입니다.</div>; // ID가 없는 경우
@@ -405,14 +412,14 @@ export default function StudentRelationshipEditorPage() {
                         {/* 성별 선택 버튼 그룹 */}
                         <div className="flex items-center space-x-1 bg-gray-100 p-0.5 rounded-lg">
                             <button
-                                onClick={() => setSelectedGender('MALE')}
-                                className={`px-3 py-1 text-xs rounded-md transition-colors duration-150 ${selectedGender === 'MALE' ? 'bg-[#6366f1] text-white shadow-sm font-semibold' : 'text-gray-500 hover:text-gray-700'}`}
+                                onClick={() => setSelectedGender('male')}
+                                className={`px-3 py-1 text-xs rounded-md transition-colors duration-150 ${selectedGender === 'male' ? 'bg-[#6366f1] text-white shadow-sm font-semibold' : 'text-gray-500 hover:text-gray-700'}`}
                             >
                                 남학생
                             </button>
                             <button
-                                onClick={() => setSelectedGender('FEMALE')}
-                                className={`px-3 py-1 text-xs rounded-md transition-colors duration-150 ${selectedGender === 'FEMALE' ? 'bg-[#6366f1] text-white shadow-sm font-semibold' : 'text-gray-500 hover:text-gray-700'}`}
+                                onClick={() => setSelectedGender('female')}
+                                className={`px-3 py-1 text-xs rounded-md transition-colors duration-150 ${selectedGender === 'female' ? 'bg-[#6366f1] text-white shadow-sm font-semibold' : 'text-gray-500 hover:text-gray-700'}`}
                             >
                                 여학생
                             </button>
@@ -434,42 +441,45 @@ export default function StudentRelationshipEditorPage() {
                 </header>
 
                 <div className="mb-8 bg-white p-4 rounded-xl shadow-md">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                        {otherStudents && otherStudents.length > 0 ? (
-                            otherStudents.map(target => {
-                                const currentRelation = relationshipSettings[target.id] || null;
-                                return (
-                                    <div key={target.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 flex flex-col justify-between">
-                                        <p className="font-semibold text-center mb-3 text-black truncate">{target.name}</p>
-                                        <div className="flex justify-center gap-1.5">
-                                            {(Object.keys(RELATIONSHIP_TYPES) as Array<keyof typeof RELATIONSHIP_TYPES>).map(type => {
-                                                const isSelected = currentRelation === type;
-                                                // 이미지 기반 색상 조정 (예시)
-                                                const selectedBgColor = RELATIONSHIP_COLORS[type] || 'bg-indigo-500'; // 기본 색상 제공
-                                                const selectedTextColor = 'text-white';
-                                                const defaultBgColor = 'bg-gray-100';
-                                                const defaultTextColor = 'text-gray-600';
-                                                const hoverBgColor = `hover:brightness-95`;
+                    {/* otherStudents가 useMemo로 생성되었으므로 로딩 상태 추가 확인 */}
+                    {isLoadingAllStudents ? (
+                       <div className="text-center text-gray-500 py-4">학생 목록 로딩 중...</div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                          {otherStudents && otherStudents.length > 0 ? (
+                              otherStudents.map(target => { // 이제 otherStudents는 created_at 순서
+                                  const currentRelation = relationshipSettings[target.id] || null;
+                                  return (
+                                      <div key={target.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 flex flex-col justify-between">
+                                          <p className="font-semibold text-center mb-3 text-black truncate" title={target.name}>{target.name || `학생 ${target.id.substring(0, 4)}`}</p>
+                                          <div className="flex justify-center gap-1.5">
+                                              {/* 새 4가지 관계 유형 버튼 */}
+                                              {(Object.keys(RELATIONSHIP_TYPES) as Array<keyof typeof RELATIONSHIP_TYPES>).map(type => {
+                                                  const isSelected = currentRelation === type;
+                                                  const bgColor = isSelected ? RELATIONSHIP_COLORS[type] : '#f3f4f6'; // 미선택 시 연한 회색 (bg-gray-100)
+                                                  const textColor = isSelected ? 'text-white' : 'text-gray-600';
+                                                  const hoverEffect = isSelected ? `hover:brightness-110` : `hover:bg-gray-200`;
 
-                                                return (
-                                                    <button
-                                                        key={type}
-                                                        onClick={() => handleRelationshipChange(target.id, isSelected ? null : type)}
-                                                        className={`px-3 py-1 text-xs rounded-full transition-all duration-150 ${hoverBgColor} ${isSelected ? `${selectedTextColor}` : `${defaultBgColor} ${defaultTextColor}`}`}
-                                                        style={isSelected ? { backgroundColor: selectedBgColor } : {}}
-                                                    >
-                                                        {RELATIONSHIP_TYPES[type]}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                );
-                            })
-                        ) : (
-                            <p className="text-gray-500 italic col-span-full text-center py-4">같은 반에 다른 학생이 없습니다.</p>
-                        )}
-                    </div>
+                                                  return (
+                                                      <button
+                                                          key={type}
+                                                          onClick={() => handleRelationshipChange(target.id, isSelected ? null : type)}
+                                                          className={`px-3 py-1 text-xs rounded-md transition-all duration-150 ${hoverEffect} ${textColor} ${isSelected ? '' : 'border border-gray-200'}`}
+                                                          style={{ backgroundColor: bgColor }}
+                                                      >
+                                                          {RELATIONSHIP_TYPES[type]}
+                                                      </button>
+                                                  );
+                                              })}
+                                          </div>
+                                      </div>
+                                  );
+                              })
+                          ) : (
+                              <p className="text-gray-500 italic col-span-full text-center py-4">같은 반에 다른 학생이 없습니다.</p>
+                          )}
+                      </div>
+                    )}
                 </div>
 
                 <div className="mb-8 bg-white p-4 rounded-xl shadow-md">

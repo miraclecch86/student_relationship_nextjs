@@ -347,10 +347,6 @@ export default function ClassRelationshipPage() {
       }
   };
 
-  const handleChangeLayout = useCallback(() => {
-    graphRef.current?.triggerLayoutChange(); // Ref를 통해 그래프 컴포넌트 함수 호출
-  }, []);
-
   const handleResetStudents = () => {
     setIsResetModalOpen(true); // 초기화 확인 모달 열기
   };
@@ -416,7 +412,7 @@ export default function ClassRelationshipPage() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <div className="max-w-screen-xl mx-auto px-4 py-8 flex flex-col h-screen">
+      <div className="max-w-screen-xl mx-auto px-4 py-8 flex flex-col">
 
         {/* 상단 헤더: 수정 */}
         <header className="mb-4 flex justify-between items-center bg-white p-3 rounded-lg shadow-md flex-shrink-0">
@@ -435,12 +431,13 @@ export default function ClassRelationshipPage() {
         <div className="mb-4 flex flex-wrap justify-between items-center gap-4 bg-white p-3 rounded-lg shadow-md flex-shrink-0">
           <div className="flex gap-2 items-center flex-wrap">
             <span className="font-semibold text-sm mr-2 text-[#6366f1]">관계 필터:</span>
-            <button onClick={() => setFilterType('ALL')} className={`px-3 py-1 text-xs rounded transition-all duration-200 ${filterType === 'ALL' ? 'bg-[#6366f1] text-white shadow' : 'bg-gray-100 text-gray-700 hover:bg-[#e0e7ff]'}`}>전체</button>
+            <button onClick={() => setFilterType('ALL')} className={`px-3 py-1 text-xs rounded-md transition-all duration-200 ${filterType === 'ALL' ? 'bg-[#6366f1] text-white shadow' : 'bg-gray-100 text-gray-700 hover:bg-[#e0e7ff]'}`}>전체</button>
+            {/* 새 4가지 관계 유형 필터 버튼 */} 
             {Object.entries(RELATIONSHIP_TYPES).map(([key, label]) => (
               <button
                 key={key}
                 onClick={() => setFilterType(key as keyof typeof RELATIONSHIP_TYPES)}
-                className={`px-3 py-1 text-xs rounded transition-all duration-200 ${filterType === key ? 'text-white shadow' : 'bg-gray-100 text-gray-700 hover:bg-[#e0e7ff]'}`}
+                className={`px-3 py-1 text-xs rounded-md transition-all duration-200 ${filterType === key ? 'text-white shadow' : 'bg-gray-100 text-gray-700 hover:bg-[#e0e7ff]'}`}
                 style={filterType === key ? { backgroundColor: RELATIONSHIP_COLORS[key as keyof typeof RELATIONSHIP_COLORS] } : {}}
               >
                 {label}
@@ -448,12 +445,6 @@ export default function ClassRelationshipPage() {
             ))}
           </div>
           <div className="flex gap-2">
-            <button 
-              onClick={handleChangeLayout} 
-              className="px-4 py-2 text-sm bg-[#6366f1] text-white rounded-md hover:bg-[#4f46e5] shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:ring-offset-1 transition-all duration-200 cursor-pointer font-semibold hover:-translate-y-0.5 hover:shadow-md"
-            >
-              배치 변경
-            </button>
             <button
               onClick={handleResetStudents}
               disabled={resetStudentsMutation.isPending}
@@ -464,9 +455,9 @@ export default function ClassRelationshipPage() {
           </div>
         </div>
 
-        <div className="flex-grow flex flex-col md:flex-row gap-4 overflow-hidden">
+        <div className="flex-grow flex flex-col md:flex-row gap-4">
 
-          <div className="w-full md:w-[250px] bg-white rounded-lg shadow-md flex flex-col flex-shrink-0">
+          <div className="w-full md:w-[230px] bg-white rounded-lg shadow-md flex flex-col flex-shrink-0">
             <h3 className="text-base font-semibold p-3 border-b text-[#6366f1] flex-shrink-0">
               학생 목록 ({students?.length || 0}명)
             </h3>
@@ -519,7 +510,7 @@ export default function ClassRelationshipPage() {
           </div>
 
           <div className="flex-1 flex flex-col gap-4">
-            <div className="bg-white rounded-lg shadow-md overflow-hidden relative h-[500px] flex-shrink-0">
+            <div className="bg-white rounded-lg shadow-md overflow-hidden relative h-[600px] flex-shrink-0">
               {students && relationships ? (
                 <RelationshipGraph
                   ref={graphRef}
@@ -543,14 +534,15 @@ export default function ClassRelationshipPage() {
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 flex-shrink-0">
+            {/* 새 4가지 관계 유형 랭킹 박스 */} 
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 flex-shrink-0">
               {Object.entries(RELATIONSHIP_TYPES).map(([type, title]) => (
                   <div key={type} className="min-h-[180px]">
                       {students && relationships ? (
                           <RelationshipTypeRankBox
                               title={title}
-                              students={rankedStudentsByType[type]}
-                              relationshipType={type}
+                              students={rankedStudentsByType[type]?.slice(0, 10)}
+                              relationshipType={type} // key (e.g., FRIENDLY) 전달
                           />
                       ) : (
                           <div className="bg-white rounded-lg shadow-md p-3 h-full flex items-center justify-center text-sm text-gray-500 italic">

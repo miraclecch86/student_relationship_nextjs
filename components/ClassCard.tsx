@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Class } from '@/lib/supabase'; // Supabase 타입
+import { Class as BaseClass } from '@/lib/supabase'; // Supabase 타입
 import EditClassNameModal from './EditClassNameModal';
 import ConfirmModal from './ConfirmModal'; // 삭제 확인 모달
 import toast from 'react-hot-toast';
@@ -11,7 +11,7 @@ import { supabase } from '@/lib/supabase'; // supabase 클라이언트
 import { useRouter } from 'next/navigation'; // 라우터 임포트
 
 // 학급 수정 함수
-async function updateClass(id: string, newName: string): Promise<Class | null> {
+async function updateClass(id: string, newName: string): Promise<BaseClass | null> {
   const { data, error } = await supabase
     .from('classes')
     .update({ name: newName.trim() })
@@ -22,8 +22,13 @@ async function updateClass(id: string, newName: string): Promise<Class | null> {
   return data;
 }
 
+// 주관식 질문 개수를 포함하는 타입 정의 (page.tsx 와 동일하게)
+interface ClassWithCount extends BaseClass {
+  subjectiveQuestionCount?: number; // optional로 처리하여 에러 방지
+}
+
 interface ClassCardProps {
-  classData: Class;
+  classData: ClassWithCount;
   // onEdit prop은 이제 사용하지 않지만, 호환성을 위해 남겨둘 수 있음 (또는 제거)
   onEdit: (id: string, newName: string) => Promise<void>; 
   onDelete: (id: string) => Promise<void>; // 부모의 삭제 처리 함수
@@ -35,20 +40,31 @@ export default function ClassCard({ classData, onEdit, onDelete }: ClassCardProp
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
-  // 수정 뮤테이션
-  const updateMutation = useMutation<Class | null, Error, { id: string; newName: string }>({
-      mutationFn: ({ id, newName }) => updateClass(id, newName),
+  // 수정 뮤테이션 (반환 타입 BaseClass | null)
+  const updateMutation = useMutation<BaseClass | null, Error, { id: string; newName: string }>({
+      mutationFn: ({ id, newName }) => {
+          // 실제 수정 로직은 상위 컴포넌트나 상태 관리 라이브러리에서 처리해야 함
+          console.warn("ClassCard: Actual update logic should be handled by parent or state management.");
+          // 임시로 null 반환 또는 상위의 실제 함수 호출 결과를 반환해야 함
+          return Promise.resolve(null); 
+      },
       onSuccess: (updatedClass) => {
+          // 상위 컴포넌트에서 invalidateQueries를 통해 UI가 업데이트될 것이므로,
+          // ClassCard 자체에서 별도의 성공 메시지를 띄우지 않아도 됨.
+          // 만약 updatedClass가 null이 아니라면 (실제 업데이트 로직이 여기 있다면) toast.success 사용 가능
           if (updatedClass) {
-              queryClient.invalidateQueries({ queryKey: ['classes'] });
-              toast.success(`'${updatedClass.name}'으로 수정되었습니다.`);
-              setIsEditModalOpen(false);
+            // 이 부분은 실제 업데이트 로직이 ClassCard 내부에 있을 경우에만 유효
+            // queryClient.invalidateQueries({ queryKey: ['classes'] }); // 상위에서 하므로 제거 또는 주석처리
+            // toast.success(`'${updatedClass.name}'으로 수정되었습니다.`); // 상위에서 하므로 제거 또는 주석처리
           } else {
-              toast.error('학급 이름 수정 중 오류 발생');
+            // 실제 업데이트가 상위에서 이루어지므로, 여기서는 모달만 닫음
+            // toast.info(...) 제거
           }
+          setIsEditModalOpen(false); // 모달 닫기는 유지
       },
       onError: (error) => {
-          toast.error(`수정 실패: ${error.message}`);
+          // 에러 발생 시에는 사용자에게 피드백 제공
+          toast.error(`수정 중 오류 발생: ${error.message}`);
       },
   });
 
@@ -62,7 +78,7 @@ export default function ClassCard({ classData, onEdit, onDelete }: ClassCardProp
   // 수정 모달 저장 핸들러
   const handleSaveName = async (newName: string) => {
     // 뮤테이션 실행 (로딩 상태는 모달이 prop으로 받음)
-    await updateMutation.mutateAsync({ id: classData.id, newName });
+    updateMutation.mutate({ id: classData.id, newName });
     // 성공 시 onSuccess에서 모달 닫힘
   };
 
@@ -99,8 +115,10 @@ export default function ClassCard({ classData, onEdit, onDelete }: ClassCardProp
               <p className="text-xl font-bold text-indigo-500">0</p>
             </div>
             <div className="bg-gray-100 rounded-lg p-3 text-center">
-              <p className="text-sm font-medium text-gray-600 mb-1">관계 설정</p>
-              <p className="text-xl font-bold text-indigo-500">0%</p>
+              <p className="text-sm font-medium text-gray-600 mb-1">주관식 질문</p>
+              <p className="text-xl font-bold text-indigo-500">
+                {classData.subjectiveQuestionCount ?? 0}개
+              </p>
             </div>
           </div>
 

@@ -28,7 +28,7 @@ export default function RootLayout({
       <body className={`${inter.className} bg-gray-50`}> {/* 기본 배경색 적용 */}
         <QueryClientProvider client={queryClient}> {/* Provider로 감싸기 */}
           {children}
-          <Toaster position="bottom-center" /> {/* Toaster 컴포넌트 추가 */}
+          <Toaster position="top-center" /> {/* Toaster 위치를 top-center로 변경 */}
         </QueryClientProvider>
       </body>
     </html>

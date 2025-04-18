@@ -20,11 +20,11 @@ const RelationshipTypeRankBox: React.FC<RelationshipTypeRankBoxProps> = ({
         {title}
       </h3>
       {students && students.length > 0 ? (
-        <ul className="text-sm text-black flex-grow overflow-y-auto pr-2 flex flex-col gap-0">
-          {students.slice(0, 3).map((student, index) => ( // 상위 3명만 표시
+        <ul className="text-sm flex-grow overflow-y-auto pr-2 flex flex-col gap-0">
+          {students.slice(0, 10).map((student, index) => ( 
             <li key={student.id} className="flex items-center justify-between py-0.5 px-1 rounded hover:bg-gray-100 leading-tight">
-              <span className="font-semibold">{index + 1}위:</span>
-              <span className="truncate ml-2 flex-1 text-right">{student.name}</span>
+              <span className="font-medium text-gray-500">{index + 1}위:</span>
+              <span className="truncate ml-2 flex-1 text-right font-medium text-gray-500">{student.name}</span>
               {/* 필요하다면 받은 횟수 등을 표시할 수 있습니다. */}
               {/* 예: <span className="text-xs text-gray-500 ml-1">({student.count})</span> */}
             </li>

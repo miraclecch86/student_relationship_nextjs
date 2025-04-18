@@ -1,19 +1,15 @@
 export const RELATIONSHIP_TYPES = {
-  FRIEND: '친구',
-  CLOSE_FRIEND: '친한 친구',
-  BEST_FRIEND: '베스트 프렌드',
-  ACQUAINTANCE: '알고 지내는 사이',
-  MENTOR: '멘토',
-  MENTEE: '멘티',
+  FRIENDLY: '친해',
+  WANNA_BE_CLOSE: '친해질래',
+  NEUTRAL: '괜찮아',
+  AWKWARD: '불편해',
 } as const;
 
 export const RELATIONSHIP_COLORS = {
-  FRIEND: '#4CAF50',
-  CLOSE_FRIEND: '#2196F3',
-  BEST_FRIEND: '#9C27B0',
-  ACQUAINTANCE: '#FF9800',
-  MENTOR: '#F44336',
-  MENTEE: '#E91E63',
+  FRIENDLY: '#22c55e',      // bg-green-500
+  WANNA_BE_CLOSE: '#3b82f6', // bg-blue-500
+  NEUTRAL: '#a855f7',       // bg-purple-500
+  AWKWARD: '#f97316',       // bg-orange-500
 } as const;
 
 export const WEEKLY_QUESTIONS = [

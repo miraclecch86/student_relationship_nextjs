@@ -92,7 +92,7 @@ export default function StudentListItem({
 
   return (
     <div
-      className={`relative group rounded-lg shadow-md p-3 transition-transform duration-200 cursor-pointer text-sm ${isSelected ? 'bg-indigo-100 scale-[1.02] shadow-lg' : 'bg-white hover:shadow-lg hover:scale-[1.03]'}`}
+      className={`relative group rounded-lg shadow-md p-2 transition-transform duration-200 cursor-pointer text-sm ${isSelected ? 'bg-indigo-100 scale-[1.02] shadow-lg' : 'bg-white hover:shadow-lg hover:scale-[1.03]'}`}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
       onClick={handleCardClick}
