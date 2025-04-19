@@ -400,8 +400,10 @@ export default function ClassRelationshipPage() {
   // handleNodeClick 핸들러는 StudentListItem에서도 사용하므로 이름 변경 및 통합
   const handleSelectStudent = useCallback((student: NodeData | null) => {
     setSelectedStudent(student);
-    // TODO: 주관식 답변 로딩 로직 추가
-  }, []);
+    if (student) {
+      router.push(`/class/${classId}/student/${student.id}`);
+    }
+  }, [classId, router]);
 
   // StudentListItem에 전달할 함수들
   const handleUpdateStudent = async (id: string, newName: string) => {
@@ -625,7 +627,6 @@ function SortableStudentItem(props: {
 }) {
   const {
     attributes,
-    listeners,
     setNodeRef,
     transform,
     transition,
@@ -637,7 +638,7 @@ function SortableStudentItem(props: {
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+    <div ref={setNodeRef} style={style} {...attributes}>
       <StudentListItem
         student={props.student}
         classId={props.classId}

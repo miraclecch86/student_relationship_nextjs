@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { NodeData } from '@/app/class/[classId]/page';
 import { PencilIcon, TrashIcon, CheckIcon, XMarkIcon, Bars3Icon } from '@heroicons/react/24/outline';
 import ConfirmModal from './ConfirmModal';
+import { DraggableSyntheticListeners } from '@dnd-kit/core';
 
 interface StudentListItemProps {
   student: NodeData;
@@ -13,6 +14,7 @@ interface StudentListItemProps {
   isSelected: boolean;
   onUpdateStudent: (id: string, newName: string) => Promise<void>;
   onDeleteStudent: (id: string) => Promise<void>;
+  listeners?: DraggableSyntheticListeners;
 }
 
 export default function StudentListItem({
@@ -22,6 +24,7 @@ export default function StudentListItem({
   isSelected,
   onUpdateStudent,
   onDeleteStudent,
+  listeners,
 }: StudentListItemProps) {
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
@@ -102,8 +105,8 @@ export default function StudentListItem({
       } shadow-sm hover:shadow`}
     >
       <div className="flex items-center gap-1">
-        <div className="p-0.5 hover:bg-gray-100 rounded cursor-grab active:cursor-grabbing">
-          <Bars3Icon className="w-3 h-3 text-gray-400" />
+        <div {...listeners} className="p-1 hover:bg-gray-100 rounded cursor-grab active:cursor-grabbing flex-shrink-0">
+          <Bars3Icon className="w-3.5 h-3.5 text-gray-400" />
         </div>
         {isEditing ? (
           <input
@@ -111,50 +114,52 @@ export default function StudentListItem({
             value={editedName}
             onChange={handleNameChange}
             onKeyDown={handleKeyPress}
-            className="flex-1 px-1 py-0.5 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            className="flex-1 min-w-0 px-1.5 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 text-gray-900"
             autoFocus
             onClick={(e) => e.stopPropagation()}
           />
         ) : (
-          <span className="flex-1 text-sm font-medium text-gray-700">
+          <span className="flex-1 min-w-0 text-sm font-medium text-gray-700 truncate">
             {student.name}
           </span>
         )}
-        {isEditing ? (
-          <div className="flex items-center gap-0.5">
-            <button
-              onClick={handleSaveClick}
-              className="p-0.5 rounded-full hover:bg-green-100 text-gray-400 hover:text-green-600"
-              title="저장"
-            >
-              <CheckIcon className="w-3 h-3" />
-            </button>
-            <button
-              onClick={handleCancelClick}
-              className="p-0.5 rounded-full hover:bg-red-100 text-gray-400 hover:text-red-600"
-              title="취소"
-            >
-              <XMarkIcon className="w-3 h-3" />
-            </button>
-          </div>
-        ) : (
-          <div className={`flex items-center gap-0.5 transition-opacity duration-150 ${isHovering ? 'opacity-100' : 'opacity-0'}`}>
-            <button
-              onClick={handleEditClick}
-              className="p-0.5 rounded-full hover:bg-gray-200 text-gray-400 hover:text-blue-600"
-              title="이름 수정"
-            >
-              <PencilIcon className="w-3 h-3" />
-            </button>
-            <button
-              onClick={handleDeleteClick}
-              className="p-0.5 rounded-full hover:bg-gray-200 text-gray-400 hover:text-red-600"
-              title="삭제"
-            >
-              <TrashIcon className="w-3 h-3" />
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {isEditing ? (
+            <>
+              <button
+                onClick={handleSaveClick}
+                className="p-1 rounded-full hover:bg-green-100 text-gray-700 hover:text-green-600"
+                title="저장"
+              >
+                <CheckIcon className="w-4 h-4" />
+              </button>
+              <button
+                onClick={handleCancelClick}
+                className="p-1 rounded-full hover:bg-red-100 text-gray-700 hover:text-red-600"
+                title="취소"
+              >
+                <XMarkIcon className="w-4 h-4" />
+              </button>
+            </>
+          ) : (
+            <div className={`flex items-center gap-1 transition-opacity duration-150 ${isHovering ? 'opacity-100' : 'opacity-0'}`}>
+              <button
+                onClick={handleEditClick}
+                className="p-1 rounded-full hover:bg-gray-200 text-gray-700 hover:text-blue-600"
+                title="이름 수정"
+              >
+                <PencilIcon className="w-4 h-4" />
+              </button>
+              <button
+                onClick={handleDeleteClick}
+                className="p-1 rounded-full hover:bg-gray-200 text-gray-700 hover:text-red-600"
+                title="삭제"
+              >
+                <TrashIcon className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       <ConfirmModal
