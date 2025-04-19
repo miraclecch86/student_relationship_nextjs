@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, Student, Relationship, Class, Question, Answer } from '@/lib/supabase';
@@ -13,6 +13,10 @@ import { RELATIONSHIP_TYPES, RELATIONSHIP_COLORS } from '@/lib/constants';
 import { ArrowPathIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { arrayMove } from '@dnd-kit/sortable';
 
 // 데이터 타입 정의 (D3.js용 노드 및 링크)
 export interface NodeData extends Student {
@@ -191,6 +195,15 @@ export default function ClassRelationshipPage() {
   const [filterType, setFilterType] = useState<keyof typeof RELATIONSHIP_TYPES | 'ALL'>('ALL');
   const [newStudentName, setNewStudentName] = useState('');
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [studentOrder, setStudentOrder] = useState<string[]>([]);
+
+  // DnD 센서 설정
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   // 학급 상세 정보 조회
   const { data: classDetails, isLoading: isLoadingClass, isError: isErrorClass, error: errorClass } = useQuery({
@@ -264,6 +277,35 @@ export default function ClassRelationshipPage() {
 
     return rankings;
   }, [students, relationships]);
+
+  // 학생 목록 순서 초기화
+  useEffect(() => {
+    if (students) {
+      setStudentOrder(students.map(student => student.id));
+    }
+  }, [students]);
+
+  // 드래그 앤 드롭 종료 핸들러
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    if (over && active.id !== over.id) {
+      const oldIndex = studentOrder.indexOf(active.id as string);
+      const newIndex = studentOrder.indexOf(over.id as string);
+      
+      setStudentOrder(arrayMove(studentOrder, oldIndex, newIndex));
+    }
+  };
+
+  // 정렬된 학생 목록
+  const sortedStudents = useMemo(() => {
+    if (!students) return [];
+    return [...students].sort((a, b) => {
+      const indexA = studentOrder.indexOf(a.id);
+      const indexB = studentOrder.indexOf(b.id);
+      return indexA - indexB;
+    });
+  }, [students, studentOrder]);
 
   // --- 학생 추가 Mutation ---
   const addStudentMutation = useMutation<Student, Error, string>({
@@ -483,25 +525,28 @@ export default function ClassRelationshipPage() {
             <div className="flex-grow overflow-y-auto p-2 space-y-2">
               <AnimatePresence mode='popLayout'>
                 {students && students.length > 0 ? (
-                  students.map(student => (
-                    <motion.div
-                      key={student.id}
-                      layout
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.2, type: "spring", stiffness: 100, damping: 15 }}
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <SortableContext
+                      items={studentOrder}
+                      strategy={verticalListSortingStrategy}
                     >
-                      <StudentListItem
-                        student={student}
-                        classId={classId}
-                        onSelect={handleSelectStudent}
-                        isSelected={selectedStudent?.id === student.id}
-                        onUpdateStudent={handleUpdateStudent}
-                        onDeleteStudent={handleDeleteStudent}
-                      />
-                    </motion.div>
-                  ))
+                      {sortedStudents.map(student => (
+                        <SortableStudentItem
+                          key={student.id}
+                          student={student}
+                          classId={classId}
+                          onSelect={handleSelectStudent}
+                          isSelected={selectedStudent?.id === student.id}
+                          onUpdateStudent={handleUpdateStudent}
+                          onDeleteStudent={handleDeleteStudent}
+                        />
+                      ))}
+                    </SortableContext>
+                  </DndContext>
                 ) : (
                   <p className="text-sm text-gray-500 p-3 italic text-center">등록된 학생이 없습니다.</p>
                 )}
@@ -565,6 +610,42 @@ export default function ClassRelationshipPage() {
           confirmText="초기화"
         />
       </div>
+    </div>
+  );
+}
+
+// SortableStudentItem 컴포넌트
+function SortableStudentItem(props: {
+  student: NodeData;
+  classId: string;
+  onSelect: (student: NodeData) => void;
+  isSelected: boolean;
+  onUpdateStudent: (id: string, newName: string) => Promise<void>;
+  onDeleteStudent: (id: string) => Promise<void>;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+  } = useSortable({ id: props.student.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      <StudentListItem
+        student={props.student}
+        classId={props.classId}
+        onSelect={props.onSelect}
+        isSelected={props.isSelected}
+        onUpdateStudent={props.onUpdateStudent}
+        onDeleteStudent={props.onDeleteStudent}
+      />
     </div>
   );
 }

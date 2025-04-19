@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { NodeData } from '@/app/class/[classId]/page';
-import { PencilIcon, TrashIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { PencilIcon, TrashIcon, CheckIcon, XMarkIcon, Bars3Icon } from '@heroicons/react/24/outline';
 import ConfirmModal from './ConfirmModal';
 
 interface StudentListItemProps {
@@ -92,53 +92,69 @@ export default function StudentListItem({
 
   return (
     <div
-      className={`relative group rounded-lg shadow-md p-2 transition-transform duration-200 cursor-pointer text-sm ${isSelected ? 'bg-indigo-100 scale-[1.02] shadow-lg' : 'bg-white hover:shadow-lg hover:scale-[1.03]'}`}
+      onClick={handleCardClick}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
-      onClick={handleCardClick}
-      title={student.name}
+      className={`relative group py-1.5 px-2 rounded-lg transition-all duration-150 cursor-pointer border ${
+        isSelected
+          ? 'bg-indigo-50 border-indigo-500'
+          : 'hover:bg-gray-50 border-gray-200'
+      } shadow-sm hover:shadow`}
     >
-      {isEditing ? (
-        <div className="flex items-center gap-1 w-full">
+      <div className="flex items-center gap-1">
+        <div className="p-0.5 hover:bg-gray-100 rounded cursor-grab active:cursor-grabbing">
+          <Bars3Icon className="w-3 h-3 text-gray-400" />
+        </div>
+        {isEditing ? (
           <input
             type="text"
             value={editedName}
             onChange={handleNameChange}
             onKeyDown={handleKeyPress}
-            className="flex-grow border-b border-[#6366f1] px-1 py-0.5 text-sm focus:outline-none bg-transparent text-black"
+            className="flex-1 px-1 py-0.5 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
             autoFocus
             onClick={(e) => e.stopPropagation()}
           />
-          <button onClick={handleSaveClick} className="p-0.5 text-green-600 hover:text-green-800 flex-shrink-0">
-            <CheckIcon className="w-4 h-4" />
-          </button>
-          <button onClick={handleCancelClick} className="p-0.5 text-red-600 hover:text-red-800 flex-shrink-0">
-            <XMarkIcon className="w-4 h-4" />
-          </button>
-        </div>
-      ) : (
-        <p className="text-center font-medium truncate text-black" title={student.name}>
-          {student.name}
-        </p>
-      )}
-
-      <div
-        className={`absolute top-1 right-1 flex items-center gap-0.5 transition-opacity duration-150 ${isHovering && !isEditing ? 'opacity-100' : 'opacity-0 group-hover:opacity-50'}`}
-      >
-        <button
-          onClick={handleEditClick}
-          className="p-1 rounded-full hover:bg-gray-200 text-gray-400 hover:text-blue-600"
-          title="이름 수정"
-        >
-          <PencilIcon className="w-3 h-3" />
-        </button>
-        <button
-          onClick={handleDeleteClick}
-          className="p-1 rounded-full hover:bg-gray-200 text-gray-400 hover:text-red-600"
-          title="삭제"
-        >
-          <TrashIcon className="w-3 h-3" />
-        </button>
+        ) : (
+          <span className="flex-1 text-sm font-medium text-gray-700">
+            {student.name}
+          </span>
+        )}
+        {isEditing ? (
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={handleSaveClick}
+              className="p-0.5 rounded-full hover:bg-green-100 text-gray-400 hover:text-green-600"
+              title="저장"
+            >
+              <CheckIcon className="w-3 h-3" />
+            </button>
+            <button
+              onClick={handleCancelClick}
+              className="p-0.5 rounded-full hover:bg-red-100 text-gray-400 hover:text-red-600"
+              title="취소"
+            >
+              <XMarkIcon className="w-3 h-3" />
+            </button>
+          </div>
+        ) : (
+          <div className={`flex items-center gap-0.5 transition-opacity duration-150 ${isHovering ? 'opacity-100' : 'opacity-0'}`}>
+            <button
+              onClick={handleEditClick}
+              className="p-0.5 rounded-full hover:bg-gray-200 text-gray-400 hover:text-blue-600"
+              title="이름 수정"
+            >
+              <PencilIcon className="w-3 h-3" />
+            </button>
+            <button
+              onClick={handleDeleteClick}
+              className="p-0.5 rounded-full hover:bg-gray-200 text-gray-400 hover:text-red-600"
+              title="삭제"
+            >
+              <TrashIcon className="w-3 h-3" />
+            </button>
+          </div>
+        )}
       </div>
 
       <ConfirmModal

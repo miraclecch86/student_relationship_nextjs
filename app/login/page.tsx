@@ -76,10 +76,15 @@ export default function LoginPage() {
     setError(null);
     setIsLoading(true);
 
+    // 개발 환경과 프로덕션 환경의 리다이렉트 URL을 구분
+    const redirectUrl = process.env.NODE_ENV === 'development' 
+      ? 'http://localhost:3000/auth/callback'
+      : 'https://student-relationship.vercel.app/auth/callback';
+
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: redirectUrl,
       },
     });
 
