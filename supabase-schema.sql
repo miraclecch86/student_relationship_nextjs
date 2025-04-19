@@ -36,52 +36,51 @@ create table students (
   gender text check (gender in ('male', 'female')),
   position_x float, -- 관계도 좌표 X
   position_y float, -- 관계도 좌표 Y
-  created_at timestamp with time zone default now()
+  created_at timestamp with time zone default now(),
+  display_order integer
 );
 
--- students 테이블에 RLS 활성화
-alter table students enable row level security;
+-- display_order 컬럼 추가 (순서 저장용)
+ALTER TABLE public.students ADD COLUMN IF NOT EXISTS display_order integer;
 
--- students 테이블 RLS 정책 설정
-create policy "Users can view their own students"
-on students for select
-using (
-  exists (
-    select 1 from classes
-    where classes.id = students.class_id
-    and classes.user_id = auth.uid()
-  )
-);
+-- RLS 활성화 및 강제 적용 (테이블 생성 후 또는 스키마 적용 시점에 실행)
+ALTER TABLE public.students ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.students FORCE ROW LEVEL SECURITY; -- 테이블 소유자에게도 RLS 적용
 
-create policy "Users can insert their own students"
-on students for insert
-with check (
-  exists (
-    select 1 from classes
-    where classes.id = class_id
-    and classes.user_id = auth.uid()
-  )
-);
+-- 기존 정책 삭제 (존재할 경우)
+DROP POLICY IF EXISTS "사용자는 자신의 클래스의 학생만 볼 수 있음" ON public.students;
 
-create policy "Users can update their own students"
-on students for update
-using (
-  exists (
-    select 1 from classes
-    where classes.id = students.class_id
-    and classes.user_id = auth.uid()
-  )
-);
+-- 새 정책 생성 (display_order 고려 및 WITH CHECK 추가)
+CREATE POLICY "사용자는 자신의 클래스의 학생만 볼 수 있음" ON public.students
+    FOR ALL -- SELECT, INSERT, UPDATE, DELETE 모두 적용
+    USING ( -- SELECT, UPDATE, DELETE 시 체크
+        class_id IN (
+            SELECT id FROM public.classes 
+            WHERE user_id = auth.uid()
+        )
+    )
+    WITH CHECK ( -- INSERT, UPDATE 시 체크
+        class_id IN (
+            SELECT id FROM public.classes 
+            WHERE user_id = auth.uid()
+        )
+    );
 
-create policy "Users can delete their own students"
-on students for delete
-using (
-  exists (
-    select 1 from classes
-    where classes.id = students.class_id
-    and classes.user_id = auth.uid()
-  )
-);
+-- 초기 데이터 마이그레이션 (필요시 별도 실행):
+-- UPDATE public.students 
+-- SET display_order = subquery.row_number
+-- FROM (
+--     SELECT 
+--         s.id,
+--         ROW_NUMBER() OVER (
+--             PARTITION BY s.class_id 
+--             ORDER BY s.created_at
+--         ) as row_number
+--     FROM public.students s
+--     INNER JOIN public.classes c ON s.class_id = c.id
+--     WHERE c.user_id = auth.uid() -- 로그인한 사용자의 데이터만 초기화
+-- ) as subquery
+-- WHERE public.students.id = subquery.id;
 
 -- ✅ 3. 관계 테이블
 create table relations (

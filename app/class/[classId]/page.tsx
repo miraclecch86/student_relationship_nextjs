@@ -68,6 +68,7 @@ async function fetchStudents(classId: string): Promise<NodeData[]> {
     .from('students')
     .select('*, position_x, position_y')
     .eq('class_id', classId)
+    .order('display_order', { ascending: true })
     .order('created_at', { ascending: true });
   if (error) {
     console.error('Error fetching students:', error);
@@ -201,6 +202,19 @@ async function fetchAnswers(studentId: string): Promise<Answer[]> {
     return data;
 }
 
+// 학생 순서 업데이트 함수 추가
+async function updateStudentOrder(studentId: string, newOrder: number): Promise<void> {
+  const { error } = await supabase
+    .from('students')
+    .update({ display_order: newOrder })
+    .eq('id', studentId);
+  
+  if (error) {
+    console.error('Error updating student order:', error);
+    throw new Error(`학생 순서 업데이트 실패: ${error.message}`);
+  }
+}
+
 export default function ClassRelationshipPage() {
   const params = useParams();
   const router = useRouter();
@@ -305,8 +319,8 @@ export default function ClassRelationshipPage() {
     }
   }, [students]);
 
-  // 드래그 앤 드롭 종료 핸들러
-  const handleDragEnd = (event: DragEndEvent) => {
+  // 드래그 앤 드롭 종료 핸들러 수정
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
     
@@ -314,7 +328,24 @@ export default function ClassRelationshipPage() {
       const oldIndex = studentOrder.indexOf(active.id as string);
       const newIndex = studentOrder.indexOf(over.id as string);
       
-      setStudentOrder(arrayMove(studentOrder, oldIndex, newIndex));
+      const newOrder = arrayMove(studentOrder, oldIndex, newIndex);
+      setStudentOrder(newOrder);
+
+      try {
+        // 변경된 순서대로 학생들의 display_order 업데이트
+        const updatePromises = newOrder.map((studentId, index) => 
+          updateStudentOrder(studentId, index + 1)
+        );
+        
+        await Promise.all(updatePromises);
+        // 성공적으로 저장되면 학생 목록 다시 불러오기
+        queryClient.invalidateQueries({ queryKey: ['students', classId] });
+      } catch (error) {
+        console.error('Failed to update student order:', error);
+        toast.error('학생 순서 저장에 실패했습니다.');
+        // 에러 발생 시 이전 순서로 되돌리기
+        setStudentOrder(studentOrder);
+      }
     }
   };
 
