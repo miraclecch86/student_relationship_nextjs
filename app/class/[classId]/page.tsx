@@ -13,8 +13,25 @@ import { RELATIONSHIP_TYPES, RELATIONSHIP_COLORS } from '@/lib/constants';
 import { ArrowPathIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
-import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  defaultDropAnimationSideEffects,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+  AnimateLayoutChanges,
+} from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { arrayMove } from '@dnd-kit/sortable';
 
@@ -196,13 +213,16 @@ export default function ClassRelationshipPage() {
   const [newStudentName, setNewStudentName] = useState('');
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [studentOrder, setStudentOrder] = useState<string[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
 
-  // DnD 센서 설정
   const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        delay: 250,
+        tolerance: 5,
+      },
+    }),
+    useSensor(KeyboardSensor)
   );
 
   // 학급 상세 정보 조회
@@ -288,6 +308,7 @@ export default function ClassRelationshipPage() {
   // 드래그 앤 드롭 종료 핸들러
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
+    setActiveId(null);
     
     if (over && active.id !== over.id) {
       const oldIndex = studentOrder.indexOf(active.id as string);
@@ -419,6 +440,20 @@ export default function ClassRelationshipPage() {
   console.log('Filtered relationships before passing to graph:', filteredRelationships);
   console.log('Ranked students by type:', rankedStudentsByType); // 랭킹 데이터 로그 추가
 
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  };
+
+  const dropAnimationConfig = {
+    sideEffects: defaultDropAnimationSideEffects({
+      styles: {
+        active: {
+          opacity: '0.5',
+        },
+      },
+    }),
+  };
+
   if (isLoading) {
     return (
         <div className="flex flex-col justify-center items-center min-h-screen bg-gray-100">
@@ -530,24 +565,40 @@ export default function ClassRelationshipPage() {
                   <DndContext
                     sensors={sensors}
                     collisionDetection={closestCenter}
+                    onDragStart={handleDragStart}
                     onDragEnd={handleDragEnd}
                   >
                     <SortableContext
                       items={studentOrder}
                       strategy={verticalListSortingStrategy}
                     >
-                      {sortedStudents.map(student => (
-                        <SortableStudentItem
-                          key={student.id}
-                          student={student}
+                      <div className="space-y-2">
+                        {sortedStudents.map(student => (
+                          <SortableStudentItem
+                            key={student.id}
+                            student={student}
+                            classId={classId}
+                            onSelect={handleSelectStudent}
+                            isSelected={selectedStudent?.id === student.id}
+                            onUpdateStudent={handleUpdateStudent}
+                            onDeleteStudent={handleDeleteStudent}
+                          />
+                        ))}
+                      </div>
+                    </SortableContext>
+                    <DragOverlay>
+                      {activeId ? (
+                        <StudentListItem
+                          student={students.find(s => s.id === activeId)!}
                           classId={classId}
                           onSelect={handleSelectStudent}
-                          isSelected={selectedStudent?.id === student.id}
+                          isSelected={selectedStudent?.id === activeId}
                           onUpdateStudent={handleUpdateStudent}
                           onDeleteStudent={handleDeleteStudent}
+                          isDragging={true}
                         />
-                      ))}
-                    </SortableContext>
+                      ) : null}
+                    </DragOverlay>
                   </DndContext>
                 ) : (
                   <p className="text-sm text-gray-500 p-3 italic text-center">등록된 학생이 없습니다.</p>
@@ -627,14 +678,25 @@ function SortableStudentItem(props: {
 }) {
   const {
     attributes,
+    listeners,
     setNodeRef,
     transform,
     transition,
-  } = useSortable({ id: props.student.id });
+    isDragging
+  } = useSortable({
+    id: props.student.id,
+    transition: {
+      duration: 300,
+      easing: 'cubic-bezier(0.25, 1, 0.5, 1)',
+    }
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
+    zIndex: isDragging ? 50 : 'auto',
+    position: 'relative' as const,
+    opacity: isDragging ? 0.5 : 1,
   };
 
   return (
@@ -646,6 +708,8 @@ function SortableStudentItem(props: {
         isSelected={props.isSelected}
         onUpdateStudent={props.onUpdateStudent}
         onDeleteStudent={props.onDeleteStudent}
+        listeners={listeners}
+        isDragging={isDragging}
       />
     </div>
   );

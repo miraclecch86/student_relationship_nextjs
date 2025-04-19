@@ -15,6 +15,7 @@ interface StudentListItemProps {
   onUpdateStudent: (id: string, newName: string) => Promise<void>;
   onDeleteStudent: (id: string) => Promise<void>;
   listeners?: DraggableSyntheticListeners;
+  isDragging?: boolean;
 }
 
 export default function StudentListItem({
@@ -25,6 +26,7 @@ export default function StudentListItem({
   onUpdateStudent,
   onDeleteStudent,
   listeners,
+  isDragging = false,
 }: StudentListItemProps) {
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
@@ -98,14 +100,19 @@ export default function StudentListItem({
       onClick={handleCardClick}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
+      {...listeners}
       className={`relative group py-1.5 px-2 rounded-lg transition-all duration-150 cursor-pointer border ${
         isSelected
           ? 'bg-indigo-50 border-indigo-500'
           : 'hover:bg-gray-50 border-gray-200'
-      } shadow-sm hover:shadow`}
+      } shadow-sm hover:shadow touch-none ${
+        isDragging ? 'opacity-100 scale-105 shadow-lg bg-white' : ''
+      }`}
     >
       <div className="flex items-center gap-1">
-        <div {...listeners} className="p-1 hover:bg-gray-100 rounded cursor-grab active:cursor-grabbing flex-shrink-0">
+        <div 
+          className="p-1 hover:bg-gray-100 rounded cursor-grab active:cursor-grabbing flex-shrink-0"
+        >
           <Bars3Icon className="w-3.5 h-3.5 text-gray-400" />
         </div>
         {isEditing ? (
@@ -116,7 +123,6 @@ export default function StudentListItem({
             onKeyDown={handleKeyPress}
             className="flex-1 min-w-0 px-1.5 py-1 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 text-gray-900"
             autoFocus
-            onClick={(e) => e.stopPropagation()}
           />
         ) : (
           <span className="flex-1 min-w-0 text-sm font-medium text-gray-700 truncate">
