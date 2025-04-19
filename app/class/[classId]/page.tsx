@@ -412,7 +412,7 @@ export default function ClassRelationshipPage() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <div className="max-w-screen-xl mx-auto px-4 py-8 flex flex-col">
+      <div className="max-w-screen-2xl mx-auto px-4 py-8 flex flex-col">
 
         {/* 상단 헤더: 수정 */}
         <header className="mb-4 flex justify-between items-center bg-white p-3 rounded-lg shadow-md flex-shrink-0">
@@ -509,8 +509,8 @@ export default function ClassRelationshipPage() {
             </div>
           </div>
 
-          <div className="flex-1 flex flex-col gap-4">
-            <div className="bg-white rounded-lg shadow-md overflow-hidden relative h-[600px] flex-shrink-0">
+          <div className="flex-1 flex flex-col gap-5">
+            <div className="bg-white rounded-lg shadow-md overflow-hidden relative h-[720px] flex-shrink-0">
               {students && relationships ? (
                 <RelationshipGraph
                   ref={graphRef}
@@ -525,7 +525,7 @@ export default function ClassRelationshipPage() {
               )}
             </div>
 
-            <div className="w-full flex-shrink-0">
+            <div className="w-full flex-shrink-0 mb-2">
               <WeeklyAnswersBox
                   questions={questions}
                   answers={answers}

@@ -25,6 +25,7 @@ async function updateClass(id: string, newName: string): Promise<BaseClass | nul
 // 주관식 질문 개수를 포함하는 타입 정의 (page.tsx 와 동일하게)
 interface ClassWithCount extends BaseClass {
   subjectiveQuestionCount?: number; // optional로 처리하여 에러 방지
+  studentCount?: number; // 학생 수 필드 추가
 }
 
 interface ClassCardProps {
@@ -112,7 +113,7 @@ export default function ClassCard({ classData, onEdit, onDelete }: ClassCardProp
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div className="bg-gray-100 rounded-lg p-3 text-center">
               <p className="text-sm font-medium text-gray-600 mb-1">전체 학생</p>
-              <p className="text-xl font-bold text-indigo-500">0</p>
+              <p className="text-xl font-bold text-indigo-500">{classData.studentCount ?? 0}명</p>
             </div>
             <div className="bg-gray-100 rounded-lg p-3 text-center">
               <p className="text-sm font-medium text-gray-600 mb-1">주관식 질문</p>

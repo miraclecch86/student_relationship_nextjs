@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, Class as BaseClass } from '@/lib/supabase';
 import ClassCard from '@/components/ClassCard';
@@ -11,6 +12,7 @@ import { motion } from 'framer-motion';
 // 주관식 질문 개수를 포함하는 새로운 인터페이스 정의
 interface ClassWithCount extends BaseClass {
   subjectiveQuestionCount: number;
+  studentCount: number;  // 학생 수 필드 추가
 }
 
 // fetchClasses 함수를 RPC 호출 대신 기본 select 로 변경
@@ -26,21 +28,37 @@ async function fetchClasses(): Promise<ClassWithCount[]> {
     throw new Error('학급 정보를 불러오는 중 오류가 발생했습니다.');
   }
 
-  // 2. 각 학급별 주관식 질문 개수 가져오기
+  // 각 학급별 학생 수와 주관식 질문 개수 가져오기
   const classesWithCounts = await Promise.all(
     data.map(async (cls) => {
-      const { count, error: countError } = await supabase
+      // 1. 학생 수 가져오기
+      const { count: studentCount, error: studentCountError } = await supabase
+        .from('students')
+        .select('id', { count: 'exact', head: true })
+        .eq('class_id', cls.id);
+
+      if (studentCountError) {
+        console.error(`Error fetching student count for class ${cls.id}:`, studentCountError);
+        return { ...cls, studentCount: 0, subjectiveQuestionCount: 0 };
+      }
+
+      // 2. 주관식 질문 개수 가져오기
+      const { count: questionCount, error: countError } = await supabase
         .from('questions')
-        .select('id', { count: 'exact', head: true }) // 개수만 필요
+        .select('id', { count: 'exact', head: true })
         .eq('class_id', cls.id)
-        .eq('question_type', 'subjective'); // 주관식 필터링
+        .eq('question_type', 'subjective');
 
       if (countError) {
-        console.error(`Error fetching subjective question count for class ${cls.id}:`, countError);
-        // 오류 발생 시 개수를 0으로 처리하거나, 오류를 전파할 수 있음
-        return { ...cls, subjectiveQuestionCount: 0 };
+        console.error(`Error fetching question count for class ${cls.id}:`, countError);
+        return { ...cls, studentCount: studentCount ?? 0, subjectiveQuestionCount: 0 };
       }
-      return { ...cls, subjectiveQuestionCount: count ?? 0 };
+
+      return { 
+        ...cls, 
+        studentCount: studentCount ?? 0,
+        subjectiveQuestionCount: questionCount ?? 0 
+      };
     })
   );
 
@@ -48,15 +66,20 @@ async function fetchClasses(): Promise<ClassWithCount[]> {
 }
 
 async function addClass(name: string): Promise<BaseClass> {
-  // teacher_name 제거
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError) throw new Error('사용자 정보를 가져올 수 없습니다.');
+  if (!user) throw new Error('로그인이 필요합니다.');
+
   const { data, error } = await supabase
     .from('classes')
-    .insert([{ name: name.trim() }]) // teacher_name 삽입 제거
-    .select('id, name, created_at') // select 구체화
+    .insert([{ 
+      name: name.trim(),
+      user_id: user.id 
+    }])
+    .select('id, name, created_at')
     .single();
 
   if (error) throw new Error(error.message);
-  // student_count 제거됨
   return data;
 }
 
@@ -99,13 +122,63 @@ async function replaceAllClasses(loadedClasses: Omit<BaseClass, 'id' | 'created_
 }
 
 export default function Home() {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [newClassName, setNewClassName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
 
-  const { data: classes, isLoading, isError, error } = useQuery<ClassWithCount[], Error>({
+  useEffect(() => {
+    let isMounted = true;
+    const checkAuth = async () => {
+      setIsAuthLoading(true);
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (!isMounted) return;
+
+        if (error) {
+          console.error("Auth Error:", error);
+          router.replace('/login');
+          return;
+        }
+
+        if (!session) {
+          router.replace('/login');
+        } else {
+          const userRole = session.user?.user_metadata?.role;
+          console.log('[DEBUG] Checking role in main page:', userRole);
+          
+          if (!userRole) {
+            router.replace('/select-role');
+            return;
+          } else if (userRole !== 'teacher') {
+            router.replace('/student');
+            return;
+          }
+          setIsAuthenticated(true);
+        }
+      } catch (err) {
+        console.error("Auth check failed:", err);
+        router.replace('/login');
+      } finally {
+        if (isMounted) {
+          setIsAuthLoading(false);
+        }
+      }
+    };
+
+    checkAuth();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [router]);
+
+  const { data: classes, isLoading: isClassesLoading, isError, error } = useQuery<ClassWithCount[], Error>({
     queryKey: ['classes'],
     queryFn: fetchClasses,
+    enabled: isAuthenticated,
   });
 
   // 학급 추가 Mutation
@@ -220,39 +293,40 @@ export default function Home() {
     await deleteClassMutation.mutateAsync(id);
   };
 
-  if (isLoading) return <div className="flex justify-center items-center h-screen text-primary">로딩 중...</div>;
+  const handleLogout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      router.replace('/login');
+    } catch (err) {
+      console.error('Logout error:', err);
+      toast.error('로그아웃 중 오류가 발생했습니다.');
+    }
+  };
+
+  if (isAuthLoading) {
+    return <div className="flex justify-center items-center h-screen">인증 확인 중...</div>;
+  }
+
+  if (!isAuthenticated || isClassesLoading) {
+     return <div className="flex justify-center items-center h-screen text-primary">로딩 중...</div>;
+  }
+
   if (isError) return <div className="text-red-500 text-center mt-10">데이터 로딩 중 오류 발생: {error?.message}</div>;
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-8">
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-4xl font-extrabold text-gray-900 text-center mb-6">학급 관리</h1>
-
-        {/* 저장하기 / 불러오기 버튼 추가 */}
-        <div className="flex gap-2 justify-end mb-4">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-4xl font-extrabold text-gray-900">학급 관리</h1>
           <motion.button
-            onClick={handleSave}
-            className="bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-150"
+            onClick={handleLogout}
+            className="bg-red-100 text-red-700 hover:bg-red-200 px-4 py-2 rounded-md text-sm font-medium transition-colors duration-150"
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.98 }}
           >
-            학급 정보 저장하기
+            로그아웃
           </motion.button>
-          <motion.button
-            onClick={handleLoad}
-            className="bg-gray-100 text-gray-700 hover:bg-gray-200 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-150"
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            학급 정보 불러오기
-          </motion.button>
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            accept=".json"
-            style={{ display: 'none' }} // 숨김 처리
-          />
         </div>
 
         <motion.div 
@@ -292,7 +366,7 @@ export default function Home() {
                 ) : null
             ))
           ) : (
-            !isLoading && (
+            !isClassesLoading && (
               <p className="sm:col-span-2 lg:col-span-3 text-center text-gray-500 py-5">
                 생성된 학급이 없습니다.
               </p>
