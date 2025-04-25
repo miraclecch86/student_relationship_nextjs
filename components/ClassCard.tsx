@@ -88,7 +88,10 @@ export default function ClassCard({ classData, onEdit, onDelete }: ClassCardProp
   const confirmDelete = async () => { try { await onDelete(classData.id); } catch (error) {} };
 
   // 카드 클릭 핸들러
-  const handleCardClick = () => { router.push(`/class/${classData.id}`); };
+  const handleCardClick = () => {
+    // 설문 목록 페이지로 이동하도록 경로 수정
+    router.push(`/class/${classData.id}/survey`); 
+  };
   // --- 이벤트 핸들러들 끝 ---
 
   return (

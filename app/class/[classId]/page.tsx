@@ -77,7 +77,7 @@ async function fetchStudents(classId: string): Promise<NodeData[]> {
   return data as NodeData[];
 }
 
-async function fetchRelationships(classId: string): Promise<LinkData[]> {
+async function fetchRelationships(classId: string, surveyId?: string | null): Promise<LinkData[]> {
     // 특정 학급의 학생 ID 목록 가져오기
     const { data: students, error: studentError } = await supabase
         .from('students')
@@ -92,11 +92,20 @@ async function fetchRelationships(classId: string): Promise<LinkData[]> {
     const studentIds = students.map(s => s.id);
 
     // 해당 학생들 간의 관계 데이터 가져오기
-    const { data, error } = await supabase
-        .from('relations') // 테이블명 수정
-        .select('from_student_id, to_student_id, relation_type') // 필드명 수정
-        .in('from_student_id', studentIds) // 필드명 수정
-        .in('to_student_id', studentIds); // 필드명 수정
+    let query = supabase
+        .from('relations')
+        .select('from_student_id, to_student_id, relation_type')
+        .in('from_student_id', studentIds)
+        .in('to_student_id', studentIds);
+
+    // surveyId 유무에 따라 필터링
+    if (surveyId) {
+        query = query.eq('survey_id', surveyId);
+    } else {
+        query = query.is('survey_id', null); // surveyId가 없으면 null인 관계만 (기본 관계도)
+    }
+
+    const { data, error } = await query;
 
     if (error) {
         console.error('Error fetching relationships:', error);
@@ -105,12 +114,12 @@ async function fetchRelationships(classId: string): Promise<LinkData[]> {
 
     // D3 Link 형식으로 변환
     const linkData = data.map(rel => ({
-        source: rel.from_student_id, // 필드명 수정
-        target: rel.to_student_id,   // 필드명 수정
+        source: rel.from_student_id,
+        target: rel.to_student_id,
         type: rel.relation_type as keyof typeof RELATIONSHIP_TYPES,
     }));
 
-    console.log('Fetched and mapped relationships (LinkData):', linkData); // 로그 추가
+    console.log(`Fetched relationships for surveyId: ${surveyId ?? 'NULL'}`, linkData);
     return linkData;
 }
 
@@ -253,10 +262,10 @@ export default function ClassRelationshipPage() {
     enabled: !!classId,
   });
 
-  // 관계 목록 조회
+  // 관계 목록 조회 (surveyId 없이 호출하여 기본 관계만 가져옴)
   const { data: relationships, isLoading: isLoadingRelationships, isError: isErrorRelationships, error: errorRelationships } = useQuery({
-    queryKey: ['relations', classId],
-    queryFn: () => fetchRelationships(classId),
+    queryKey: ['relations', classId, null], // queryKey에 null 추가하여 구분
+    queryFn: () => fetchRelationships(classId, null),
     enabled: !!classId,
   });
 

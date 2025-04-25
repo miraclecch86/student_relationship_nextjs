@@ -24,6 +24,7 @@ interface RelationshipGraphProps {
   width?: number;
   height?: number;
   classId: string;
+  surveyId?: string | null;
 }
 
 export interface RelationshipGraphRef {
@@ -58,6 +59,7 @@ const RelationshipGraph = forwardRef<RelationshipGraphRef, RelationshipGraphProp
     width = 800,
     height = 600,
     classId,
+    surveyId,
   },
   ref
 ) => {

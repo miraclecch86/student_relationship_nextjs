@@ -90,14 +90,21 @@ create table relations (
   relation_type text check (relation_type in (
     'FRIEND', 'CLOSE_FRIEND', 'BEST_FRIEND', 'ACQUAINTANCE', 'MENTOR', 'MENTEE'
   )),
+  survey_id uuid references surveys(id) on delete cascade, -- 설문 ID 추가 (NULL 허용)
   created_at timestamp with time zone default now(),
-  constraint relations_from_to_student_id_unique unique (from_student_id, to_student_id)
+  constraint relations_from_to_survey_id_unique unique (from_student_id, to_student_id, survey_id) -- Unique 제약 조건 변경 (survey_id 포함)
 );
+
+-- 컬럼 주석 추가
+COMMENT ON COLUMN public.relations.survey_id IS 'Identifier for the survey this relation belongs to. NULL indicates a class-level relation.';
 
 -- relations 테이블에 RLS 활성화
 alter table relations enable row level security;
+alter table relations force row level security;
 
--- relations 테이블 RLS 정책 설정
+-- relations 테이블 RLS 정책 설정 (기존 정책 유지)
+-- (데이터 필터링은 survey_id 기준으로 어플리케이션 레벨에서 수행)
+DROP POLICY IF EXISTS "Users can view their own relations" ON public.relations;
 create policy "Users can view their own relations"
 on relations for select
 using (
@@ -109,6 +116,7 @@ using (
   )
 );
 
+DROP POLICY IF EXISTS "Users can insert their own relations" ON public.relations;
 create policy "Users can insert their own relations"
 on relations for insert
 with check (
@@ -120,6 +128,7 @@ with check (
   )
 );
 
+DROP POLICY IF EXISTS "Users can update their own relations" ON public.relations;
 create policy "Users can update their own relations"
 on relations for update
 using (
@@ -131,6 +140,7 @@ using (
   )
 );
 
+DROP POLICY IF EXISTS "Users can delete their own relations" ON public.relations;
 create policy "Users can delete their own relations"
 on relations for delete
 using (
@@ -390,3 +400,35 @@ left join questions q on q.class_id = c.id
 left join answers a on a.student_id = s.id
 group by c.id, c.name, c.user_id;
 */
+
+-- ✅ 11. 설문 테이블 (기존 파일 끝에 추가)
+CREATE TABLE IF NOT EXISTS public.surveys (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    class_id uuid REFERENCES public.classes(id) ON DELETE CASCADE NOT NULL,
+    name text NOT NULL,
+    description text,
+    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+COMMENT ON TABLE public.surveys IS 'Stores survey information for each class.';
+COMMENT ON COLUMN public.surveys.name IS 'Name of the survey.';
+COMMENT ON COLUMN public.surveys.description IS 'Optional description for the survey.';
+CREATE INDEX IF NOT EXISTS idx_surveys_class_id ON public.surveys(class_id);
+ALTER TABLE public.surveys ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.surveys FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can view surveys for their classes" ON public.surveys;
+CREATE POLICY "Users can view surveys for their classes"
+    ON public.surveys FOR SELECT
+    USING (class_id IN (SELECT id FROM public.classes WHERE user_id = auth.uid()));
+DROP POLICY IF EXISTS "Users can insert surveys for their classes" ON public.surveys;
+CREATE POLICY "Users can insert surveys for their classes"
+    ON public.surveys FOR INSERT
+    WITH CHECK (class_id IN (SELECT id FROM public.classes WHERE user_id = auth.uid()));
+DROP POLICY IF EXISTS "Users can update surveys for their classes" ON public.surveys;
+CREATE POLICY "Users can update surveys for their classes"
+    ON public.surveys FOR UPDATE
+    USING (class_id IN (SELECT id FROM public.classes WHERE user_id = auth.uid()))
+    WITH CHECK (class_id IN (SELECT id FROM public.classes WHERE user_id = auth.uid()));
+DROP POLICY IF EXISTS "Users can delete surveys for their classes" ON public.surveys;
+CREATE POLICY "Users can delete surveys for their classes"
+    ON public.surveys FOR DELETE
+    USING (class_id IN (SELECT id FROM public.classes WHERE user_id = auth.uid()));
