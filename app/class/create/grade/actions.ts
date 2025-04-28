@@ -4,10 +4,11 @@ import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
 import { Database } from '@/lib/database.types';
 
-export async function createClass({ school, grade, classNum }: {
+export async function createClass({ school, grade, classNum, year }: {
   school: string;
   grade: number;
   classNum: number;
+  year: string;
 }) {
   const cookieStore = cookies();
   console.log('[Action: createClass] Cookies:', cookieStore.getAll());
@@ -27,7 +28,7 @@ export async function createClass({ school, grade, classNum }: {
 
   console.log(`[Action: createClass] User retrieved successfully, User ID: ${user.id}`);
 
-  const className = `${school} ${grade}학년 ${classNum}반`;
+  const className = `${year} ${school} ${grade}학년 ${classNum}반`;
   console.log(`[Action: createClass] Attempting to insert class '${className}' with user_id: ${user.id}`);
 
   const { data, error } = await supabase.from("classes").insert({

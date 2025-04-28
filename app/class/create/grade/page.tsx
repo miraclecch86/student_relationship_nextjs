@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation } from '@tanstack/react-query';
 // import { supabase } from '@/lib/supabase'; // 클라이언트 supabase 사용 제거
 import { createClass as createClassAction } from './actions'; // 서버 액션 import
@@ -23,10 +23,11 @@ interface CreatedClass {
     class: number | null;
 }
 
-export default function Page({ searchParams }: { searchParams: { school: string } }) {
+export default function Page() {
   const router = useRouter();
-  // searchParams를 직접 접근하는 대신 구조 분해 할당 사용 권장
-  const schoolName = searchParams.school ?? ''; // null 병합 연산자 사용
+  const searchParams = useSearchParams();
+  const schoolName = searchParams.get('school') ?? '';
+  const year = searchParams.get('year') ?? '';
   const [grade, setGrade] = useState('');
   const [classNum, setClassNum] = useState('');
 
@@ -34,7 +35,7 @@ export default function Page({ searchParams }: { searchParams: { school: string 
   const createClassMutation = useMutation<
     CreatedClass, // 성공 시 반환 타입
     Error,        // 에러 타입
-    { school: string; grade: number; classNum: number } // mutate 인자 타입
+    { school: string; grade: number; classNum: number; year: string } // mutate 인자 타입
   >({
     mutationFn: createClassAction, // 서버 액션 함수 사용
     onSuccess: (data) => {
@@ -53,11 +54,12 @@ export default function Page({ searchParams }: { searchParams: { school: string 
     const classNumParsed = parseInt(classNum, 10);
 
     if (!isNaN(gradeNum) && !isNaN(classNumParsed) && schoolName.trim()) {
-      // 서버 액션 호출 시 객체 형태로 인자 전달
+      // 서버 액션 호출 시 객체 형태로 인자 전달 (year도 포함)
       createClassMutation.mutate({ 
           school: schoolName, 
           grade: gradeNum, 
-          classNum: classNumParsed 
+          classNum: classNumParsed,
+          year: year
       });
     } else {
       alert('학교 이름이 유효하고, 학년과 반은 숫자로 입력해주세요.');
@@ -67,6 +69,7 @@ export default function Page({ searchParams }: { searchParams: { school: string 
   return (
     <div>
       <h1>학년 / 반 입력</h1>
+      <p>연도: {year}</p>
       <p>학교: {schoolName}</p>
       <input
         type="number" // 숫자 입력 타입 사용

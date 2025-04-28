@@ -26,6 +26,7 @@ async function updateClass(id: string, newName: string): Promise<BaseClass | nul
 interface ClassWithCount extends BaseClass {
   subjectiveQuestionCount?: number; // optional로 처리하여 에러 방지
   studentCount?: number; // 학생 수 필드 추가
+  surveyCount?: number; // 설문지 수 필드 추가
 }
 
 interface ClassCardProps {
@@ -78,9 +79,8 @@ export default function ClassCard({ classData, onEdit, onDelete }: ClassCardProp
 
   // 수정 모달 저장 핸들러
   const handleSaveName = async (newName: string) => {
-    // 뮤테이션 실행 (로딩 상태는 모달이 prop으로 받음)
-    updateMutation.mutate({ id: classData.id, newName });
-    // 성공 시 onSuccess에서 모달 닫힘
+    await onEdit(classData.id, newName);
+    setIsEditModalOpen(false);
   };
 
   // 삭제 버튼 핸들러
@@ -107,22 +107,20 @@ export default function ClassCard({ classData, onEdit, onDelete }: ClassCardProp
       >
         {/* 상단: 학급 이름 */}
         <div className="bg-indigo-500 px-4 py-3">
-          <h3 className="text-white font-semibold truncate">{classData.name}</h3>
+          <h3 className="text-white font-semibold truncate text-sm">{classData.name}</h3>
         </div>
 
         {/* 하단: 정보 및 버튼 섹션 */}        
         <div className="p-4">
           {/* 정보 박스 */}          
           <div className="grid grid-cols-2 gap-3 mb-4">
-            <div className="bg-gray-100 rounded-lg p-3 text-center">
+            <div className="bg-gray-50 rounded-lg p-3 text-center">
               <p className="text-sm font-medium text-gray-600 mb-1">전체 학생</p>
               <p className="text-xl font-bold text-indigo-500">{classData.studentCount ?? 0}명</p>
             </div>
-            <div className="bg-gray-100 rounded-lg p-3 text-center">
-              <p className="text-sm font-medium text-gray-600 mb-1">주관식 질문</p>
-              <p className="text-xl font-bold text-indigo-500">
-                {classData.subjectiveQuestionCount ?? 0}개
-              </p>
+            <div className="bg-gray-50 rounded-lg p-3 text-center">
+              <p className="text-sm font-medium text-gray-600 mb-1">설문지</p>
+              <p className="text-xl font-bold text-indigo-500">{classData.surveyCount ?? 0}개</p>
             </div>
           </div>
 
@@ -132,7 +130,7 @@ export default function ClassCard({ classData, onEdit, onDelete }: ClassCardProp
             <motion.button
               onClick={handleEditClick}
               // 변경: 색상(light indigo), hover 효과(translate + shadow), 기본 스타일(rounded-md 등) 확인, active 스타일 변경
-              className="w-full px-4 py-2 bg-indigo-50 text-indigo-500 text-sm font-medium rounded-md hover:bg-indigo-100 active:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:ring-offset-1 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
+              className="w-full px-4 py-2 bg-indigo-50 text-indigo-500 text-sm font-medium rounded-md hover:bg-indigo-100 active:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:ring-offset-1 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
             >
               수정
             </motion.button>
@@ -140,7 +138,7 @@ export default function ClassCard({ classData, onEdit, onDelete }: ClassCardProp
             <motion.button
               onClick={handleDeleteClick}
               // 변경: 색상(light red), hover 효과(translate + shadow), 기본 스타일 확인, active 스타일 변경
-              className="w-full px-4 py-2 bg-red-50 text-red-600 text-sm font-medium rounded-md hover:bg-red-100 active:bg-red-200 focus:outline-none focus:ring-2 focus:ring-red-300 focus:ring-offset-1 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
+              className="w-full px-4 py-2 bg-red-50 text-red-600 text-sm font-medium rounded-md hover:bg-red-100 active:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-200 focus:ring-offset-1 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
             >
               삭제
             </motion.button>

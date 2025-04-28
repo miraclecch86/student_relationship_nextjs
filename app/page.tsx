@@ -13,8 +13,9 @@ import Link from 'next/link';
 // 주관식 질문 개수를 포함하는 새로운 인터페이스 정의
 interface ClassWithCount extends BaseClass {
   user_id: string;
-  subjectiveQuestionCount: number;
+  subjectiveQuestionCount?: number;
   studentCount: number;
+  surveyCount: number;
 }
 
 // fetchClasses 함수를 RPC 호출 대신 기본 select 로 변경
@@ -53,29 +54,21 @@ async function fetchClasses(): Promise<ClassWithCount[]> {
         .select('id', { count: 'exact', head: true })
         .eq('class_id', cls.id);
 
-      if (studentCountError) {
-        console.error(`Error fetching student count for class ${cls.id}:`, studentCountError);
-        // 에러 발생 시 기본값 반환
-        return { ...cls, studentCount: 0, subjectiveQuestionCount: 0 }; 
-      }
-
-      // 2. 주관식 질문 개수 가져오기
-      const { count: questionCount, error: countError } = await supabase
-        .from('questions')
+      // 2. 설문지 개수 가져오기
+      const { count: surveyCount, error: surveyCountError } = await supabase
+        .from('surveys')
         .select('id', { count: 'exact', head: true })
-        .eq('class_id', cls.id)
-        .eq('question_type', 'subjective');
+        .eq('class_id', cls.id);
 
-      if (countError) {
-        console.error(`Error fetching question count for class ${cls.id}:`, countError);
-         // 에러 발생 시 기본값 반환
-        return { ...cls, studentCount: studentCount ?? 0, subjectiveQuestionCount: 0 };
+      if (studentCountError || surveyCountError) {
+        console.error(`Error fetching counts for class ${cls.id}:`, studentCountError, surveyCountError);
+        return { ...cls, studentCount: 0, surveyCount: 0 };
       }
 
-      return { 
-        ...cls, 
+      return {
+        ...cls,
         studentCount: studentCount ?? 0,
-        subjectiveQuestionCount: questionCount ?? 0 
+        surveyCount: surveyCount ?? 0,
       };
     })
   );
@@ -304,10 +297,7 @@ export default function Home() {
 
   // ClassCard에 전달할 수정 함수
   const handleEditClass = async (id: string, newName: string) => {
-    console.log(`Attempting to edit class ${id} to ${newName}`);
-    // 실제 수정 로직은 ClassCard 내부의 상태 관리 및 저장 버튼 클릭 시 처리 필요
-    // 예: updateClassMutation.mutate({ id, newName });
-    // 성공/실패 처리는 해당 뮤테이션에서 담당
+    await updateClassMutation.mutateAsync({ id, newName });
   };
 
   // ClassCard에 전달할 삭제 함수
