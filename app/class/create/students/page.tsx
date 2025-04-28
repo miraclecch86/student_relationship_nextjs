@@ -303,10 +303,10 @@ export default function CreateStudentsPage() {
 
   // 학생 목록 UI 렌더링 (기존 페이지 구조 활용)
   return (
-    <div className="min-h-screen bg-gray-100 p-8">
-      <div className="max-w-md mx-auto bg-white rounded-lg shadow-md overflow-hidden">
-        <h1 className="text-xl font-bold p-4 border-b text-center text-gray-800">학생 목록 입력</h1>
-        <div className="p-4 border-b">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-700 via-indigo-800 to-indigo-900">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col">
+        <h1 className="text-2xl font-bold p-6 border-b text-center text-indigo-800">학생 목록 입력</h1>
+        <div className="p-6 border-b">
           <div className="flex gap-2 items-center">
             <input
               type="text"
@@ -314,18 +314,18 @@ export default function CreateStudentsPage() {
               onChange={(e) => setNewStudentName(e.target.value)}
               onKeyPress={handleAddStudentKeyPress}
               placeholder="학생 이름 입력 후 Enter"
-              className="flex-grow min-w-0 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm shadow-sm"
+              className="flex-grow min-w-0 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm shadow-sm text-black placeholder:text-gray-400"
             />
             <button
               onClick={handleAddStudent}
               disabled={!newStudentName.trim() || addStudentMutation.isPending}
-              className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+              className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
             >
               {addStudentMutation.isPending ? '추가중...' : '추가'}
             </button>
           </div>
         </div>
-        <div className="flex-grow overflow-y-auto p-3 space-y-2 h-[calc(100vh-300px)] max-h-[500px]">
+        <div className="flex-grow overflow-y-auto p-4 space-y-2 max-h-[400px]">
           <AnimatePresence>
             {students && students.length > 0 ? (
               <DndContext
@@ -343,7 +343,7 @@ export default function CreateStudentsPage() {
                       key={student.id}
                       student={student}
                       classId={classId}
-                      isSelected={selectedStudentId === student.id} // 선택 상태 전달
+                      isSelected={selectedStudentId === student.id}
                       onUpdateStudent={handleUpdateStudent}
                       onDeleteStudent={handleDeleteStudent}
                     />
@@ -354,10 +354,10 @@ export default function CreateStudentsPage() {
                     <StudentListItem
                       student={students.find(s => s.id === activeId)!}
                       classId={classId}
-                      onSelect={() => {}} // 빈 함수 전달
-                      isSelected={false} // 오버레이 아이템은 선택 안됨
-                      onUpdateStudent={async () => {}} // 빈 함수 전달
-                      onDeleteStudent={async () => {}} // 빈 함수 전달
+                      onSelect={() => {}}
+                      isSelected={false}
+                      onUpdateStudent={async () => {}}
+                      onDeleteStudent={async () => {}}
                       isDragging={true}
                     />
                   ) : null}
@@ -368,11 +368,11 @@ export default function CreateStudentsPage() {
             )}
           </AnimatePresence>
         </div>
-        <div className="p-4 border-t text-center">
+        <div className="p-6 border-t text-center">
           <button 
             onClick={handleComplete} 
             disabled={!students || students.length === 0}
-            className="w-full px-4 py-2 text-sm font-medium bg-green-600 text-white rounded-md shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full px-4 py-2 text-base font-semibold bg-indigo-600 text-white rounded-lg shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             학생 목록 입력 완료
           </button>

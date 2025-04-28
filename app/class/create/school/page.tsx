@@ -22,11 +22,11 @@ export default function Page() {
   };
 
   return (
-    <div>
-      <h1>학교 정보 입력</h1>
-      <div style={{ marginBottom: '1rem' }}>
-        <label>
-          연도
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-700 via-indigo-800 to-indigo-900">
+      <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+        <h1 className="text-2xl font-bold text-indigo-800 mb-6 text-center">학교 정보 입력</h1>
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">연도</label>
           <input
             type="number"
             placeholder="예: 2024"
@@ -35,24 +35,27 @@ export default function Page() {
             min="2000"
             max="2100"
             required
-            style={{ marginLeft: '0.5rem' }}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black placeholder:text-gray-400"
           />
-        </label>
-      </div>
-      <div style={{ marginBottom: '1rem' }}>
-        <label>
-          학교 이름
+        </div>
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-1">학교 이름</label>
           <input
             type="text"
             placeholder="학교 이름"
             value={schoolName}
             onChange={(e) => setSchoolName(e.target.value)}
             required
-            style={{ marginLeft: '0.5rem' }}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black placeholder:text-gray-400"
           />
-        </label>
+        </div>
+        <button
+          onClick={handleSubmit}
+          className="w-full py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition"
+        >
+          다음 (학년/반 입력)
+        </button>
       </div>
-      <button onClick={handleSubmit}>다음 (학년/반 입력)</button>
     </div>
   );
 } 
