@@ -613,13 +613,13 @@ export default function ClassRelationshipPage() {
                         {sortedStudents.map(student => (
                           <SortableStudentItem
                             key={student.id}
-                            student={student}
-                            classId={classId}
-                            onSelect={handleSelectStudent}
-                            isSelected={selectedStudent?.id === student.id}
-                            onUpdateStudent={handleUpdateStudent}
-                            onDeleteStudent={handleDeleteStudent}
-                          />
+                        student={student}
+                        classId={classId}
+                        onSelect={handleSelectStudent}
+                        isSelected={selectedStudent?.id === student.id}
+                        onUpdateStudent={handleUpdateStudent}
+                        onDeleteStudent={handleDeleteStudent}
+                      />
                         ))}
                       </div>
                     </SortableContext>

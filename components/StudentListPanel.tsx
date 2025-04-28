@@ -25,6 +25,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { arrayMove } from '@dnd-kit/sortable';
+import { useRouter, usePathname } from 'next/navigation';
 
 // NodeData 정의 (공통으로 사용될 수 있으므로 lib 등에 정의하는 것이 좋음)
 interface NodeData extends Student {
@@ -158,14 +159,17 @@ function SortableStudentItem(props: {
 
 interface StudentListPanelProps {
   classId: string;
+  onStudentSelect?: (studentId: string) => void;
 }
 
-export default function StudentListPanel({ classId }: StudentListPanelProps) {
+export default function StudentListPanel({ classId, onStudentSelect }: StudentListPanelProps) {
   const queryClient = useQueryClient();
+  const router = useRouter();
+  const pathname = usePathname();
   const [newStudentName, setNewStudentName] = useState('');
   const [studentOrder, setStudentOrder] = useState<string[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null); // 선택 상태만 관리
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
@@ -248,8 +252,20 @@ export default function StudentListPanel({ classId }: StudentListPanelProps) {
   };
 
   const handleStudentClick = (studentId: string) => {
-    setSelectedStudentId(prevId => prevId === studentId ? null : studentId); // 선택 토글
-    // 페이지 이동 로직 제거
+    // 설문 상세 페이지 등에서 onStudentSelect가 전달되면 그걸 우선 사용
+    if (onStudentSelect) {
+      onStudentSelect(studentId);
+      return;
+    }
+    // 기존 로직 (설문 목록 페이지 등)
+    const currentPath = pathname;
+    const isSurveyListPage = /^\/class\/[^/]+\/survey$/.test(currentPath);
+    if (isSurveyListPage) {
+      // 설문 목록 페이지: 아무 작업도 하지 않음
+      return;
+    } else {
+      router.push(`/class/${classId}/student/${studentId}`);
+    }
   };
 
   const handleDragStart = (event: DragStartEvent) => {

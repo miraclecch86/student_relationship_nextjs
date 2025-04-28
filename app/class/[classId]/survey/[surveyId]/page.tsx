@@ -62,8 +62,13 @@ async function fetchRelationships(classId: string, surveyId?: string | null): Pr
     return linkData;
 }
 
-async function fetchQuestions(classId: string): Promise<Question[]> {
-    const { data, error } = await supabase.from('questions').select('*').eq('class_id', classId).order('created_at');
+async function fetchQuestions(classId: string, surveyId: string): Promise<Question[]> {
+    const { data, error } = await supabase
+        .from('questions')
+        .select('*')
+        .eq('class_id', classId)
+        .eq('survey_id', surveyId)
+        .order('created_at');
     if (error) { console.error("Error fetching questions:", error); return []; }
     return data;
 }
@@ -122,9 +127,9 @@ export default function SurveyRelationshipPage() {
   });
 
   const { data: questions, isLoading: isLoadingQuestions } = useQuery({
-      queryKey: ['questions', classId],
-      queryFn: () => fetchQuestions(classId),
-      enabled: !!classId,
+    queryKey: ['questions', classId, surveyId],
+    queryFn: () => fetchQuestions(classId, surveyId),
+    enabled: !!classId && !!surveyId,
   });
 
   const rankedStudentsByType = useMemo(() => {
@@ -311,7 +316,12 @@ export default function SurveyRelationshipPage() {
         <div className="flex-grow flex flex-col md:flex-row gap-4">
 
           <div className="w-full md:w-[230px] bg-white rounded-lg shadow-md flex flex-col flex-shrink-0">
-            <StudentListPanel classId={classId} />
+            <StudentListPanel
+              classId={classId}
+              onStudentSelect={(studentId) => {
+                router.push(`/class/${classId}/survey/${surveyId}/student/${studentId}`);
+              }}
+            />
           </div>
 
           <div className="flex-1 flex flex-col gap-5">

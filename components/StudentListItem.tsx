@@ -92,7 +92,6 @@ export default function StudentListItem({
   const handleCardClick = () => {
     if (isEditing) return;
     onSelect(student);
-    router.push(`/class/${classId}/student/${student.id}`);
   };
 
   return (
@@ -115,7 +114,7 @@ export default function StudentListItem({
         >
           <Bars3Icon className="w-3.5 h-3.5 text-gray-400" />
         </div>
-        {isEditing ? (
+      {isEditing ? (
           <input
             type="text"
             value={editedName}
@@ -137,32 +136,32 @@ export default function StudentListItem({
                 className="p-1 rounded-full hover:bg-green-100 text-gray-700 hover:text-green-600"
                 title="저장"
               >
-                <CheckIcon className="w-4 h-4" />
-              </button>
+            <CheckIcon className="w-4 h-4" />
+          </button>
               <button
                 onClick={handleCancelClick}
                 className="p-1 rounded-full hover:bg-red-100 text-gray-700 hover:text-red-600"
                 title="취소"
               >
-                <XMarkIcon className="w-4 h-4" />
-              </button>
+            <XMarkIcon className="w-4 h-4" />
+          </button>
             </>
-          ) : (
+      ) : (
             <div className={`flex items-center gap-1 transition-opacity duration-150 ${isHovering ? 'opacity-100' : 'opacity-0'}`}>
-              <button
-                onClick={handleEditClick}
+        <button
+          onClick={handleEditClick}
                 className="p-1 rounded-full hover:bg-gray-200 text-gray-700 hover:text-blue-600"
-                title="이름 수정"
-              >
+          title="이름 수정"
+        >
                 <PencilIcon className="w-4 h-4" />
-              </button>
-              <button
-                onClick={handleDeleteClick}
+        </button>
+        <button
+          onClick={handleDeleteClick}
                 className="p-1 rounded-full hover:bg-gray-200 text-gray-700 hover:text-red-600"
-                title="삭제"
-              >
+          title="삭제"
+        >
                 <TrashIcon className="w-4 h-4" />
-              </button>
+        </button>
             </div>
           )}
         </div>
