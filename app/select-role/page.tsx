@@ -15,53 +15,91 @@ export default function SelectRole() {
     setError(null);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('사용자 정보를 찾을 수 없습니다.');
+      // 역할 업데이트 전 세션 갱신 시도
+      console.log('[DEBUG SelectRole] Attempting to refresh session...');
+      const { error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError) {
+        console.error('[DEBUG SelectRole] Error refreshing session:', refreshError);
+        // 세션 갱신 실패 시, 로그인 재시도 유도
+        throw new Error('사용자 세션 갱신에 실패했습니다. 다시 로그인해주세요.');
+      }
+      console.log('[DEBUG SelectRole] Session refreshed successfully.');
 
-      // 1. profiles 테이블 업데이트
+      // 갱신된 세션 정보 가져오기
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError || !session?.user) {
+        console.error('[DEBUG SelectRole] Error getting session or user after refresh:', sessionError);
+        throw new Error('갱신된 사용자 세션 정보를 찾을 수 없습니다.');
+      }
+      const user = session.user;
+
+      console.log('[DEBUG SelectRole] Updating role for user (after refresh):', user.id);
+
+      const { error: metadataError } = await supabase.auth.updateUser({
+        data: { role: role }
+      });
+
+      if (metadataError) {
+        console.error('[DEBUG SelectRole] Metadata update error:', metadataError);
+        throw metadataError;
+      }
+
+      console.log('[DEBUG SelectRole] User metadata updated successfully');
+
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({ 
+        .upsert({ 
+          id: user.id, 
           role: role,
-          role_verified: true 
-        })
-        .eq('id', user.id);
+          role_verified: true,
+          email: user.email
+        }, { 
+          onConflict: 'id' 
+        });
 
-      if (profileError) throw profileError;
+      if (profileError) {
+        console.error('[DEBUG SelectRole] Profile upsert error:', profileError);
+        throw profileError;
+      }
 
-      // 2. user_roles 테이블에 추가 (중복 방지)
-      const { error: roleError } = await supabase
+      console.log('[DEBUG SelectRole] Profile upserted successfully');
+
+      const { error: roleTableError } = await supabase
         .from('user_roles')
         .upsert({ 
           user_id: user.id,
           role: role 
         }, {
-          onConflict: 'user_id,role'
+          onConflict: 'user_id, role' 
         });
+      
+      if (roleTableError) {
+        console.error('[DEBUG SelectRole] User_roles upsert error:', roleTableError);
+        if (roleTableError.code === '23505') {
+            console.error('[DEBUG SelectRole] Unique constraint violation on user_roles.');
+        } else if (roleTableError.code === '42P10') {
+             console.error('[DEBUG SelectRole] ON CONFLICT specification error. Check constraint columns.');
+        }
+        throw roleTableError;
+      }
 
-      if (roleError) throw roleError;
+      console.log('[DEBUG SelectRole] User_roles upserted successfully');
 
-      // 3. 역할에 따른 리다이렉트
       if (role === 'teacher') {
-        // 유저의 classId 가져오기
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('class_id')
-          .eq('id', user.id)
-          .single();
-        
-        if (profileError) throw profileError;
-        if (!profile?.class_id) throw new Error('클래스 정보를 찾을 수 없습니다.');
-
-        // 해당 클래스 페이지로 리다이렉트
-        router.replace(`/class/${profile.class_id}`);
+        router.replace('/teacher');
       } else {
         router.replace('/student');
       }
 
     } catch (error) {
-      console.error('Role selection error:', error);
-      setError('역할 선택 중 오류가 발생했습니다. 다시 시도해주세요.');
+      console.error('[DEBUG SelectRole] Role selection error caught:', error);
+      // 세션 관련 에러 메시지 표시
+      if (error instanceof Error && (error.message.includes('세션') || error.message.includes('session'))) {
+        setError(error.message);
+      } else {
+        setError('역할 선택 중 오류가 발생했습니다. 다시 시도해주세요.');
+      }
     } finally {
       setIsLoading(false);
     }

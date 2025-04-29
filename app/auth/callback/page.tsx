@@ -10,36 +10,23 @@ export default function AuthCallbackPage() {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-        if (userError) {
-          console.error('Error getting user:', userError);
-          router.replace('/login');
+        // 세션 처리를 위해 getUser() 또는 getSession()을 호출할 수 있지만,
+        // 에러 처리를 제외하고 특별한 로직 없이 성공 시 리디렉션합니다.
+        const { error } = await supabase.auth.getSession(); 
+        
+        if (error) {
+          console.error('[DEBUG Callback] Error during getSession on callback:', error);
+          router.replace('/login?error=auth_callback_failed');
           return;
         }
+        
+        // 역할 확인 없이 기본 페이지(예: /teacher)로 리디렉션
+        console.log('[DEBUG Callback] Auth successful, redirecting to /teacher...');
+        router.replace('/teacher'); 
 
-        if (!user) {
-          console.log('[DEBUG] No user found in callback, redirecting to login.');
-          router.replace('/login');
-          return;
-        }
-
-        const userRole = user?.user_metadata?.role;
-        console.log('[DEBUG] Checking role from getUser() in callback page. userRole:', userRole, 'User metadata:', user?.user_metadata);
-
-        if (!userRole) {
-          router.replace('/select-role');
-        } else if (userRole === 'teacher') {
-          router.replace('/');
-        } else if (userRole === 'student') {
-          router.replace('/student');
-        } else {
-          console.warn('Unexpected user role:', userRole);
-          router.replace('/select-role');
-        }
       } catch (err) {
-        console.error('Auth callback error:', err);
-        router.replace('/login');
+        console.error('[DEBUG Callback] Unexpected error during callback handling:', err);
+        router.replace('/login?error=callback_exception');
       }
     };
 

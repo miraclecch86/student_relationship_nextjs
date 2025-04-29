@@ -13,7 +13,8 @@ export default function LoginPage() {
     let isMounted = true;
 
     const checkSessionAndRedirect = async () => {
-      setIsLoading(true);
+      if (isMounted && !isLoading) setIsLoading(true);
+      
       try {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
@@ -28,19 +29,37 @@ export default function LoginPage() {
 
         if (session) {
           const user = session.user;
-          const userRole = user?.user_metadata?.role;
+          let userRole = user?.user_metadata?.role;
 
-          console.log('User session found. Role:', userRole);
-          console.log('[DEBUG] Checking role before redirect in login page. userRole:', userRole, 'User metadata:', user?.user_metadata);
+          console.log('[DEBUG Login Page] Session found. Metadata Role:', userRole);
+
+          if (!userRole) {
+            console.log('[DEBUG Login Page] No role in metadata, checking profiles...');
+            const { data: profile, error: profileError } = await supabase
+              .from('profiles')
+              .select('role')
+              .eq('id', user.id)
+              .single();
+
+            if (profileError && profileError.code !== 'PGRST116') {
+              console.error('Profile fetch error in login page:', profileError);
+              setIsLoading(false);
+              return;
+            } 
+            userRole = profile?.role;
+            console.log('[DEBUG Login Page] Role from profile:', userRole);
+          }
+          
+          console.log('[DEBUG Login Page] Final role check:', userRole);
 
           if (!userRole) {
             router.replace('/select-role');
           } else if (userRole === 'teacher') {
-            router.replace('/class');
+            router.replace('/teacher');
           } else if (userRole === 'student') {
             router.replace('/student');
           } else {
-            console.warn('Unexpected user role:', userRole);
+            console.warn('Unexpected user role in login page:', userRole);
             router.replace('/select-role');
           }
         } else {
@@ -48,7 +67,7 @@ export default function LoginPage() {
         }
       } catch (err) {
         if (isMounted) {
-          console.error('Error during session check:', err);
+          console.error('Error during session check in login page:', err);
           setError('사용자 정보를 확인하는 중 오류가 발생했습니다.');
           setIsLoading(false);
         }
@@ -58,10 +77,15 @@ export default function LoginPage() {
     checkSessionAndRedirect();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (event, session) => {
         if (isMounted) {
-          console.log('Auth state changed:', _event, session);
-          checkSessionAndRedirect();
+          console.log('[DEBUG Login Page] Auth state changed:', event);
+          if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+            checkSessionAndRedirect();
+          }
+          if (event === 'SIGNED_OUT') {
+            setIsLoading(false);
+          }
         }
       }
     );
@@ -76,7 +100,6 @@ export default function LoginPage() {
     setError(null);
     setIsLoading(true);
 
-    // 개발 환경과 프로덕션 환경의 리다이렉트 URL을 구분
     const redirectUrl = process.env.NODE_ENV === 'development' 
       ? 'http://localhost:3000/auth/callback'
       : 'https://student-relationship.vercel.app/auth/callback';
@@ -122,10 +145,7 @@ export default function LoginPage() {
           <div className="space-y-4">
             <button
               onClick={() => handleLogin('google')}
-              disabled={isLoading}
-              className={`w-full bg-white text-gray-800 border border-gray-300 rounded-md px-4 py-2 shadow-sm hover:bg-gray-100 flex items-center justify-center space-x-2 transition duration-150 ease-in-out ${
-                isLoading ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
+              className="w-full bg-white text-gray-800 border border-gray-300 rounded-md px-4 py-2 shadow-sm hover:bg-gray-100 flex items-center justify-center space-x-2 transition duration-150 ease-in-out"
             >
               <svg
                 className="w-5 h-5"
@@ -155,10 +175,7 @@ export default function LoginPage() {
 
             <button
               onClick={() => handleLogin('kakao')}
-              disabled={isLoading}
-              className={`w-full bg-[#FEE500] text-black font-bold rounded-md px-4 py-2 shadow-sm hover:brightness-95 flex items-center justify-center space-x-2 transition duration-150 ease-in-out ${
-                isLoading ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
+              className="w-full bg-[#FEE500] text-black font-bold rounded-md px-4 py-2 shadow-sm hover:brightness-95 flex items-center justify-center space-x-2 transition duration-150 ease-in-out"
             >
               <svg
                 className="w-5 h-5"
