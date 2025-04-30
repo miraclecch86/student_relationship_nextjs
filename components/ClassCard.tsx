@@ -16,7 +16,7 @@ async function updateClass(id: string, newName: string): Promise<BaseClass | nul
     .from('classes')
     .update({ name: newName.trim() })
     .eq('id', id)
-    .select('id, name, created_at')
+    .select('id, name, created_at, user_id')
     .single();
   if (error) throw new Error(error.message);
   return data;

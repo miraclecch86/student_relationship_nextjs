@@ -1,49 +1,69 @@
 "use server";
 
-import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
-import { cookies } from "next/headers";
+import { cookies } from 'next/headers';
+import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { Database } from '@/lib/database.types';
+import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 
-export async function createClass({ school, grade, classNum, year }: {
+export async function createClass(formData: {
+  year: number;
   school: string;
   grade: number;
   classNum: number;
-  year: string;
 }) {
-  const cookieStore = cookies();
-  console.log('[Action: createClass] Cookies:', cookieStore.getAll());
-
-  const supabase = createServerComponentClient<Database>({ cookies: () => cookieStore });
+  const supabase = createServerComponentClient<Database>({ cookies });
   
-  const { data: { user }, error: getUserError } = await supabase.auth.getUser();
-
-  if (getUserError) {
-    console.error("Error getting user:", getUserError);
-    throw new Error(`사용자 정보를 가져오는 중 오류 발생: ${getUserError.message}`);
-  }
-
-  if (!user) {
-    throw new Error("로그인된 사용자 세션이 존재하지 않습니다. (getUser 반환값 null)");
-  }
-
-  console.log(`[Action: createClass] User retrieved successfully, User ID: ${user.id}`);
-
-  const className = `${year} ${school} ${grade}학년 ${classNum}반`;
-  console.log(`[Action: createClass] Attempting to insert class '${className}' with user_id: ${user.id}`);
-
-  const { data, error } = await supabase.from("classes").insert({
-    name: className,
-    user_id: user.id,
-  }).select().single();
-
-  if (error) {
-    console.error("Error inserting class (Full Error Object):", error);
-    if (error.message.includes('violates row-level security policy')) {
-        throw new Error(`학급 생성 실패: RLS 정책 위반. 현재 사용자(ID: ${user.id})로 ${className} 학급 생성이 거부되었습니다. 정책을 확인하세요.`);
+  let newClassId: string | null = null;
+  
+  try {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError || !user) {
+      throw new Error(userError?.message || '로그인이 필요합니다.');
     }
-    throw new Error(`학급 생성 중 데이터베이스 오류가 발생했습니다: ${error.message}`);
-  }
+    
+    console.log('[Action: createClass] User retrieved successfully, User ID:', user.id);
 
-  console.log("[Action: createClass] Class created successfully:", data);
-  return data;
+    const className = `${formData.year} ${formData.school} ${formData.grade}학년 ${formData.classNum}반`;
+    
+    console.log('[Action: createClass] Attempting to insert class', className, 'with user_id:', user.id);
+    
+    const { data: insertedData, error: insertError } = await supabase
+      .from('classes')
+      .insert([{ 
+        name: className,
+        user_id: user.id,
+      } as any])
+      .select('id')
+      .single();
+
+    if (insertError || !insertedData?.id) {
+      console.error('[Action: createClass] Insert Error or ID missing:', insertError, insertedData);
+      throw new Error(insertError?.message || '학급 생성 후 ID를 반환받지 못했습니다.');
+    }
+    
+    newClassId = insertedData.id;
+    console.log('[Action: createClass] Class created successfully with ID:', newClassId);
+
+    revalidatePath('/teacher');
+
+  } catch (error) {
+    console.error('[Action: createClass] Error caught:', error);
+    let errorMessage = '학급 생성 중 오류가 발생했습니다.';
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    const params = new URLSearchParams();
+    params.set('year', String(formData.year));
+    params.set('school', formData.school);
+    params.set('grade', String(formData.grade));
+    params.set('classNum', String(formData.classNum));
+    params.set('error', errorMessage);
+    redirect(`/class/create/grade?${params.toString()}`);
+  }
+  
+  if (newClassId) {
+     redirect(`/class/create/students?classId=${newClassId}`);
+  }
 }

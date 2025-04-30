@@ -29,12 +29,12 @@ const WeeklyAnswersBox: React.FC<WeeklyAnswersBoxProps> = ({
 }) => {
   // 선택된 학생의 답변만 ID를 키로 하는 Map으로 미리 만들어 둠 (성능 개선)
   const selectedStudentAnswerMap = useMemo(() => {
-    const map = new Map<string, string | null>(); // question_id -> answer_text
-    if (selectedStudent && answers) {
+    const map = new Map<string, string | null>();
+    if (answers && selectedStudent) {
       answers
         .filter(answer => answer.student_id === selectedStudent.id)
         .forEach(answer => {
-          map.set(answer.question_id, answer.answer_text);
+          map.set(answer.question_id, answer.answer_text ?? null);
         });
     }
     return map;
