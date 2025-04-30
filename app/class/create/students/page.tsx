@@ -314,7 +314,7 @@ export default function CreateStudentsPage() {
               onChange={(e) => setNewStudentName(e.target.value)}
               onKeyPress={handleAddStudentKeyPress}
               placeholder="학생 이름 입력 후 Enter"
-              className="flex-grow min-w-0 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm shadow-sm text-black placeholder:text-gray-400"
+              className="flex-grow min-w-0 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm shadow-sm text-black placeholder:text-gray-500"
             />
             <button
               onClick={handleAddStudent}

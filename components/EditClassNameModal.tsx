@@ -72,7 +72,10 @@ export default function EditClassNameModal({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
              >
-              <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-lg bg-white p-6 text-left align-middle shadow-lg transition-all">
+              <Dialog.Panel 
+                className="w-full max-w-md transform overflow-hidden rounded-lg bg-white p-6 text-left align-middle transition-all"
+                style={{ boxShadow: '0 -8px 20px rgba(0, 0, 0, 0.1), 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)' }}
+              >
                 <Dialog.Title
                   as="h3"
                   className="text-lg font-semibold leading-6 text-gray-900" // 아이콘 제거

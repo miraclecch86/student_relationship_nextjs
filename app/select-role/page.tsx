@@ -108,7 +108,7 @@ export default function SelectRole() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100">
       <div className="bg-white p-8 rounded-lg shadow-md w-96">
-        <h1 className="text-2xl font-bold text-center mb-6">당신의 역할을 선택해주세요</h1>
+        <h1 className="text-2xl font-bold text-center mb-6 text-indigo-600">당신의 역할을 선택해주세요</h1>
         
         <div className="space-y-4">
           <button

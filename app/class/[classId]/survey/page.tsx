@@ -8,6 +8,8 @@ import StudentListPanel from '@/components/StudentListPanel';
 import SurveyCard from '@/components/SurveyCard';
 import { ArrowPathIcon, ExclamationCircleIcon, PlusIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import ConfirmModal from '@/components/ConfirmModal';
+import EditSurveyModal from '@/components/EditSurveyModal';
 
 // --- 데이터 Fetching 함수 --- 
 
@@ -57,6 +59,37 @@ async function createSurvey(classId: string, name: string, description?: string)
   return data;
 }
 
+// 설문 삭제 함수 (예시: CASCADE 설정이 DB에 되어 있다고 가정)
+async function deleteSurvey(surveyId: string): Promise<void> {
+  const { error } = await supabase
+    .from('surveys')
+    .delete()
+    .eq('id', surveyId);
+  if (error) throw new Error(`설문 삭제 실패: ${error.message}`);
+}
+
+// 설문 업데이트 함수 추가
+async function updateSurvey(surveyData: Partial<Survey>): Promise<Survey | null> {
+    if (!surveyData.id) throw new Error("수정할 설문 ID가 없습니다.");
+    const { id, ...updateData } = surveyData; // id는 조건에만 사용
+    
+    // 업데이트할 필드가 있는지 확인
+    if (Object.keys(updateData).length === 0) {
+        console.log("No fields to update for survey:", id);
+        return null; // 변경 사항 없으면 null 반환
+    }
+
+    const { data, error } = await supabase
+      .from('surveys')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw new Error(`설문 업데이트 실패: ${error.message}`);
+    return data;
+}
+
 export default function SurveyListPage() {
   const params = useParams();
   const router = useRouter();
@@ -66,6 +99,8 @@ export default function SurveyListPage() {
   const [showCreateSurveyModal, setShowCreateSurveyModal] = useState(false);
   const [newSurveyName, setNewSurveyName] = useState('');
   const [newSurveyDesc, setNewSurveyDesc] = useState('');
+  const [surveyToDelete, setSurveyToDelete] = useState<Survey | null>(null);
+  const [surveyToEdit, setSurveyToEdit] = useState<Survey | null>(null);
 
   // 학급 상세 정보 조회 (헤더용)
   const { data: classDetails, isLoading: isLoadingClassDetails } = useQuery({
@@ -96,6 +131,40 @@ export default function SurveyListPage() {
     },
   });
 
+  // 설문 삭제 Mutation
+  const deleteSurveyMutation = useMutation<void, Error, string>({
+    mutationFn: deleteSurvey,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['surveys', classId] });
+      toast.success('설문이 삭제되었습니다.');
+      setSurveyToDelete(null);
+    },
+    onError: (error) => {
+      toast.error(error.message);
+      setSurveyToDelete(null);
+    }
+  });
+
+  // 설문 수정 Mutation 추가
+  const updateSurveyMutation = useMutation<Survey | null, Error, Partial<Survey>>({
+    mutationFn: updateSurvey,
+    onSuccess: (updatedSurvey) => {
+      if (updatedSurvey) {
+        queryClient.invalidateQueries({ queryKey: ['surveys', classId] });
+        toast.success('설문 정보가 수정되었습니다.');
+      } else {
+        // 변경 사항이 없었을 경우 (toast.info 대신 기본 toast 사용)
+        toast('변경된 내용이 없습니다.'); 
+      }
+      setSurveyToEdit(null); // 모달 닫기
+    },
+    onError: (error) => {
+      toast.error(error.message);
+      // 모달을 닫지 않고 에러를 표시할 수도 있음
+      // setSurveyToEdit(null);
+    }
+  });
+
   const handleCreateSurvey = () => {
     if (newSurveyName.trim()) {
       createSurveyMutation.mutate({ name: newSurveyName, description: newSurveyDesc });
@@ -106,6 +175,32 @@ export default function SurveyListPage() {
 
   const handleSurveyClick = (surveyId: string) => {
     router.push(`/class/${classId}/survey/${surveyId}`);
+  };
+
+  // 수정 버튼 클릭 시
+  const handleEditSurvey = (survey: Survey) => {
+    setSurveyToEdit(survey); // 수정 모달 열기
+  };
+
+  // 수정 모달 저장 버튼 클릭 시
+  const handleSaveSurveyEdit = async (updatedSurveyData: Partial<Survey>) => {
+    await updateSurveyMutation.mutateAsync(updatedSurveyData);
+    // 성공/실패 처리는 onSuccess/onError에서
+  };
+
+  // 삭제 버튼 클릭 시 (확인 모달 열기)
+  const handleDeleteSurveyClick = (surveyId: string) => {
+    const survey = surveys?.find(s => s.id === surveyId);
+    if (survey) {
+      setSurveyToDelete(survey); 
+    }
+  };
+  
+  // 삭제 확인 모달에서 확인 눌렀을 때
+  const confirmSurveyDelete = () => {
+    if (surveyToDelete) {
+      deleteSurveyMutation.mutate(surveyToDelete.id);
+    }
   };
 
   const isLoading = isLoadingClassDetails || isLoadingSurveys;
@@ -157,7 +252,13 @@ export default function SurveyListPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {surveys && surveys.length > 0 ? (
                 surveys.map((survey) => (
-                  <SurveyCard key={survey.id} survey={survey} onClick={() => handleSurveyClick(survey.id)} />
+                  <SurveyCard 
+                    key={survey.id} 
+                    survey={survey} 
+                    onClick={() => handleSurveyClick(survey.id)}
+                    onEdit={handleEditSurvey}
+                    onDelete={handleDeleteSurveyClick}
+                  />
                 ))
               ) : (
                 <p className="text-gray-500 italic col-span-full text-center mt-8">생성된 설문이 없습니다. '새 설문 만들기' 버튼을 클릭하여 설문을 추가하세요.</p>
@@ -202,6 +303,29 @@ export default function SurveyListPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {surveyToDelete && (
+        <ConfirmModal
+          isOpen={!!surveyToDelete}
+          onClose={() => setSurveyToDelete(null)}
+          onConfirm={confirmSurveyDelete}
+          title="설문 삭제 확인"
+          message={`'${surveyToDelete.name}' 설문을 정말 삭제하시겠습니까? 관련된 모든 데이터(질문, 답변, 관계 등)가 삭제됩니다.`}
+          confirmText="삭제"
+          isLoading={deleteSurveyMutation.isPending}
+        />
+      )}
+
+      {/* 설문 수정 모달 */}      
+      {surveyToEdit && (
+          <EditSurveyModal
+            isOpen={!!surveyToEdit}
+            onClose={() => setSurveyToEdit(null)}
+            onSave={handleSaveSurveyEdit}
+            initialSurvey={surveyToEdit}
+            isLoading={updateSurveyMutation.isPending}
+          />
       )}
     </div>
   );

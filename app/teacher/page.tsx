@@ -143,143 +143,45 @@ export default function TeacherPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
+    console.log("[TeacherPage MOUNT]");
 
-    const fetchProfileRole = async (userId: string): Promise<string | null | undefined> => {
-      console.log('[TeacherPage Auth] fetchProfileRole called for user:', userId);
-      try {
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', userId)
-          .single();
+    // 인증/역할 확인 로직 모두 제거 - Middleware에서 처리
 
-        if (profileError && profileError.code !== 'PGRST116') {
-          console.error('[TeacherPage Auth] Profile fetch error inside function:', profileError);
-          return null;
-        }
-        console.log('[TeacherPage Auth] Role from profile inside function:', profile?.role);
-        return profile?.role;
-      } catch (err) {
-        console.error('[TeacherPage Auth] Unexpected error in fetchProfileRole:', err);
-        return null;
-      }
-    };
+    // 데이터 로딩 시작 시 로딩 상태 관리 (useQuery 사용)
+    // setIsAuthLoading(true); // 제거
 
-    const checkAuth = async () => {
-      console.log(`[TeacherPage Auth Check START] isMounted: ${isMounted}, isAuthLoading: ${isAuthLoading}, isAuthenticated: ${isAuthenticated}`);
-      if (!isMounted) {
-          console.log('[TeacherPage Auth Check END] Unmounted, exiting.');
-          return;
-      }
-
-      // 데이터 동기화 시간을 벌기 위한 지연 (일단 유지)
-      console.log('[TeacherPage Auth] Adding short delay before auth check...');
-      await new Promise(resolve => setTimeout(resolve, 200)); 
-      console.log('[TeacherPage Auth] Delay finished, starting auth check.');
-
-      // 로딩 상태 설정
-      if (isMounted) setIsAuthLoading(true);
-      console.log('[TeacherPage Auth] Set isAuthLoading to true');
-      try {
-        console.log('[TeacherPage Auth] Calling getSession...');
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        console.log(`[TeacherPage Auth] getSession completed. isMounted: ${isMounted}`);
-        if (!isMounted) {
-            console.log('[TeacherPage Auth Check END] Unmounted after getSession, exiting.');
-            return; // 비동기 작업 중 언마운트 확인
-        }
-
-        if (sessionError || !session) {
-          console.error("[TeacherPage Auth] Session Error or No Session:", sessionError);
-          router.replace('/login?error=session_check_failed');
-          console.log('[TeacherPage Auth Check END] Redirecting to login (no session).');
-          return;
-        }
-
-        const user = session.user;
-        let userRole = user?.user_metadata?.role;
-        console.log(`[TeacherPage Auth] Session OK. User ID: ${user.id}. Metadata Role: ${userRole}`);
-
-        if (!userRole) {
-          console.log('[TeacherPage Auth] No role in metadata, calling fetchProfileRole...');
-          userRole = await fetchProfileRole(user.id);
-          console.log(`[TeacherPage Auth] fetchProfileRole returned: ${userRole}. isMounted: ${isMounted}`);
-           if (!isMounted) {
-               console.log('[TeacherPage Auth Check END] Unmounted after fetchProfileRole, exiting.');
-               return; // 비동기 작업 중 언마운트 확인
-           }
-           if (userRole === null) { // fetchProfileRole에서 오류 발생 시
-              console.error('[TeacherPage Auth] Failed to fetch profile role, redirecting to login.');
-              router.replace('/login?error=profile_fetch_failed');
-              console.log('[TeacherPage Auth Check END] Redirecting to login (profile fetch failed).');
-              return;
-           }
-        }
-
-        console.log(`[TeacherPage Auth] Final role check. Determined Role: ${userRole}`);
-        if (userRole === 'teacher') {
-          console.log('[TeacherPage Auth] Role is teacher, proceeding. Setting isAuthenticated to true.');
-          // 상태 업데이트는 isMounted 확인 후
-          if (isMounted) setIsAuthenticated(true);
-        } else if (userRole === 'student') {
-          console.log('[TeacherPage Auth] Role is student, redirecting to /student.');
-          router.replace('/student');
-          console.log('[TeacherPage Auth Check END] Redirecting to /student.');
-        } else {
-          console.log(`[TeacherPage Auth] No valid role found (${userRole}), redirecting to /select-role.`);
-          router.replace('/select-role');
-          console.log('[TeacherPage Auth Check END] Redirecting to /select-role.');
-        }
-
-      } catch (err) {
-        console.error("[TeacherPage Auth] Auth check failed catch block:", err);
-        if (isMounted) router.replace('/login?error=auth_exception');
-        console.log('[TeacherPage Auth Check END] Exception, redirecting to login.');
-      } finally {
-        console.log(`[TeacherPage Auth Check FINALLY] isMounted: ${isMounted}. Setting isAuthLoading to false.`);
-        if (isMounted) {
-          setIsAuthLoading(false);
-        }
-      }
-    };
-
-    checkAuth();
-
-    // onAuthStateChange 리스너
+    // onAuthStateChange 리스너 - 로그아웃/로그인 시 상태/데이터 처리
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log(`[TeacherPage Auth] onAuthStateChange triggered. Event: ${event}, Session: ${session ? 'exists' : 'null'}, isMounted: ${isMounted}`);
       if (!isMounted) return;
-      // console.log("[TeacherPage Auth] Auth state changed event:", event); // 중복 로그 제거
-      if (event === 'SIGNED_OUT' || (event === 'TOKEN_REFRESHED' && !session)) {
-        console.log('[TeacherPage Auth] SIGNED_OUT or TOKEN_REFRESHED without session. Setting isAuthenticated to false, redirecting to login.');
-        setIsAuthenticated(false);
-        router.replace('/login');
+
+      if (event === 'SIGNED_OUT') {
+        console.log('[TeacherPage Auth] SIGNED_OUT event. State will be handled by middleware.');
+        // setIsAuthenticated(false); // 미들웨어가 리다이렉트
       } else if (event === 'SIGNED_IN') {
-        console.log('[TeacherPage Auth] SIGNED_IN event. Calling checkAuth again.');
-        checkAuth();
-      } else if (event === 'INITIAL_SESSION') {
-         console.log('[TeacherPage Auth] INITIAL_SESSION event received.');
-         // INITIAL_SESSION 시 checkAuth 호출은 useEffect에서 이미 처리되므로 중복 호출 방지
-      } else if (event === 'USER_UPDATED') {
-         console.log('[TeacherPage Auth] USER_UPDATED event received. May re-run checkAuth if needed.');
-         // 필요 시 checkAuth() 호출 또는 다른 로직 수행
+         console.log('[TeacherPage Auth] SIGNED_IN event. Invalidating queries.');
+         // setIsAuthenticated(true); // 미들웨어가 접근을 보장
+         queryClient.invalidateQueries({ queryKey: ['classes'] }); // 데이터 갱신
       }
     });
 
     return () => {
-      console.log('[TeacherPage Auth] Component unmounting. Cleaning up subscription.');
+      console.log('[TeacherPage UNMOUNT] Cleaning up subscription.');
       isMounted = false;
       subscription?.unsubscribe();
     };
-  }, [router]); // router 외 다른 디펜던시 없음 확인
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryClient]); // 의존성 정리
 
+  // 데이터 로딩 상태는 useQuery 사용
   const { data: classes, isLoading: isClassesLoading, isError, error } = useQuery<ClassWithCount[], Error>({
     queryKey: ['classes'],
     queryFn: fetchClasses,
-    enabled: isAuthenticated,
+    // enabled: isAuthenticated, // Middleware가 접근을 제어하므로 항상 true 또는 제거
   });
 
   // 학급 추가 Mutation
@@ -402,12 +304,9 @@ export default function TeacherPage() {
     }
   };
 
-  if (isAuthLoading) {
-    return <div className="flex justify-center items-center h-screen">인증 확인 중...</div>;
-  }
-
-  if (!isAuthenticated || isClassesLoading) {
-     return <div className="flex justify-center items-center h-screen text-primary">로딩 중...</div>;
+  // 로딩 및 에러 처리 (useQuery 상태 사용)
+  if (isClassesLoading) {
+      return <div className="flex justify-center items-center h-screen text-primary">학급 목록 로딩 중...</div>;
   }
 
   if (isError) return <div className="text-red-500 text-center mt-10">데이터 로딩 중 오류 발생: {(error as any)?.message ?? '알 수 없는 오류'}</div>;
@@ -455,12 +354,6 @@ export default function TeacherPage() {
         />
       </div>
 
-      {isClassesLoading && <p>학급 목록을 불러오는 중...</p>}
-      {isError && (
-        <p className="text-red-500">
-          오류 발생: {(error as any)?.message ?? '알 수 없는 오류'}
-        </p>
-      )}
       {!isClassesLoading && !isError && (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {classes && classes.length > 0 ? (

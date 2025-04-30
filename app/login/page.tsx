@@ -1,100 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
 export default function LoginPage() {
-  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const checkSessionAndRedirect = async () => {
-      if (isMounted && !isLoading) setIsLoading(true);
-      
-      try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-        if (!isMounted) return;
-
-        if (sessionError) {
-          console.error('Session Error:', sessionError);
-          setError('세션 정보를 가져오는 중 오류가 발생했습니다.');
-          setIsLoading(false);
-          return;
-        }
-
-        if (session) {
-          const user = session.user;
-          let userRole = user?.user_metadata?.role;
-
-          console.log('[DEBUG Login Page] Session found. Metadata Role:', userRole);
-
-          if (!userRole) {
-            console.log('[DEBUG Login Page] No role in metadata, checking profiles...');
-            const { data: profile, error: profileError } = await supabase
-              .from('profiles')
-              .select('role')
-              .eq('id', user.id)
-              .single();
-
-            if (profileError && profileError.code !== 'PGRST116') {
-              console.error('Profile fetch error in login page:', profileError);
-              setIsLoading(false);
-              return;
-            } 
-            userRole = profile?.role;
-            console.log('[DEBUG Login Page] Role from profile:', userRole);
-          }
-          
-          console.log('[DEBUG Login Page] Final role check:', userRole);
-
-          if (!userRole) {
-            router.replace('/select-role');
-          } else if (userRole === 'teacher') {
-            router.replace('/teacher');
-          } else if (userRole === 'student') {
-            router.replace('/student');
-          } else {
-            console.warn('Unexpected user role in login page:', userRole);
-            router.replace('/select-role');
-          }
-        } else {
-          setIsLoading(false);
-        }
-      } catch (err) {
-        if (isMounted) {
-          console.error('Error during session check in login page:', err);
-          setError('사용자 정보를 확인하는 중 오류가 발생했습니다.');
-          setIsLoading(false);
-        }
-      }
-    };
-
-    checkSessionAndRedirect();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (isMounted) {
-          console.log('[DEBUG Login Page] Auth state changed:', event);
-          if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
-            checkSessionAndRedirect();
-          }
-          if (event === 'SIGNED_OUT') {
-            setIsLoading(false);
-          }
-        }
-      }
-    );
-
-    return () => {
-      isMounted = false;
-      subscription?.unsubscribe();
-    };
-  }, [router]);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async (provider: 'google' | 'kakao') => {
     setError(null);
@@ -118,14 +29,6 @@ export default function LoginPage() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div>로그인 정보 확인 중...</div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col items-center justify-center min-h-screen py-2 bg-gray-50">
       <main className="flex flex-col items-center justify-center w-full flex-1 px-4 sm:px-20 text-center">
@@ -145,48 +48,64 @@ export default function LoginPage() {
           <div className="space-y-4">
             <button
               onClick={() => handleLogin('google')}
-              className="w-full bg-white text-gray-800 border border-gray-300 rounded-md px-4 py-2 shadow-sm hover:bg-gray-100 flex items-center justify-center space-x-2 transition duration-150 ease-in-out"
+              disabled={isLoading}
+              className="w-full bg-white text-gray-800 border border-gray-300 rounded-md px-4 py-2 shadow-sm hover:bg-gray-100 flex items-center justify-center space-x-2 transition duration-150 ease-in-out disabled:opacity-50"
             >
-              <svg
-                className="w-5 h-5"
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 48 48"
-              >
-                <path
-                  fill="#EA4335"
-                  d="M24 9.5c3.4 0 6.3 1.2 8.7 3.4l6.5-6.5C35.3 2.9 29.9 1 24 1 14.9 1 7.4 6.5 3.9 14.1l7.7 6C13.2 13.4 18.2 9.5 24 9.5z"
-                />
-                <path
-                  fill="#4285F4"
-                  d="M46.1 24.4c0-1.6-.1-3.2-.4-4.7H24v8.9h12.4c-.5 2.9-2.1 5.4-4.6 7.1l7.3 5.7c4.3-4 6.9-9.8 6.9-17z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M11.6 28.1c-.4-1.2-.6-2.5-.6-3.8s.2-2.6.6-3.8l-7.7-6C2.6 17.7 1 20.7 1 24.3s1.6 6.6 3.9 9.5l7.7-5.7z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M24 47c5.9 0 11.1-1.9 14.8-5.2l-7.3-5.7c-2 1.3-4.5 2.1-7.5 2.1-5.8 0-10.8-3.9-12.6-9.2l-7.7 6C7.4 41.5 14.9 47 24 47z"
-                />
-                <path fill="none" d="M0 0h48v48H0z" />
-              </svg>
+              {isLoading ? (
+                 <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                 </svg>
+              ) : (
+                <svg
+                  className="w-5 h-5"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 48 48"
+                >
+                  <path
+                    fill="#EA4335"
+                    d="M24 9.5c3.4 0 6.3 1.2 8.7 3.4l6.5-6.5C35.3 2.9 29.9 1 24 1 14.9 1 7.4 6.5 3.9 14.1l7.7 6C13.2 13.4 18.2 9.5 24 9.5z"
+                  />
+                  <path
+                    fill="#4285F4"
+                    d="M46.1 24.4c0-1.6-.1-3.2-.4-4.7H24v8.9h12.4c-.5 2.9-2.1 5.4-4.6 7.1l7.3 5.7c4.3-4 6.9-9.8 6.9-17z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M11.6 28.1c-.4-1.2-.6-2.5-.6-3.8s.2-2.6.6-3.8l-7.7-6C2.6 17.7 1 20.7 1 24.3s1.6 6.6 3.9 9.5l7.7-5.7z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M24 47c5.9 0 11.1-1.9 14.8-5.2l-7.3-5.7c-2 1.3-4.5 2.1-7.5 2.1-5.8 0-10.8-3.9-12.6-9.2l-7.7 6C7.4 41.5 14.9 47 24 47z"
+                  />
+                  <path fill="none" d="M0 0h48v48H0z" />
+                </svg>
+              )}
               <span>Google 계정으로 로그인</span>
             </button>
 
             <button
               onClick={() => handleLogin('kakao')}
-              className="w-full bg-[#FEE500] text-black font-bold rounded-md px-4 py-2 shadow-sm hover:brightness-95 flex items-center justify-center space-x-2 transition duration-150 ease-in-out"
+              disabled={isLoading}
+              className="w-full bg-[#FEE500] text-black font-bold rounded-md px-4 py-2 shadow-sm hover:brightness-95 flex items-center justify-center space-x-2 transition duration-150 ease-in-out disabled:opacity-50 disabled:brightness-75"
             >
-              <svg
-                className="w-5 h-5"
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  fill="#3C1E1E"
-                  d="M12 3C6.5 3 2 6.5 2 11c0 2.8 1.9 5.2 4.7 6.5-.2.6-.7 2.3-.8 2.6 0 0 0 .2.1.2s.2 0 .2 0c.3-.1 3.3-2.2 3.8-2.6.6.1 1.3.2 2 .2 5.5 0 10-3.5 10-8 0-4.5-4.5-8-10-8"
-                />
-              </svg>
+             {isLoading ? (
+                 <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                 </svg>
+              ) : (
+                <svg
+                  className="w-5 h-5"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    fill="#3C1E1E"
+                    d="M12 3C6.5 3 2 6.5 2 11c0 2.8 1.9 5.2 4.7 6.5-.2.6-.7 2.3-.8 2.6 0 0 0 .2.1.2s.2 0 .2 0c.3-.1 3.3-2.2 3.8-2.6.6.1 1.3.2 2 .2 5.5 0 10-3.5 10-8 0-4.5-4.5-8-10-8"
+                  />
+                </svg>
+              )}
               <span>카카오 계정으로 로그인</span>
             </button>
           </div>
