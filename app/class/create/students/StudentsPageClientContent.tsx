@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, Student } from '@/lib/supabase';
@@ -113,6 +113,7 @@ function SortableStudentItem(props: {
   isSelected: boolean;
   onUpdateStudent: (id: string, newName: string) => Promise<void>;
   onDeleteStudent: (id: string) => Promise<void>;
+  disabled: boolean;
 }) {
   const {
     attributes,
@@ -148,6 +149,7 @@ function SortableStudentItem(props: {
         onDeleteStudent={props.onDeleteStudent}
         listeners={listeners}
         isDragging={isDragging}
+        disabled={props.disabled}
       />
     </div>
   );
@@ -163,10 +165,16 @@ export default function StudentsPageClientContent() {
   const [studentOrder, setStudentOrder] = useState<string[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [touchStartY, setTouchStartY] = useState<number | null>(null);
+  const [isTouchScrolling, setIsTouchScrolling] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { delay: 250, tolerance: 5 },
+    useSensor(PointerSensor, { 
+      activationConstraint: { 
+        delay: 200,
+        tolerance: 0
+      } 
     }),
     useSensor(KeyboardSensor)
   );
@@ -277,6 +285,36 @@ export default function StudentsPageClientContent() {
     }
   };
 
+  // 터치 이벤트 핸들러 추가
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStartY(e.touches[0].clientY);
+    setIsTouchScrolling(false);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartY === null || !scrollContainerRef.current) return;
+    
+    const touchY = e.touches[0].clientY;
+    const diff = touchStartY - touchY;
+    
+    if (Math.abs(diff) > 10 && !isTouchScrolling) {
+      setIsTouchScrolling(true);
+    }
+    
+    if (isTouchScrolling) {
+      // 스크롤 동작 처리
+      scrollContainerRef.current.scrollTop += diff / 2;
+      setTouchStartY(touchY);
+      e.stopPropagation();
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setTouchStartY(null);
+    // 잠시 후 스크롤 플래그 리셋 (드래그를 위해)
+    setTimeout(() => setIsTouchScrolling(false), 300);
+  };
+
   if (!classId) {
     return <div>잘못된 접근입니다. 학급 생성 과정을 다시 시작해주세요.</div>;
   }
@@ -312,7 +350,14 @@ export default function StudentsPageClientContent() {
             </button>
           </div>
         </div>
-        <div className="flex-grow overflow-y-auto p-4 space-y-2 max-h-[400px]">
+        <div 
+          ref={scrollContainerRef}
+          className="flex-grow overflow-y-auto p-4 space-y-2 max-h-[400px]" 
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
           <AnimatePresence>
             {students && students.length > 0 ? (
               <DndContext
@@ -320,6 +365,7 @@ export default function StudentsPageClientContent() {
                 collisionDetection={closestCenter}
                 onDragStart={handleDragStart}
                 onDragEnd={handleDragEnd}
+                modifiers={[]}
               >
                 <SortableContext
                   items={studentOrder}
@@ -333,6 +379,7 @@ export default function StudentsPageClientContent() {
                       isSelected={selectedStudentId === student.id}
                       onUpdateStudent={handleUpdateStudent}
                       onDeleteStudent={handleDeleteStudent}
+                      disabled={isTouchScrolling}
                     />
                   ))}
                 </SortableContext>

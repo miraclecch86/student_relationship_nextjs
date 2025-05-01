@@ -122,18 +122,63 @@ async function deleteClass(id: string): Promise<void> {
   }
 }
 
-// 불러온 데이터로 학급 및 학생 데이터 교체 함수 (RPC 호출로 변경)
-async function replaceAllClasses(loadedClasses: Omit<BaseClass, 'id' | 'created_at'>[]): Promise<void> {
-    // RPC 함수 호출로 변경: 모든 클래스/학생 삭제 후 새 데이터 삽입
-    // 참고: Supabase RPC는 기본적으로 JSON을 지원합니다.
-    const classesToInsert = loadedClasses.map(cls => ({ name: cls.name }));
-    const { error } = await supabase.rpc('replace_all_classes', { new_classes: classesToInsert });
+// 데이터 내보내기 함수 (RPC 호출)
+async function exportUserData(): Promise<any> {
+  const { data, error } = await supabase.rpc('export_user_data');
+  
+  if (error) {
+    console.error('RPC export_user_data error:', error);
+    throw new Error(`데이터 내보내기 실패: ${error.message}`);
+  }
+  
+  return data;
+}
 
-    if (error) {
-        console.error('RPC replace_all_classes error:', error);
-        throw new Error(`데이터 교체 실패: ${error.message}`);
+// 데이터 가져오기 함수 (RPC 호출)
+async function importUserData(userData: any): Promise<any> {
+  console.log("importUserData 호출됨, userData:", JSON.stringify(userData).slice(0, 500) + "...");
+  
+  try {
+    // 데이터 형식 확인 - 올바른 형식이어야 함
+    if (!userData || typeof userData !== 'object') {
+      throw new Error('유효하지 않은 데이터 형식입니다.');
     }
-    // 기존 로직 (개별 테이블 delete/insert) 제거
+    
+    // RPC 호출
+    const { data, error } = await supabase.rpc('import_user_data', { user_data: userData });
+    
+    if (error) {
+      console.error('RPC import_user_data error:', error);
+      console.error('Error details:', JSON.stringify(error));
+      throw new Error(`데이터 가져오기 실패: ${error.message || '알 수 없는 오류'}`);
+    }
+    
+    console.log("RPC 성공 응답:", data);
+    return data;
+  } catch (err) {
+    console.error('importUserData 예외 발생:', err);
+    throw err;
+  }
+}
+
+// 단순 버전 데이터 가져오기 함수 (RPC 호출)
+async function importUserDataSimple(userData: any): Promise<any> {
+  console.log("importUserDataSimple 호출됨");
+  
+  try {
+    // RPC 호출
+    const { data, error } = await supabase.rpc('import_user_data_simple', { user_data: userData });
+    
+    if (error) {
+      console.error('RPC import_user_data_simple error:', error);
+      throw new Error(`간단 데이터 가져오기 실패: ${error.message}`);
+    }
+    
+    return data;
+  } catch (err) {
+    console.error('importUserDataSimple 예외 발생:', err);
+    throw err;
+  }
 }
 
 export default function TeacherPage() {
@@ -221,23 +266,34 @@ export default function TeacherPage() {
     },
   });
 
-  // 데이터 불러오기 Mutation (mutationFn 내부만 수정)
-  const loadDataMutation = useMutation<void, Error, File>({
-      mutationFn: async (file) => {
-          const loadedData = await readJsonFile(file);
-          if (!Array.isArray(loadedData)) {
-              throw new Error('잘못된 파일 형식입니다. 학급 목록 배열이 필요합니다.');
-          }
-          // RPC 함수 호출
-          await replaceAllClasses(loadedData as Omit<BaseClass, 'id' | 'created_at'>[]);
-      },
-      onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: ['classes'] });
-          toast.success('데이터를 성공적으로 불러왔습니다.');
-      },
-      onError: (error) => {
-          toast.error(`데이터 불러오기 실패: ${error.message}`);
-      },
+  // 데이터 내보내기 Mutation
+  const exportDataMutation = useMutation<any, Error>({
+    mutationFn: exportUserData,
+    onSuccess: (data) => {
+      const filename = `학급_데이터_${new Date().toISOString().slice(0, 10)}.json`;
+      downloadJson(data, filename);
+      toast.success('데이터를 성공적으로 내보냈습니다.');
+    },
+    onError: (error) => {
+      toast.error(`데이터 내보내기 실패: ${error.message}`);
+    },
+  });
+
+  // 데이터 가져오기 Mutation
+  const importDataMutation = useMutation<any, Error, any>({
+    mutationFn: importUserData,
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['classes'] });
+      const insertedCounts = result?.inserted || {};
+      const sourceInfo = result?.source || '알 수 없음';
+      toast.success(
+        `데이터를 성공적으로 가져왔습니다. (출처: ${sourceInfo})` +
+        `\n학급: ${insertedCounts.classes || 0}, 학생: ${insertedCounts.students || 0}, 설문: ${insertedCounts.surveys || 0}`
+      );
+    },
+    onError: (error) => {
+      toast.error(`데이터 가져오기 실패: ${error.message}`);
+    },
   });
 
   const handleAddClass = () => {
@@ -254,16 +310,13 @@ export default function TeacherPage() {
     }
   };
 
-  // 저장 버튼 핸들러
+  // 저장 버튼 핸들러 - 수정
   const handleSave = () => {
     if (!classes || classes.length === 0) {
       toast.error('저장할 학급 데이터가 없습니다.');
       return;
     }
-    // 저장할 데이터 정제 (id, created_at 제외 - teacher_name, student_count는 이미 타입에서 제외됨)
-    const dataToSave = classes.map(({ id, created_at, ...rest }) => rest);
-    const filename = `학급_데이터_${new Date().toISOString().slice(0, 10)}.json`;
-    downloadJson(dataToSave, filename);
+    exportDataMutation.mutate();
   };
 
   // 불러오기 버튼 핸들러
@@ -271,11 +324,54 @@ export default function TeacherPage() {
     fileInputRef.current?.click();
   };
 
-  // 파일 선택 핸들러
+  // 파일 선택 핸들러 - 수정
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-        loadDataMutation.mutate(file);
+      readJsonFile(file)
+        .then((data) => {
+          console.log("파일에서 읽은 데이터:", JSON.stringify(data).slice(0, 300) + "...");
+          
+          // 메타데이터 확인
+          let sourceInfo = '알 수 없음';
+          if (data.metadata && data.metadata.exported_by) {
+            sourceInfo = data.metadata.exported_by;
+          }
+          
+          // 데이터 검증
+          if (!data.classes) {
+            toast.error("유효하지 않은 데이터 형식입니다. 'classes' 필드가 없습니다.");
+            return;
+          }
+          
+          if (confirm(`데이터를 가져오시겠습니까?\n\n출처: ${sourceInfo}\n\n기존 데이터는 유지되고, 동일한 이름의 학급은 가져온 날짜와 출처 정보를 포함하여 추가됩니다.`)) {
+            try {
+              // 간단 버전의 함수 먼저 시도
+              toast.success("간단 버전으로 데이터 가져오기 시도 중...");
+              
+              importUserDataSimple(data)
+                .then(result => {
+                  queryClient.invalidateQueries({ queryKey: ['classes'] });
+                  toast.success(`간단 버전으로 데이터 가져오기 성공! 학급 ${result?.inserted?.classes || 0}개 추가됨`);
+                })
+                .catch(err => {
+                  console.error("간단 버전 가져오기 실패:", err);
+                  toast.error(`간단 버전 실패: ${err.message}`);
+                  
+                  // 원래 버전 시도
+                  toast.success("원래 버전으로 다시 시도 중...");
+                  importDataMutation.mutate(data);
+                });
+            } catch (err) {
+              console.error("데이터 가져오기 중 오류 발생:", err);
+              toast.error("데이터 처리 중 오류가 발생했습니다.");
+            }
+          }
+        })
+        .catch((error) => {
+          console.error("파일 읽기 실패:", error);
+          toast.error(`파일 읽기 실패: ${error.message}`);
+        });
     }
     // 파일 입력 초기화 (동일 파일 다시 선택 가능하도록)
     if (fileInputRef.current) {
@@ -334,16 +430,17 @@ export default function TeacherPage() {
       <div className="mb-8 flex space-x-4">
         <button 
           onClick={handleSave}
-          className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 shadow-sm"
+          disabled={exportDataMutation.isPending || !classes || classes.length === 0}
+          className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 shadow-sm disabled:opacity-50"
         >
-          데이터 저장
+          {exportDataMutation.isPending ? '저장 중...' : '데이터 내보내기'}
         </button>
         <button 
           onClick={handleLoad}
-          disabled={loadDataMutation.isPending}
+          disabled={importDataMutation.isPending}
           className="px-4 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 disabled:opacity-50 shadow-sm"
         >
-          {loadDataMutation.isPending ? '불러오는 중...' : '데이터 불러오기'}
+          {importDataMutation.isPending ? '가져오는 중...' : '데이터 가져오기'}
         </button>
         <input 
           type="file" 

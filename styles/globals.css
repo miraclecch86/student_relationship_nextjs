@@ -24,3 +24,30 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* 드래그 핸들과 스크롤 관련 커스텀 스타일 */
+.drag-handle {
+  touch-action: none !important;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* 모바일 스크롤 최적화 스타일 */
+.touch-pan-y {
+  touch-action: pan-y !important;
+}
+
+.optimized-scroll {
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+}
+
+/* 모바일 터치 스크롤을 위한 추가 스타일 */
+.scrollable-content {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: pan-y !important;
+  scroll-behavior: smooth;
+}

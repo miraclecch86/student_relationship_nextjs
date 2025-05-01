@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, Student } from '@/lib/supabase';
 import StudentListItem from '@/components/StudentListItem';
@@ -17,6 +17,7 @@ import {
   DragEndEvent,
   DragOverlay,
   DragStartEvent,
+  defaultDropAnimationSideEffects,
 } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -115,8 +116,9 @@ function SortableStudentItem(props: {
   onUpdateStudent: (id: string, newName: string) => Promise<void>;
   onDeleteStudent: (id: string) => Promise<void>;
   onClick: (studentId: string) => void; // 선택 상태 관리를 위한 onClick 추가
+  disabled: boolean;
 }) {
-  const { student, classId, isSelected, onUpdateStudent, onDeleteStudent, onClick } = props;
+  const { student, classId, isSelected, onUpdateStudent, onDeleteStudent, onClick, disabled } = props;
   const {
     attributes,
     listeners,
@@ -151,6 +153,7 @@ function SortableStudentItem(props: {
         onDeleteStudent={onDeleteStudent}
         listeners={listeners}
         isDragging={isDragging}
+        disabled={disabled}
       />
     </div>
   );
@@ -170,9 +173,17 @@ export default function StudentListPanel({ classId, onStudentSelect }: StudentLi
   const [studentOrder, setStudentOrder] = useState<string[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [touchStartY, setTouchStartY] = useState<number | null>(null);
+  const [isTouchScrolling, setIsTouchScrolling] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        delay: 200,
+        tolerance: 0
+      }
+    }),
     useSensor(KeyboardSensor)
   );
 
@@ -301,6 +312,47 @@ export default function StudentListPanel({ classId, onStudentSelect }: StudentLi
     }
   };
 
+  // 터치 이벤트 핸들러 추가
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStartY(e.touches[0].clientY);
+    setIsTouchScrolling(false);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartY === null || !scrollContainerRef.current) return;
+    
+    const touchY = e.touches[0].clientY;
+    const diff = touchStartY - touchY;
+    
+    if (Math.abs(diff) > 10 && !isTouchScrolling) {
+      setIsTouchScrolling(true);
+    }
+    
+    if (isTouchScrolling) {
+      // 스크롤 동작 처리
+      scrollContainerRef.current.scrollTop += diff / 2;
+      setTouchStartY(touchY);
+      e.stopPropagation();
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setTouchStartY(null);
+    // 잠시 후 스크롤 플래그 리셋 (드래그를 위해)
+    setTimeout(() => setIsTouchScrolling(false), 300);
+  };
+
+  // 드롭 애니메이션 설정
+  const dropAnimation = {
+    sideEffects: defaultDropAnimationSideEffects({
+      styles: {
+        active: {
+          opacity: '0.5',
+        },
+      },
+    }),
+  };
+
   if (isLoading) {
     return <div className="p-4 text-center"><ArrowPathIcon className="w-6 h-6 animate-spin mx-auto" /></div>;
   }
@@ -333,7 +385,14 @@ export default function StudentListPanel({ classId, onStudentSelect }: StudentLi
           </button>
         </div>
       </div>
-      <div className="flex-grow overflow-y-auto p-2 space-y-1">
+      <div 
+        ref={scrollContainerRef}
+        className="flex-grow overflow-y-auto p-2 space-y-1" 
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
         <AnimatePresence>
           {students && students.length > 0 ? (
             <DndContext
@@ -341,6 +400,7 @@ export default function StudentListPanel({ classId, onStudentSelect }: StudentLi
               collisionDetection={closestCenter}
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
+              modifiers={[]}
             >
               <SortableContext
                 items={studentOrder}
@@ -356,6 +416,7 @@ export default function StudentListPanel({ classId, onStudentSelect }: StudentLi
                     onUpdateStudent={handleUpdateStudent}
                     onDeleteStudent={handleDeleteStudent}
                     onClick={handleStudentClick} // 클릭 핸들러 전달
+                    disabled={isTouchScrolling} // 스크롤 중에는 드래그 비활성화
                   />
                 ))}
               </SortableContext>
