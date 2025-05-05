@@ -1,14 +1,52 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 
-export default function SelectRole() {
+// 기본 역할 선택 컴포넌트
+function SelectRoleContent({ resetParam }: { resetParam: string | null }) {
   const router = useRouter();
   const supabase = createClientComponentClient();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // 페이지 진입 시 세션 완전 초기화 및 갱신
+  useEffect(() => {
+    const refreshAuthState = async () => {
+      console.log('[DEBUG SelectRole] Page loaded, refreshing auth state...');
+      const wasReset = resetParam === 'true';
+      
+      if (wasReset) {
+        console.log('[DEBUG SelectRole] Reset parameter detected, ensuring clean state');
+        // 브라우저 스토리지 초기화
+        sessionStorage.clear();
+        localStorage.removeItem('supabase.auth.token');
+      }
+      
+      try {
+        // Supabase 세션 명시적 갱신
+        const { error } = await supabase.auth.refreshSession();
+        if (error) {
+          console.error('[DEBUG SelectRole] Session refresh error:', error);
+        } else {
+          console.log('[DEBUG SelectRole] Session refreshed successfully');
+          
+          // reset=true인 경우 세션에서 역할 정보가 제거되었는지 확인
+          if (wasReset) {
+            const { data: { session } } = await supabase.auth.getSession();
+            console.log('[DEBUG SelectRole] After reset, session user metadata:', 
+              session?.user?.user_metadata);
+          }
+        }
+      } catch (err) {
+        console.error('[DEBUG SelectRole] Error in session refresh:', err);
+      }
+    };
+    
+    refreshAuthState();
+  }, [supabase.auth, resetParam]);
 
   const handleRoleSelect = async (role: 'teacher' | 'student') => {
     setIsLoading(true);
@@ -144,5 +182,29 @@ export default function SelectRole() {
         </p>
       </div>
     </div>
+  );
+}
+
+// useSearchParams를 사용하는 컴포넌트 - Suspense로 감싸서 사용됨
+function SelectRoleWithParams() {
+  const searchParams = useSearchParams();
+  const resetParam = searchParams.get('reset');
+  
+  return <SelectRoleContent resetParam={resetParam} />;
+}
+
+// 메인 페이지 컴포넌트
+export default function SelectRole() {
+  // Suspense로 감싸서 useSearchParams 사용하는 컴포넌트를 렌더링
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100">
+        <div className="bg-white p-8 rounded-lg shadow-md w-96">
+          <h1 className="text-2xl font-bold text-center mb-6 text-indigo-600">로딩 중...</h1>
+        </div>
+      </div>
+    }>
+      <SelectRoleWithParams />
+    </Suspense>
   );
 } 

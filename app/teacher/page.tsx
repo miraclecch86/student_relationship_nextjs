@@ -403,8 +403,8 @@ export default function TeacherPage() {
   // 역할 변경 핸들러 추가
   const handleRoleChange = () => {
     console.log('역할 변경하기 버튼 클릭됨');
-    // router.push 대신 직접 window.location.href 사용
-    window.location.href = '/select-role';
+    // API 라우트를 사용하여 역할 재설정
+    window.location.href = '/api/reset-role';
   };
 
   // 로딩 및 에러 처리 (useQuery 상태 사용)
