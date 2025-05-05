@@ -400,6 +400,13 @@ export default function TeacherPage() {
     }
   };
 
+  // 역할 변경 핸들러 추가
+  const handleRoleChange = () => {
+    console.log('역할 변경하기 버튼 클릭됨');
+    // router.push 대신 직접 window.location.href 사용
+    window.location.href = '/select-role';
+  };
+
   // 로딩 및 에러 처리 (useQuery 상태 사용)
   if (isClassesLoading) {
       return <div className="flex justify-center items-center h-screen text-primary">학급 목록 로딩 중...</div>;
@@ -408,71 +415,79 @@ export default function TeacherPage() {
   if (isError) return <div className="text-red-500 text-center mt-10">데이터 로딩 중 오류 발생: {(error as any)?.message ?? '알 수 없는 오류'}</div>;
 
   return (
-    <div className="min-h-screen bg-gray-100 p-8">
-      <header className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-800">내 학급 목록</h1>
-        <div className="flex items-center space-x-4">
+    <div className="min-h-screen bg-gray-100 p-4 lg:p-8">
+      <div className="max-w-screen-2xl mx-auto">
+        <header className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-800">내 학급 목록</h1>
+          <div className="flex items-center space-x-4">
+            <button 
+              onClick={handleRoleChange}
+              className="px-3 py-1.5 text-xs bg-purple-500 text-white rounded-md hover:bg-purple-600 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 shadow-sm"
+            >
+              역할 변경하기
+            </button>
+            <button 
+              onClick={handleSave}
+              disabled={exportDataMutation.isPending || !classes || classes.length === 0}
+              className="px-3 py-1.5 text-xs bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 shadow-sm disabled:opacity-50"
+            >
+              {exportDataMutation.isPending ? '저장 중...' : '데이터 내보내기'}
+            </button>
+            <button 
+              onClick={handleLoad}
+              disabled={importDataMutation.isPending}
+              className="px-3 py-1.5 text-xs bg-yellow-500 text-white rounded-md hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 disabled:opacity-50 shadow-sm"
+            >
+              {importDataMutation.isPending ? '가져오는 중...' : '데이터 가져오기'}
+            </button>
+            <button 
+              onClick={handleLogout}
+              className="text-sm text-gray-600 hover:text-indigo-600"
+            >
+              로그아웃
+            </button>
+          </div>
+        </header>
+
+        <div className="mb-8 flex space-x-4">
           <Link
             href="/class/create/school"
-            className="inline-block bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors duration-200 text-sm font-medium shadow-sm"
+            className="inline-block bg-indigo-600 text-white px-6 py-3 text-lg font-medium rounded-md hover:bg-indigo-700 transition-colors duration-200 shadow-md"
           >
             + 새 학급 만들기
           </Link>
-          <button 
-            onClick={handleLogout}
-            className="text-sm text-gray-600 hover:text-indigo-600"
-          >
-            로그아웃
-          </button>
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleFileChange} 
+            accept=".json" 
+            className="hidden" 
+          />
         </div>
-      </header>
 
-      <div className="mb-8 flex space-x-4">
-        <button 
-          onClick={handleSave}
-          disabled={exportDataMutation.isPending || !classes || classes.length === 0}
-          className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 shadow-sm disabled:opacity-50"
-        >
-          {exportDataMutation.isPending ? '저장 중...' : '데이터 내보내기'}
-        </button>
-        <button 
-          onClick={handleLoad}
-          disabled={importDataMutation.isPending}
-          className="px-4 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 disabled:opacity-50 shadow-sm"
-        >
-          {importDataMutation.isPending ? '가져오는 중...' : '데이터 가져오기'}
-        </button>
-        <input 
-          type="file" 
-          ref={fileInputRef} 
-          onChange={handleFileChange} 
-          accept=".json" 
-          className="hidden" 
-        />
+        {!isClassesLoading && !isError && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {classes && classes.length > 0 ? (
+              classes.map((cls) => (
+                <motion.div
+                  key={cls.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <ClassCard 
+                    classData={cls} 
+                    onEdit={handleEditClass} 
+                    onDelete={handleDeleteClass}
+                  />
+                </motion.div>
+              ))
+            ) : (
+              <p className="text-gray-500 italic col-span-full">생성된 학급이 없습니다. '새 학급 만들기' 버튼을 클릭하여 시작하세요.</p>
+            )}
+          </div>
+        )}
       </div>
-
-      {!isClassesLoading && !isError && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {classes && classes.length > 0 ? (
-            classes.map((cls) => (
-              <motion.div
-                key={cls.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-              >
-                <ClassCard 
-                  classData={cls} 
-                  onEdit={handleEditClass} 
-                  onDelete={handleDeleteClass}
-                />
-              </motion.div>
-            ))
-          ) : (
-            <p className="text-gray-500 italic col-span-full">생성된 학급이 없습니다. '새 학급 만들기' 버튼을 클릭하여 시작하세요.</p>
-          )}
-        </div>
-      )}
     </div>
   );
 }

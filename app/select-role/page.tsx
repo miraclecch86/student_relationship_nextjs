@@ -14,6 +14,13 @@ export default function SelectRole() {
     setIsLoading(true);
     setError(null);
 
+    // 학생 역할 선택 시 알림 메시지 표시 후 반환
+    if (role === 'student') {
+      setIsLoading(false);
+      alert('학생 기능은 현재 개발 중입니다. 추후 업데이트될 예정입니다.');
+      return;
+    }
+
     try {
       // 역할 업데이트 전 세션 갱신 시도
       console.log('[DEBUG SelectRole] Attempting to refresh session...');
