@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronDownIcon, ArrowRightOnRectangleIcon, UserIcon, UserCircleIcon } from '@heroicons/react/24/outline';
+import { ArrowRightOnRectangleIcon, UserIcon } from '@heroicons/react/24/outline';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -68,15 +68,17 @@ export default function UserProfile() {
     return name.charAt(0).toUpperCase();
   };
 
-  // 이름에 기반한 색상 생성 함수
+  // 이름에 기반한 색상 생성 함수 - 파란색 계열로 변경
   const getColorByName = (name: string | null): string => {
-    if (!name) return 'bg-indigo-500';
+    if (!name) return 'bg-blue-500';
+    
+    // 파란색 계열 컬러 팔레트
     const colors = [
-      'bg-indigo-500', 'bg-purple-500', 'bg-pink-500', 'bg-red-500',
-      'bg-orange-500', 'bg-amber-500', 'bg-yellow-500', 'bg-lime-500',
-      'bg-green-500', 'bg-emerald-500', 'bg-teal-500', 'bg-cyan-500',
-      'bg-sky-500', 'bg-blue-500', 'bg-violet-500', 'bg-fuchsia-500'
+      'bg-blue-500', 'bg-sky-500', 'bg-cyan-500', 'bg-teal-500',
+      'bg-blue-600', 'bg-sky-600', 'bg-cyan-600', 'bg-teal-600',
+      'bg-indigo-500', 'bg-indigo-600', 'bg-blue-700', 'bg-sky-700'
     ];
+    
     // 이름의 각 문자 코드 합계로 일관된 색상 선택
     const sum = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
     return colors[sum % colors.length];
@@ -88,14 +90,11 @@ export default function UserProfile() {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center justify-center space-x-1 rounded-full transition-all duration-300 focus:outline-none group"
+        className="flex items-center justify-center rounded-full transition-all duration-300 focus:outline-none"
         aria-expanded={isOpen}
       >
-        <div className="relative flex items-center">
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-medium shadow-lg hover:shadow-indigo-200 transition-all duration-300 border-2 border-white group-hover:border-indigo-100 ${userColor}`}>
-            {getInitial(userName)}
-          </div>
-          <ChevronDownIcon className={`w-3.5 h-3.5 text-gray-500 ml-1 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-medium shadow-lg hover:shadow-blue-200 transition-all duration-300 ${userColor}`}>
+          {getInitial(userName)}
         </div>
       </button>
       
@@ -108,13 +107,13 @@ export default function UserProfile() {
             transition={{ duration: 0.2, ease: "easeOut" }}
             className="absolute right-0 mt-2 w-60 origin-top-right bg-white/90 backdrop-blur-sm rounded-lg shadow-xl overflow-hidden z-20 border border-gray-100"
           >
-            <div className="px-4 py-3 bg-gradient-to-br from-indigo-50 to-purple-50 border-b border-gray-100">
+            <div className="px-4 py-3 bg-gradient-to-br from-blue-50 to-sky-50 border-b border-gray-100">
               <div className="flex items-center space-x-3">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-medium shadow border-2 border-white ${userColor}`}>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-medium shadow ${userColor}`}>
                   {getInitial(userName)}
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-indigo-700 truncate">{userName || '사용자'}</p>
+                  <p className="text-sm font-medium text-blue-700 truncate">{userName || '사용자'}</p>
                   <p className="text-xs text-gray-500 truncate mt-0.5">{userEmail || '이메일 정보 없음'}</p>
                 </div>
               </div>
@@ -122,9 +121,9 @@ export default function UserProfile() {
             <div className="p-1">
               <button
                 onClick={handleRoleChange}
-                className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-indigo-50 rounded-md transition-colors duration-200 my-1"
+                className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded-md transition-colors duration-200 my-1"
               >
-                <UserIcon className="w-4 h-4 mr-2 text-indigo-600" />
+                <UserIcon className="w-4 h-4 mr-2 text-blue-600" />
                 <span>역할 변경하기</span>
               </button>
               <button
