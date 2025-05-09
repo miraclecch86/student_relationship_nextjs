@@ -16,7 +16,6 @@ import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
-import UserProfile from '@/components/UserProfile';
 
 // 분석 결과 타입 정의
 interface AnalysisResult {
@@ -57,43 +56,95 @@ async function fetchClassDetails(classId: string): Promise<Class | null> {
 
 // 분석 결과 목록 조회 함수
 async function fetchAnalysisResults(classId: string): Promise<AnalysisResult[]> {
-  const response = await fetch(`/api/class/${classId}/analysis`);
+  console.log(`분석 목록 요청: classId=${classId}`);
   
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.error || '분석 결과를 불러오는데 실패했습니다.');
+  try {
+    // API 라우트 대신 직접 Supabase 쿼리를 실행
+    const { data, error } = await supabase
+      .from('analysis_results')
+      .select('*')
+      .eq('class_id', classId)
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Supabase 쿼리 오류:', error);
+      throw new Error(`분석 결과를 불러오는데 실패했습니다: ${error.message}`);
+    }
+    
+    console.log(`분석 목록 수신 성공, ${data ? data.length : 0}개의 결과`);
+    return data || [];
+  } catch (error) {
+    console.error('분석 목록 요청 오류:', error);
+    throw error;
   }
-  
-  return response.json();
 }
 
 // 특정 분석 결과 조회 함수
 async function fetchAnalysisDetail(classId: string, analysisId: string): Promise<AnalysisResult> {
-  const response = await fetch(`/api/class/${classId}/analysis/${analysisId}`);
+  console.log(`분석 상세 정보 요청: classId=${classId}, analysisId=${analysisId}`);
   
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.error || '분석 결과 상세 정보를 불러오는데 실패했습니다.');
+  try {
+    // API 라우트 대신 직접 Supabase 쿼리를 실행
+    const { data, error } = await supabase
+      .from('analysis_results')
+      .select('*')
+      .eq('id', analysisId)
+      .eq('class_id', classId)
+      .single();
+    
+    if (error) {
+      console.error('Supabase 쿼리 오류:', error);
+      throw new Error(`분석 결과를 불러오는데 실패했습니다: ${error.message}`);
+    }
+    
+    if (!data) {
+      throw new Error('분석 결과를 찾을 수 없습니다.');
+    }
+    
+    console.log('분석 상세 정보 수신 성공');
+    return data as AnalysisResult;
+  } catch (error) {
+    console.error('분석 상세 정보 요청 오류:', error);
+    throw error;
   }
-  
-  return response.json();
 }
 
-// 분석 실행 함수
+// 분석 실행 함수 - 복잡한 로직이 있으므로 API 호출 방식 유지
 async function runAnalysis(classId: string): Promise<AnalysisResult> {
-  const response = await fetch(`/api/class/${classId}/analysis`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
+  console.log(`분석 실행 요청: classId=${classId}`);
   
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.error || '분석을 실행하는데 실패했습니다.');
+  try {
+    const response = await fetch(`/api/class/${classId}/analysis`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage = '분석을 실행하는데 실패했습니다.';
+      
+      try {
+        const errorData = JSON.parse(errorText);
+        if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+      } catch (e) {
+        console.error('오류 응답 파싱 실패:', e);
+      }
+      
+      console.error(`API 오류 (${response.status}):`, errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    const data = await response.json();
+    console.log('분석 실행 성공, 결과 ID:', data.id);
+    return data;
+  } catch (error) {
+    console.error('분석 실행 요청 오류:', error);
+    throw error;
   }
-  
-  return response.json();
 }
 
 // 분석 카드 컴포넌트
@@ -253,11 +304,16 @@ export default function ClassAnalysisPage() {
   // 선택한 분석 결과 상세 조회
   const { 
     data: selectedAnalysis,
-    isLoading: isDetailLoading
+    isLoading: isDetailLoading,
+    isError: isDetailError,
+    error: detailError
   } = useQuery({
     queryKey: ['analysisDetail', classId, selectedAnalysisId],
     queryFn: () => fetchAnalysisDetail(classId, selectedAnalysisId!),
     enabled: !!selectedAnalysisId,
+    retry: 1,  // 실패 시 1번만 재시도
+    refetchOnWindowFocus: false,
+    staleTime: 1000 * 60 * 5, // 5분 동안 데이터 캐시
   });
   
   // 분석 실행 Mutation
@@ -327,7 +383,7 @@ export default function ClassAnalysisPage() {
     <div className="min-h-screen bg-gray-100">
       <div className="max-w-screen-xl mx-auto px-4 py-8">
         {/* 헤더 */}
-        <header className="mb-8 flex justify-between items-center bg-white p-4 rounded-lg shadow-md">
+        <header className="mb-8 bg-white p-4 rounded-lg shadow-md">
           <div className="flex items-center gap-4">
             <button
               onClick={() => router.push(`/class/${classId}/dashboard`)}
@@ -338,7 +394,6 @@ export default function ClassAnalysisPage() {
             </button>
             <h1 className="text-2xl font-bold text-black">{classDetails.name} 학급 분석</h1>
           </div>
-          <UserProfile />
         </header>
         
         {/* 분석 실행 버튼 */}
@@ -414,6 +469,26 @@ export default function ClassAnalysisPage() {
               <div className="bg-white rounded-lg shadow-md p-10 flex justify-center items-center">
                 <ArrowPathIcon className="w-8 h-8 animate-spin text-indigo-500" />
                 <div className="text-indigo-500 ml-3">분석 결과 불러오는 중...</div>
+              </div>
+            ) : isDetailError ? (
+              <div className="bg-white rounded-lg shadow-md p-10">
+                <div className="text-center text-red-500 mb-4">
+                  <h3 className="text-lg font-semibold mb-2">분석 결과를 불러올 수 없습니다</h3>
+                  <p className="text-sm text-gray-600">
+                    {detailError instanceof Error ? detailError.message : '알 수 없는 오류가 발생했습니다.'}
+                  </p>
+                </div>
+                <div className="flex justify-center mt-4">
+                  <button
+                    onClick={() => {
+                      // 쿼리 무효화하고 다시 시도
+                      queryClient.invalidateQueries({ queryKey: ['analysisDetail', classId, selectedAnalysisId] });
+                    }}
+                    className="px-4 py-2 bg-indigo-500 text-white rounded-md text-sm hover:bg-indigo-600 transition-colors"
+                  >
+                    다시 시도
+                  </button>
+                </div>
               </div>
             ) : selectedAnalysis ? (
               <AnalysisDetail analysis={selectedAnalysis} />

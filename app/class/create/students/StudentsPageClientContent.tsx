@@ -281,7 +281,7 @@ export default function StudentsPageClientContent() {
 
   const handleComplete = () => {
     if (classId) {
-      router.push(`/class/${classId}/survey`);
+      router.push(`/class/${classId}/dashboard`);
     }
   };
 

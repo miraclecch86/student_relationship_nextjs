@@ -31,7 +31,7 @@ async function fetchClasses(): Promise<ClassWithCount[]> {
 
   // 클래스 데이터 조회
   const { data: classesData, error: classesError } = await supabase
-    .from('classes')
+      .from('classes')
     .select('id, name, created_at, user_id')
     .eq('user_id', session.user.id)
     .order('created_at');
@@ -171,18 +171,18 @@ export default function Home() {
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mt-8">
         {classes && classes.length > 0 ? (
           classes.map((cls) => (
-            <motion.div
+        <motion.div 
               key={cls.id}
               initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+          animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3 }}
             >
               <div className="bg-white p-4 rounded shadow">{cls.name} (Temp Card)</div>
-            </motion.div>
-          ))
-        ) : (
+        </motion.div>
+            ))
+          ) : (
           <p className="text-gray-500 italic col-span-full">생성된 학급이 없습니다.</p>
-        )}
+          )}
       </div>
     </div>
   );

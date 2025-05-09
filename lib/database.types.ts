@@ -34,6 +34,29 @@ export interface Database {
           class?: number
           name?: string
         }
+      },
+      analysis_results: {
+        Row: {
+          id: string
+          class_id: string
+          created_at: string
+          result_data: Json
+          summary: string
+        }
+        Insert: {
+          id?: string
+          class_id: string
+          created_at?: string
+          result_data: Json
+          summary: string
+        }
+        Update: {
+          id?: string
+          class_id?: string
+          created_at?: string
+          result_data?: Json
+          summary?: string
+        }
       }
     }
   }

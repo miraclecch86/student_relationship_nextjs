@@ -1,16 +1,9 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { Database } from './database.types'; // Database 타입을 가져옵니다.
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
 // createClient 대신 createClientComponentClient 사용
 // 클라이언트 컴포넌트에서 사용할 싱글톤 인스턴스 생성
-export const supabase = createClientComponentClient<Database>({ 
-  supabaseUrl,
-  supabaseKey: supabaseAnonKey,
-  isSingleton: true, // 싱글톤으로 사용 권장
-});
+export const supabase = createClientComponentClient<Database>(); 
 
 export interface Student {
   id: string;
