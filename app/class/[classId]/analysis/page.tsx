@@ -11,11 +11,15 @@ import {
   ArrowPathIcon,
   ChevronRightIcon,
   DocumentTextIcon,
+  TrashIcon,
+  XCircleIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
+import ConfirmModal from '@/components/ConfirmModal';
 
 // 분석 결과 타입 정의
 interface AnalysisResult {
@@ -117,6 +121,38 @@ async function runAnalysis(classId: string): Promise<AnalysisResult> {
   }
 }
 
+async function deleteAnalysis(classId: string, analysisId: string): Promise<void> {
+  console.log(`분석 결과 삭제 요청: classId=${classId}, analysisId=${analysisId}`);
+  
+  try {
+    const response = await fetch(`/api/class/${classId}/analysis/${analysisId}`, {
+      method: 'DELETE',
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage = '분석 결과를 삭제하는데 실패했습니다.';
+      
+      try {
+        const errorData = JSON.parse(errorText);
+        if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+      } catch (e) {
+        console.error('오류 응답 파싱 실패:', e);
+      }
+      
+      console.error(`API 오류 (${response.status}):`, errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    console.log('분석 결과 삭제 성공');
+  } catch (error) {
+    console.error('분석 삭제 요청 오류:', error);
+    throw error;
+  }
+}
+
 // 분석 카드 컴포넌트
 interface AnalysisCardProps {
   analysis: AnalysisResult;
@@ -125,35 +161,91 @@ interface AnalysisCardProps {
 function AnalysisCard({ analysis }: AnalysisCardProps) {
   const router = useRouter();
   const params = useParams();
+  const queryClient = useQueryClient();
   const classId = params.classId as string;
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
   const createdAt = new Date(analysis.created_at);
   const formattedDate = format(createdAt, 'yyyy년 MM월 dd일', { locale: ko });
   const formattedTime = format(createdAt, 'HH:mm', { locale: ko });
   
+  // 삭제 Mutation
+  const deleteAnalysisMutation = useMutation({
+    mutationFn: () => deleteAnalysis(classId, analysis.id),
+    onSuccess: () => {
+      toast.success('분석 결과가 삭제되었습니다.');
+      queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
+      setIsDeleteDialogOpen(false);
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : '삭제 중 오류가 발생했습니다.');
+    },
+  });
+  
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // 카드 클릭 이벤트 전파 방지
+    setIsDeleteDialogOpen(true);
+  };
+  
+  const confirmDelete = () => {
+    deleteAnalysisMutation.mutate();
+  };
+  
   return (
-    <motion.div
-      className="bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all duration-300 hover:shadow-lg hover:bg-gray-50"
-      onClick={() => router.push(`/class/${classId}/analysis/${analysis.id}`)}
-      whileHover={{ scale: 1.02 }}
-      layout
-    >
-      <div className="flex items-start justify-between">
-        <div className="flex items-start space-x-3">
-          <div className="bg-indigo-100 text-indigo-600 p-2 rounded-full">
-            <DocumentTextIcon className="w-5 h-5" />
+    <>
+      <motion.div
+        className="bg-white rounded-lg shadow-md p-4 transition-all duration-300 hover:shadow-lg hover:bg-gray-50 relative group"
+        whileHover={{ scale: 1.02 }}
+        layout
+      >
+        <div 
+          className="cursor-pointer pb-6" // 하단에 여백 추가하여 삭제 버튼 공간 확보
+          onClick={() => router.push(`/class/${classId}/analysis/${analysis.id}`)}
+        >
+          <div className="flex items-start justify-between">
+            <div className="flex items-start space-x-3">
+              <div className="bg-indigo-100 text-indigo-600 p-2 rounded-full">
+                <DocumentTextIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-medium text-gray-800">{formattedDate}</h3>
+                <p className="text-sm text-gray-500">{formattedTime}</p>
+              </div>
+            </div>
+            <ChevronRightIcon className="w-5 h-5 text-gray-400" />
           </div>
-          <div>
-            <h3 className="font-medium text-gray-800">{formattedDate}</h3>
-            <p className="text-sm text-gray-500">{formattedTime}</p>
+          <div className="mt-3">
+            <p className="text-sm text-gray-600 line-clamp-2">{analysis.summary}</p>
           </div>
         </div>
-        <ChevronRightIcon className="w-5 h-5 text-gray-400" />
-      </div>
-      <div className="mt-3">
-        <p className="text-sm text-gray-600 line-clamp-2">{analysis.summary}</p>
-      </div>
-    </motion.div>
+        
+        {/* 삭제 버튼 */}
+        <div className="absolute bottom-3 right-3">
+          <button
+            onClick={handleDeleteClick}
+            disabled={deleteAnalysisMutation.isPending}
+            className="p-1.5 rounded-full bg-gray-50 hover:bg-red-50 text-gray-500 hover:text-red-600 transition-colors focus:outline-none focus:ring-2 focus:ring-red-300"
+            title="삭제"
+          >
+            {deleteAnalysisMutation.isPending ? (
+              <ArrowPathIcon className="w-4 h-4 animate-spin" />
+            ) : (
+              <TrashIcon className="w-4 h-4" />
+            )}
+          </button>
+        </div>
+      </motion.div>
+      
+      <ConfirmModal
+        isOpen={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        onConfirm={confirmDelete}
+        title="분석 결과 삭제 확인"
+        message={`${formattedDate} ${formattedTime}에 생성된 분석 결과를 정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`}
+        confirmText="삭제"
+        isLoading={deleteAnalysisMutation.isPending}
+      />
+    </>
   );
 }
 

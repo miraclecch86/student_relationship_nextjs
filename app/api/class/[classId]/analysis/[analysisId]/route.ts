@@ -137,4 +137,123 @@ export async function GET(
       { status: 500 }
     );
   }
+}
+
+// 분석 결과 삭제 API
+export async function DELETE(
+  request: NextRequest,
+  context: any
+) {
+  try {
+    console.log('분석 결과 삭제 API 호출됨, context.params:', context.params);
+    const { classId, analysisId } = context.params;
+    
+    // Supabase 클라이언트 생성
+    const cookieStore = cookies();
+    console.log('쿠키 스토어 생성됨');
+    
+    const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
+    console.log('Supabase 클라이언트 생성됨');
+
+    // 인증 확인
+    console.log('인증 세션 확인 시작');
+    try {
+      const sessionResult = await supabase.auth.getSession();
+      console.log('세션 조회 결과:', {
+        hasError: !!sessionResult.error,
+        hasSession: !!sessionResult.data.session
+      });
+      
+      const { data: { session }, error: authError } = sessionResult;
+      
+      if (authError) {
+        console.error('인증 오류 발생:', authError);
+        return NextResponse.json(
+          { error: '인증되지 않은 사용자입니다.' },
+          { status: 401 }
+        );
+      }
+      
+      if (!session) {
+        console.error('세션이 존재하지 않음');
+        return NextResponse.json(
+          { error: '인증되지 않은 사용자입니다.' },
+          { status: 401 }
+        );
+      }
+      console.log('인증 확인 완료, 사용자 ID:', session.user.id);
+      
+      try {
+        // 먼저 분석 결과가 사용자의 것인지 확인
+        console.log(`분석 결과 및 권한 확인: analysisId=${analysisId}`);
+        const { data: analysis, error: dataError } = await supabase
+          .from('analysis_results')
+          .select('*, classes:class_id(user_id)')
+          .eq('id', analysisId)
+          .single();
+          
+        if (dataError) {
+          console.error('분석 결과 조회 오류:', dataError);
+          return NextResponse.json(
+            { error: '분석 결과를 찾을 수 없습니다.' },
+            { status: 404 }
+          );
+        }
+        
+        if (!analysis) {
+          console.error('분석 결과가 없음');
+          return NextResponse.json(
+            { error: '분석 결과를 찾을 수 없습니다.' },
+            { status: 404 }
+          );
+        }
+        
+        if (analysis.classes?.user_id !== session.user.id) {
+          console.log('권한 없음. 학급 소유자:', analysis.classes?.user_id, '요청자:', session.user.id);
+          return NextResponse.json(
+            { error: '이 분석 결과를 삭제할 권한이 없습니다.' },
+            { status: 403 }
+          );
+        }
+        console.log('학급 권한 확인 완료');
+        
+        // 분석 결과 삭제
+        console.log(`분석 결과 삭제 시작: analysisId=${analysisId}`);
+        const { error: deleteError } = await supabase
+          .from('analysis_results')
+          .delete()
+          .eq('id', analysisId);
+          
+        if (deleteError) {
+          console.error('분석 결과 삭제 오류:', deleteError);
+          return NextResponse.json(
+            { error: '분석 결과 삭제 중 오류가 발생했습니다.' },
+            { status: 500 }
+          );
+        }
+        
+        console.log('분석 결과 삭제 성공');
+        return NextResponse.json({ success: true });
+        
+      } catch (queryError: any) {
+        console.error('Supabase 쿼리 실행 중 예외 발생:', queryError);
+        return NextResponse.json(
+          { error: `분석 삭제 오류: ${queryError.message}` },
+          { status: 500 }
+        );
+      }
+    } catch (sessionError: any) {
+      console.error('세션 조회 중 예외 발생:', sessionError);
+      return NextResponse.json(
+        { error: `인증 오류: ${sessionError.message}` },
+        { status: 500 }
+      );
+    }
+  } catch (error: any) {
+    console.error('분석 결과 삭제 API 오류:', error);
+    return NextResponse.json(
+      { error: `서버 오류: ${error.message}`, stack: error.stack },
+      { status: 500 }
+    );
+  }
 } 

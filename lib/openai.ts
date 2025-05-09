@@ -21,6 +21,7 @@ interface OpenAIResponse {
       challenges: string[];
       suggestions: string[];
     }>;
+    message?: string;
   };
   classroomEnvironment?: {
     overall: string;
@@ -48,7 +49,10 @@ export async function analyzeStudentRelationships(
     const apiKey = process.env.OPENAI_API_KEY;
     
     if (!apiKey) {
-      throw new Error('OpenAI API 키가 설정되지 않았습니다.');
+      console.error('OpenAI API 키가 설정되지 않았습니다. 환경 변수를 확인해주세요.');
+      console.error('환경 변수 OPENAI_API_KEY를 .env.local 파일과 Vercel 프로젝트 설정에 추가해야 합니다.');
+      console.error('현재 환경 변수 키 목록:', Object.keys(process.env).filter(key => !key.includes('SECRET')));
+      throw new Error('OpenAI API 키가 설정되지 않았습니다. 환경 변수를 확인해주세요.');
     }
 
     // 분석에 필요한 데이터 준비
@@ -198,7 +202,18 @@ export async function analyzeStudentRelationships(
       
       // 확장 필드에 대한 검증
       if (parsedContent.individualAnalysis) {
-        if (!Array.isArray(parsedContent.individualAnalysis.students)) {
+        // individualAnalysis가 문자열인 경우 객체로 변환
+        if (typeof parsedContent.individualAnalysis !== 'object') {
+          const message = parsedContent.individualAnalysis;
+          parsedContent.individualAnalysis = {
+            students: [],
+            message: message
+          };
+        } else if (!parsedContent.individualAnalysis.students) {
+          // students 필드가 없는 경우 빈 배열 추가
+          parsedContent.individualAnalysis.students = [];
+        } else if (!Array.isArray(parsedContent.individualAnalysis.students)) {
+          // students 필드가 배열이 아닌 경우 빈 배열로 변환
           console.warn('students 필드가 배열이 아님:', parsedContent.individualAnalysis.students);
           parsedContent.individualAnalysis.students = [];
         } else {
@@ -271,7 +286,10 @@ export async function analyzeSurveyResults(
     const apiKey = process.env.OPENAI_API_KEY;
     
     if (!apiKey) {
-      throw new Error('OpenAI API 키가 설정되지 않았습니다.');
+      console.error('OpenAI API 키가 설정되지 않았습니다. 환경 변수를 확인해주세요.');
+      console.error('환경 변수 OPENAI_API_KEY를 .env.local 파일과 Vercel 프로젝트 설정에 추가해야 합니다.');
+      console.error('현재 환경 변수 키 목록:', Object.keys(process.env).filter(key => !key.includes('SECRET')));
+      throw new Error('OpenAI API 키가 설정되지 않았습니다. 환경 변수를 확인해주세요.');
     }
 
     // 분석에 필요한 데이터 준비

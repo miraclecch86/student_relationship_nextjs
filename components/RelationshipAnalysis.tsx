@@ -52,6 +52,16 @@ export default function RelationshipAnalysis({
       strongConnections?: string[];
       isolatedStudents?: string[];
     };
+    individualAnalysis?: {
+      message?: string;
+      students?: {
+        name: string;
+        socialPosition: string;
+        strengths?: string[];
+        challenges?: string[];
+        suggestions?: string[];
+      }[];
+    };
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -69,36 +79,82 @@ export default function RelationshipAnalysis({
         throw new Error('분석할 관계 데이터가 없습니다.');
       }
       
-      // LinkData를 Relationship 형식으로 변환 (관계 타입 매핑 추가)
-      const formattedRelationships: Relationship[] = relationships.map(r => ({
-        id: `${r.source}-${r.target}`,
-        from_student_id: r.source,
-        to_student_id: r.target,
-        relation_type: mapRelationTypeToDb(r.type),
-        created_at: new Date().toISOString()
-      }));
-      
-      // 서버 API를 통해 OpenAI 분석 요청
-      const response = await fetch('/api/openai/analyze', {
+      // 직접 OpenAI API 호출 대신 서버 API 호출
+      const response = await fetch(`/api/class/${classId}/analysis`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          students,
-          relationships: formattedRelationships,
-          answers,
-          questions
-        })
+        // 요청 본문 간소화 - API 엔드포인트는 classId를 사용해 자체적으로 데이터를 조회함
+        body: JSON.stringify({}),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(`API 오류: ${errorData.error || response.statusText}`);
+        throw new Error(errorData.error || '분석 요청 중 오류가 발생했습니다.');
+      }
+
+      const result = await response.json();
+      
+      // 디버깅을 위해 응답 구조 로깅
+      console.log('API 응답 데이터:', result);
+      console.log('result_data 타입:', typeof result.result_data);
+      
+      // 데이터 구조 확인 및 적절히 처리
+      // result_data가 JSON 문자열인 경우 파싱
+      let analysisData;
+      
+      if (result.result_data) {
+        if (typeof result.result_data === 'string') {
+          // 문자열인 경우 JSON 파싱 시도
+          try {
+            analysisData = JSON.parse(result.result_data);
+            console.log('문자열에서 JSON으로 파싱:', analysisData);
+          } catch (e) {
+            console.error('JSON 파싱 오류:', e);
+            // JSON 파싱 실패했지만 문자열 형태인 경우
+            try {
+              // 문자열에서 이스케이프된 따옴표 처리 시도
+              const cleanedStr = result.result_data
+                .replace(/\\"/g, '"')
+                .replace(/^"|"$/g, '');
+              analysisData = JSON.parse(cleanedStr);
+              console.log('정제된 문자열에서 파싱 성공:', analysisData);
+            } catch(e2) {
+              console.error('정제된 JSON 파싱 오류:', e2);
+              // 최후의 수단: 문자열을 그대로 표시
+              analysisData = { 
+                analysis: '분석 데이터 파싱 오류가 발생했습니다.', 
+                relationships: { description: '데이터 형식 오류' },
+                socialDynamics: { description: '데이터 형식 오류' } 
+              };
+            }
+          }
+        } else if (typeof result.result_data === 'object') {
+          // 이미 객체인 경우 그대로 사용
+          analysisData = result.result_data;
+          console.log('이미 객체 형태:', analysisData);
+        } else {
+          // 알 수 없는 형식
+          console.error('알 수 없는 result_data 형식:', typeof result.result_data);
+          analysisData = { 
+            analysis: '분석 데이터 형식이 예상과 다릅니다.', 
+            relationships: { description: '데이터 형식 오류' },
+            socialDynamics: { description: '데이터 형식 오류' } 
+          };
+        }
+      } else {
+        // result_data가 없는 경우
+        console.error('result_data가 없음:', result);
+        analysisData = { 
+          analysis: '분석 데이터가 없습니다.', 
+          relationships: { description: '데이터 없음' },
+          socialDynamics: { description: '데이터 없음' } 
+        };
       }
       
-      const result = await response.json();
-      setAnalysisResult(result);
+      // 분석 결과 설정
+      setAnalysisResult(analysisData);
       toast.success('관계 분석이 완료되었습니다.');
     } catch (err) {
       console.error('분석 오류:', err);
@@ -165,64 +221,145 @@ export default function RelationshipAnalysis({
           {/* 전체 분석 요약 */}
           <div className="border border-blue-100 rounded-lg p-4 bg-blue-50">
             <h3 className="text-lg font-semibold text-blue-800 mb-2">전체 분석 요약</h3>
-            <p className="text-gray-700 whitespace-pre-line">{analysisResult.analysis}</p>
+            <p className="text-gray-700 whitespace-pre-line">
+              {typeof analysisResult.analysis === 'string' 
+                ? analysisResult.analysis 
+                : '분석 데이터가 올바른 형식이 아닙니다.'}
+            </p>
           </div>
 
           {/* 관계 분석 */}
-          <div className="border border-gray-200 rounded-lg p-4">
-            <h3 className="text-lg font-semibold text-gray-800 mb-2">관계 분석</h3>
-            <p className="text-gray-700 mb-4">{analysisResult.relationships.description}</p>
-            
-            {analysisResult.relationships.issues && analysisResult.relationships.issues.length > 0 && (
-              <div className="mb-4">
-                <h4 className="font-medium text-gray-700 mb-2">주요 이슈</h4>
-                <ul className="list-disc pl-5 space-y-1">
-                  {analysisResult.relationships.issues.map((issue, index) => (
-                    <li key={index} className="text-gray-600">{issue}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            
-            {analysisResult.relationships.recommendations && analysisResult.relationships.recommendations.length > 0 && (
-              <div>
-                <h4 className="font-medium text-gray-700 mb-2">권장 사항</h4>
-                <ul className="list-disc pl-5 space-y-1">
-                  {analysisResult.relationships.recommendations.map((rec, index) => (
-                    <li key={index} className="text-gray-600">{rec}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
+          {analysisResult.relationships && (
+            <div className="border border-gray-200 rounded-lg p-4">
+              <h3 className="text-lg font-semibold text-gray-800 mb-2">관계 분석</h3>
+              <p className="text-gray-700 mb-4">
+                {typeof analysisResult.relationships.description === 'string'
+                  ? analysisResult.relationships.description
+                  : '관계 분석 데이터가 올바른 형식이 아닙니다.'}
+              </p>
+              
+              {analysisResult.relationships.issues && Array.isArray(analysisResult.relationships.issues) && analysisResult.relationships.issues.length > 0 && (
+                <div className="mb-4">
+                  <h4 className="font-medium text-gray-700 mb-2">주요 이슈</h4>
+                  <ul className="list-disc pl-5 space-y-1">
+                    {analysisResult.relationships.issues.map((issue, index) => (
+                      <li key={index} className="text-gray-600">{issue}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              {analysisResult.relationships.recommendations && Array.isArray(analysisResult.relationships.recommendations) && analysisResult.relationships.recommendations.length > 0 && (
+                <div>
+                  <h4 className="font-medium text-gray-700 mb-2">권장 사항</h4>
+                  <ul className="list-disc pl-5 space-y-1">
+                    {analysisResult.relationships.recommendations.map((rec, index) => (
+                      <li key={index} className="text-gray-600">{rec}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 사회적 역학 */}
-          <div className="border border-gray-200 rounded-lg p-4">
-            <h3 className="text-lg font-semibold text-gray-800 mb-2">사회적 역학</h3>
-            <p className="text-gray-700 mb-4">{analysisResult.socialDynamics.description}</p>
-            
-            {analysisResult.socialDynamics.strongConnections && analysisResult.socialDynamics.strongConnections.length > 0 && (
-              <div className="mb-4">
-                <h4 className="font-medium text-gray-700 mb-2">강한 유대 관계</h4>
-                <ul className="list-disc pl-5 space-y-1">
-                  {analysisResult.socialDynamics.strongConnections.map((connection, index) => (
-                    <li key={index} className="text-gray-600">{connection}</li>
+          {analysisResult.socialDynamics && (
+            <div className="border border-gray-200 rounded-lg p-4">
+              <h3 className="text-lg font-semibold text-gray-800 mb-2">사회적 역학</h3>
+              <p className="text-gray-700 mb-4">
+                {typeof analysisResult.socialDynamics.description === 'string'
+                  ? analysisResult.socialDynamics.description
+                  : '사회적 역학 데이터가 올바른 형식이 아닙니다.'}
+              </p>
+              
+              {analysisResult.socialDynamics.strongConnections && Array.isArray(analysisResult.socialDynamics.strongConnections) && analysisResult.socialDynamics.strongConnections.length > 0 && (
+                <div className="mb-4">
+                  <h4 className="font-medium text-gray-700 mb-2">강한 유대 관계</h4>
+                  <ul className="list-disc pl-5 space-y-1">
+                    {analysisResult.socialDynamics.strongConnections.map((connection, index) => (
+                      <li key={index} className="text-gray-600">{connection}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              {analysisResult.socialDynamics.isolatedStudents && Array.isArray(analysisResult.socialDynamics.isolatedStudents) && analysisResult.socialDynamics.isolatedStudents.length > 0 && (
+                <div>
+                  <h4 className="font-medium text-gray-700 mb-2">고립된 학생</h4>
+                  <ul className="list-disc pl-5 space-y-1">
+                    {analysisResult.socialDynamics.isolatedStudents.map((student, index) => (
+                      <li key={index} className="text-gray-600">{student}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 개별 학생 분석 */}
+          {analysisResult.individualAnalysis && (
+            <div className="border border-gray-200 rounded-lg p-4">
+              <h3 className="text-lg font-semibold text-gray-800 mb-2">개별 학생 분석</h3>
+              
+              {/* individualAnalysis가 message 필드를 포함할 경우 (문자열이었던 경우) */}
+              {analysisResult.individualAnalysis.message && (
+                <p className="text-gray-700 mb-4 bg-yellow-50 p-3 rounded border border-yellow-200">
+                  {analysisResult.individualAnalysis.message}
+                </p>
+              )}
+              
+              {/* 학생 데이터가 있는 경우에만 표시 */}
+              {analysisResult.individualAnalysis.students && 
+                Array.isArray(analysisResult.individualAnalysis.students) && 
+                analysisResult.individualAnalysis.students.length > 0 ? (
+                <div className="space-y-4">
+                  {analysisResult.individualAnalysis.students.map((student, index) => (
+                    <div key={index} className="border rounded-md p-3">
+                      <h4 className="font-medium text-blue-700">{student.name}</h4>
+                      <p className="text-gray-600 mb-2">사회적 위치: {student.socialPosition}</p>
+                      
+                      {student.strengths && Array.isArray(student.strengths) && student.strengths.length > 0 && (
+                        <div className="mb-2">
+                          <h5 className="text-sm font-medium text-gray-700">강점</h5>
+                          <ul className="list-disc pl-5 text-sm">
+                            {student.strengths.map((strength, idx) => (
+                              <li key={idx} className="text-gray-600">{strength}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      
+                      {student.challenges && Array.isArray(student.challenges) && student.challenges.length > 0 && (
+                        <div className="mb-2">
+                          <h5 className="text-sm font-medium text-gray-700">도전 과제</h5>
+                          <ul className="list-disc pl-5 text-sm">
+                            {student.challenges.map((challenge, idx) => (
+                              <li key={idx} className="text-gray-600">{challenge}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      
+                      {student.suggestions && Array.isArray(student.suggestions) && student.suggestions.length > 0 && (
+                        <div>
+                          <h5 className="text-sm font-medium text-gray-700">개선 제안</h5>
+                          <ul className="list-disc pl-5 text-sm">
+                            {student.suggestions.map((suggestion, idx) => (
+                              <li key={idx} className="text-gray-600">{suggestion}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
                   ))}
-                </ul>
-              </div>
-            )}
-            
-            {analysisResult.socialDynamics.isolatedStudents && analysisResult.socialDynamics.isolatedStudents.length > 0 && (
-              <div>
-                <h4 className="font-medium text-gray-700 mb-2">고립된 학생</h4>
-                <ul className="list-disc pl-5 space-y-1">
-                  {analysisResult.socialDynamics.isolatedStudents.map((student, index) => (
-                    <li key={index} className="text-gray-600">{student}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
+                </div>
+              ) : (
+                !analysisResult.individualAnalysis.message && (
+                  <p className="text-gray-500 italic">개별 학생 분석 데이터가 없습니다.</p>
+                )
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

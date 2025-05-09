@@ -132,11 +132,23 @@ export async function POST(
     // OpenAI API를 통해 분석 수행
     try {
       console.log('[POST API] GPT 분석 시작');
+      
+      // 환경 변수 확인
+      if (!process.env.OPENAI_API_KEY) {
+        console.error('[POST API] OPENAI_API_KEY 환경 변수가 설정되지 않았습니다.');
+        return NextResponse.json(
+          { error: 'OpenAI API 키가 설정되지 않았습니다. 환경 변수를 확인해주세요.' },
+          { status: 500 }
+        );
+      }
+      
+      console.log('[POST API] 환경 변수 확인 완료, API 키 길이:', process.env.OPENAI_API_KEY.length);
+      
       const analysisResult = await analyzeStudentRelationships(
         students,
         relationships || []
       );
-      console.log('[POST API] GPT 분석 완료');
+      console.log('[POST API] GPT 분석 완료, 결과 구조:', Object.keys(analysisResult));
       
       // 분석 결과 저장
       console.log('[POST API] 분석 결과 저장 시작');
@@ -148,14 +160,33 @@ export async function POST(
       } else {
         // 문자열이 아닌 경우 요약 대체
         summary = '분석 결과 요약 (자세한 내용은 상세 페이지 참조)';
+        console.warn('[POST API] 분석 결과의 analysis 필드가 문자열이 아닙니다:', typeof analysisResult.analysis);
       }
+      
+      // 결과가 이미 문자열인지 확인하고 필요한 경우 JSON 문자열로 변환하지 않음
+      const resultToSave = typeof analysisResult === 'string' 
+        ? analysisResult 
+        : analysisResult;
+      
+      // 데이터 저장 전 형식 디버깅
+      console.log('[POST API] 저장 전 데이터 형식:', {
+        analysisResultType: typeof analysisResult,
+        isString: typeof analysisResult === 'string',
+        isObject: typeof analysisResult === 'object',
+        hasAnalysis: analysisResult && typeof analysisResult.analysis !== 'undefined',
+        hasRelationships: analysisResult && typeof analysisResult.relationships !== 'undefined'
+      });
+      
+      // 결과를 JSON 문자열로 변환 (Supabase가 JSON 타입으로 저장하도록)
+      // 명시적으로 문자열화하여 저장하는 대신, JSON 객체 그대로 저장
+      // Supabase는 JSONB 타입을 사용하므로 자동으로 처리됨
       
       const { data: savedAnalysis, error: saveError } = await supabase
         .from('analysis_results')
         .insert([
           {
             class_id: classId,
-            result_data: analysisResult,
+            result_data: resultToSave,
             summary: summary,
           }
         ])
@@ -179,9 +210,14 @@ export async function POST(
       }
 
       console.log('[POST API] 분석 결과 저장 완료, ID:', savedAnalysis.id);
+      
+      // 저장된 결과에서 result_data 형식 확인
+      console.log('[POST API] 저장된 result_data 타입:', typeof savedAnalysis.result_data);
+      
       return NextResponse.json(savedAnalysis);
     } catch (error: any) {
-      console.error('[POST API] GPT 분석 오류:', error);
+      console.error('[POST API] GPT 분석 오류:', error.message);
+      console.error('[POST API] 오류 스택:', error.stack);
       return NextResponse.json(
         { error: `GPT 분석 중 오류가 발생했습니다: ${error.message}` },
         { status: 500 }
