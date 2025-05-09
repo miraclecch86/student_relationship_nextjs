@@ -9,6 +9,7 @@ import { downloadJson, readJsonFile } from '@/utils/fileUtils';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import UserProfile from '@/components/UserProfile';
 
 // 주관식 질문 개수를 포함하는 새로운 인터페이스 정의
 interface ClassWithCount extends BaseClass {
@@ -146,17 +147,6 @@ export default function Home() {
     queryFn: fetchClasses,
   });
 
-  const handleLogout = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      router.replace('/login');
-    } catch (err) {
-      console.error('Logout error:', err);
-      toast.error('로그아웃 중 오류가 발생했습니다.');
-    }
-  };
-
   if (isClassesLoading) {
      return <div className="flex justify-center items-center h-screen text-primary">로딩 중... (Home Page - Temporary)</div>;
   }
@@ -174,12 +164,7 @@ export default function Home() {
           >
             + 새 학급 만들기
           </Link>
-          <button 
-            onClick={handleLogout}
-            className="text-sm text-gray-600 hover:text-indigo-600"
-          >
-            로그아웃
-          </button>
+          <UserProfile />
         </div>
       </header>
 

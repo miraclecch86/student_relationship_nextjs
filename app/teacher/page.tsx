@@ -9,6 +9,7 @@ import { downloadJson, readJsonFile } from '@/utils/fileUtils';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import UserProfile from '@/components/UserProfile';
 
 // 주관식 질문 개수를 포함하는 새로운 인터페이스 정의
 interface ClassWithCount extends BaseClass {
@@ -389,24 +390,6 @@ export default function TeacherPage() {
     await deleteClassMutation.mutateAsync(id);
   };
 
-  const handleLogout = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      router.replace('/login');
-    } catch (err) {
-      console.error('Logout error:', err);
-      toast.error('로그아웃 중 오류가 발생했습니다.');
-    }
-  };
-
-  // 역할 변경 핸들러 추가
-  const handleRoleChange = () => {
-    console.log('역할 변경하기 버튼 클릭됨');
-    // API 라우트를 사용하여 역할 재설정
-    window.location.href = '/api/reset-role';
-  };
-
   // 로딩 및 에러 처리 (useQuery 상태 사용)
   if (isClassesLoading) {
       return <div className="flex justify-center items-center h-screen text-primary">학급 목록 로딩 중...</div>;
@@ -421,12 +404,6 @@ export default function TeacherPage() {
           <h1 className="text-3xl font-bold text-gray-800">내 학급 목록</h1>
           <div className="flex items-center space-x-4">
             <button 
-              onClick={handleRoleChange}
-              className="px-3 py-1.5 text-xs bg-purple-500 text-white rounded-md hover:bg-purple-600 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 shadow-sm"
-            >
-              역할 변경하기
-            </button>
-            <button 
               onClick={handleSave}
               disabled={exportDataMutation.isPending || !classes || classes.length === 0}
               className="px-3 py-1.5 text-xs bg-green-500 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 shadow-sm disabled:opacity-50"
@@ -440,12 +417,7 @@ export default function TeacherPage() {
             >
               {importDataMutation.isPending ? '가져오는 중...' : '데이터 가져오기'}
             </button>
-            <button 
-              onClick={handleLogout}
-              className="text-sm text-gray-600 hover:text-indigo-600"
-            >
-              로그아웃
-            </button>
+            <UserProfile />
           </div>
         </header>
 

@@ -34,6 +34,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { arrayMove } from '@dnd-kit/sortable';
+import UserProfile from '@/components/UserProfile';
 
 // 데이터 타입 정의 (D3.js용 노드 및 링크)
 export interface NodeData extends Student {
@@ -541,6 +542,7 @@ export default function ClassRelationshipPage() {
             </button>
             <h1 className="text-xl font-bold text-black">{classDetails.name}</h1>
           </div>
+          <UserProfile />
         </header>
 
         {/* 컨트롤 패널 */}
