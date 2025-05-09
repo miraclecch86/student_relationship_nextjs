@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import { Student, Question, Answer, Relationship } from '@/lib/supabase';
-import { analyzeStudentRelationships } from '@/lib/openai';
 import { ArrowPathIcon, LightBulbIcon, ExclamationCircleIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { RELATIONSHIP_TYPES } from '@/lib/constants';
@@ -61,12 +60,6 @@ export default function RelationshipAnalysis({
     setError(null);
     
     try {
-      // API 키가 있는지 확인
-      const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY;
-      if (!apiKey) {
-        throw new Error('OpenAI API 키가 설정되지 않았습니다. 환경 변수를 확인해주세요.');
-      }
-      
       // 분석에 필요한 데이터가 있는지 확인
       if (students.length === 0) {
         throw new Error('분석할 학생 데이터가 없습니다.');
@@ -85,14 +78,26 @@ export default function RelationshipAnalysis({
         created_at: new Date().toISOString()
       }));
       
-      // OpenAI API를 사용하여 학생 관계 분석
-      const result = await analyzeStudentRelationships(
-        students, 
-        formattedRelationships,
-        answers,
-        questions
-      );
+      // 서버 API를 통해 OpenAI 분석 요청
+      const response = await fetch('/api/openai/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          students,
+          relationships: formattedRelationships,
+          answers,
+          questions
+        })
+      });
       
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`API 오류: ${errorData.error || response.statusText}`);
+      }
+      
+      const result = await response.json();
       setAnalysisResult(result);
       toast.success('관계 분석이 완료되었습니다.');
     } catch (err) {

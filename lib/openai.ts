@@ -45,7 +45,7 @@ export async function analyzeStudentRelationships(
 ): Promise<OpenAIResponse> {
   try {
     // 환경 변수에서 API 키 가져오기
-    const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY;
+    const apiKey = process.env.OPENAI_API_KEY;
     
     if (!apiKey) {
       throw new Error('OpenAI API 키가 설정되지 않았습니다.');
@@ -268,7 +268,7 @@ export async function analyzeSurveyResults(
 ): Promise<string> {
   try {
     // 환경 변수에서 API 키 가져오기
-    const apiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY;
+    const apiKey = process.env.OPENAI_API_KEY;
     
     if (!apiKey) {
       throw new Error('OpenAI API 키가 설정되지 않았습니다.');
