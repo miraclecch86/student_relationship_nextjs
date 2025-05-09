@@ -6,11 +6,11 @@ import { Database } from '@/lib/database.types';
 // 특정 분석 결과 조회 API
 export async function GET(
   request: NextRequest,
-  { params }: { params: { classId: string; analysisId: string } }
+  context: any
 ) {
   try {
-    console.log('특정 분석 결과 조회 API 호출됨, params:', params);
-    const { classId, analysisId } = params;
+    console.log('특정 분석 결과 조회 API 호출됨, context.params:', context.params);
+    const { classId, analysisId } = context.params;
     
     // Supabase 클라이언트 생성
     const cookieStore = cookies();

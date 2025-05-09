@@ -79,36 +79,6 @@ async function fetchAnalysisResults(classId: string): Promise<AnalysisResult[]> 
   }
 }
 
-// 특정 분석 결과 조회 함수
-async function fetchAnalysisDetail(classId: string, analysisId: string): Promise<AnalysisResult> {
-  console.log(`분석 상세 정보 요청: classId=${classId}, analysisId=${analysisId}`);
-  
-  try {
-    // API 라우트 대신 직접 Supabase 쿼리를 실행
-    const { data, error } = await supabase
-      .from('analysis_results')
-      .select('*')
-      .eq('id', analysisId)
-      .eq('class_id', classId)
-      .single();
-    
-    if (error) {
-      console.error('Supabase 쿼리 오류:', error);
-      throw new Error(`분석 결과를 불러오는데 실패했습니다: ${error.message}`);
-    }
-    
-    if (!data) {
-      throw new Error('분석 결과를 찾을 수 없습니다.');
-    }
-    
-    console.log('분석 상세 정보 수신 성공');
-    return data as AnalysisResult;
-  } catch (error) {
-    console.error('분석 상세 정보 요청 오류:', error);
-    throw error;
-  }
-}
-
 // 분석 실행 함수 - 복잡한 로직이 있으므로 API 호출 방식 유지
 async function runAnalysis(classId: string): Promise<AnalysisResult> {
   console.log(`분석 실행 요청: classId=${classId}`);
@@ -150,21 +120,21 @@ async function runAnalysis(classId: string): Promise<AnalysisResult> {
 // 분석 카드 컴포넌트
 interface AnalysisCardProps {
   analysis: AnalysisResult;
-  onClick: () => void;
-  isSelected: boolean;
 }
 
-function AnalysisCard({ analysis, onClick, isSelected }: AnalysisCardProps) {
+function AnalysisCard({ analysis }: AnalysisCardProps) {
+  const router = useRouter();
+  const params = useParams();
+  const classId = params.classId as string;
+  
   const createdAt = new Date(analysis.created_at);
   const formattedDate = format(createdAt, 'yyyy년 MM월 dd일', { locale: ko });
   const formattedTime = format(createdAt, 'HH:mm', { locale: ko });
   
   return (
     <motion.div
-      className={`bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all duration-300 hover:shadow-lg ${
-        isSelected ? 'border-2 border-indigo-500 bg-indigo-50' : ''
-      }`}
-      onClick={onClick}
+      className="bg-white rounded-lg shadow-md p-4 cursor-pointer transition-all duration-300 hover:shadow-lg hover:bg-gray-50"
+      onClick={() => router.push(`/class/${classId}/analysis/${analysis.id}`)}
       whileHover={{ scale: 1.02 }}
       layout
     >
@@ -280,7 +250,6 @@ export default function ClassAnalysisPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const classId = params.classId as string;
-  const [selectedAnalysisId, setSelectedAnalysisId] = useState<string | null>(null);
   
   // 학급 정보 조회
   const { data: classDetails, isLoading: isClassLoading } = useQuery({
@@ -301,28 +270,13 @@ export default function ClassAnalysisPage() {
     enabled: !!classId,
   });
   
-  // 선택한 분석 결과 상세 조회
-  const { 
-    data: selectedAnalysis,
-    isLoading: isDetailLoading,
-    isError: isDetailError,
-    error: detailError
-  } = useQuery({
-    queryKey: ['analysisDetail', classId, selectedAnalysisId],
-    queryFn: () => fetchAnalysisDetail(classId, selectedAnalysisId!),
-    enabled: !!selectedAnalysisId,
-    retry: 1,  // 실패 시 1번만 재시도
-    refetchOnWindowFocus: false,
-    staleTime: 1000 * 60 * 5, // 5분 동안 데이터 캐시
-  });
-  
   // 분석 실행 Mutation
   const runAnalysisMutation = useMutation({
     mutationFn: () => runAnalysis(classId),
     onSuccess: (newAnalysis) => {
       queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
-      setSelectedAnalysisId(newAnalysis.id);
       toast.success('분석이 완료되었습니다.');
+      router.push(`/class/${classId}/analysis/${newAnalysis.id}`);
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : '분석 실행 중 오류가 발생했습니다.');
@@ -331,10 +285,6 @@ export default function ClassAnalysisPage() {
   
   const handleRunAnalysis = () => {
     runAnalysisMutation.mutate();
-  };
-  
-  const handleSelectAnalysis = (analysisId: string) => {
-    setSelectedAnalysisId(analysisId);
   };
   
   const isLoading = isClassLoading || isResultsLoading;
@@ -428,77 +378,30 @@ export default function ClassAnalysisPage() {
           </div>
         </div>
         
-        {/* 분석 결과 목록 및 상세 */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* 분석 결과 목록 */}
-          <div className="md:col-span-1">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-              <CalendarIcon className="w-5 h-5 text-indigo-500 mr-2" />
-              분석 결과 목록
-            </h2>
-            
-            {analysisResults && analysisResults.length > 0 ? (
-              <div className="space-y-4 overflow-y-auto max-h-[600px] pr-2">
-                <AnimatePresence>
-                  {analysisResults.map((analysis) => (
-                    <AnalysisCard
-                      key={analysis.id}
-                      analysis={analysis}
-                      onClick={() => handleSelectAnalysis(analysis.id)}
-                      isSelected={selectedAnalysisId === analysis.id}
-                    />
-                  ))}
-                </AnimatePresence>
-              </div>
-            ) : (
-              <div className="bg-gray-100 text-gray-600 p-8 rounded-lg text-center">
-                <p className="mb-4">분석 결과가 없습니다.</p>
-                <p className="text-sm">위의 '새 분석 실행' 버튼을 눌러 분석을 시작해보세요.</p>
-              </div>
-            )}
-          </div>
+        {/* 분석 결과 목록 */}
+        <div className="mt-8">
+          <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+            <CalendarIcon className="w-5 h-5 text-indigo-500 mr-2" />
+            분석 결과 목록
+          </h2>
           
-          {/* 분석 결과 상세 */}
-          <div className="md:col-span-2">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-              <DocumentTextIcon className="w-5 h-5 text-indigo-500 mr-2" />
-              분석 결과 상세
-            </h2>
-            
-            {isDetailLoading ? (
-              <div className="bg-white rounded-lg shadow-md p-10 flex justify-center items-center">
-                <ArrowPathIcon className="w-8 h-8 animate-spin text-indigo-500" />
-                <div className="text-indigo-500 ml-3">분석 결과 불러오는 중...</div>
-              </div>
-            ) : isDetailError ? (
-              <div className="bg-white rounded-lg shadow-md p-10">
-                <div className="text-center text-red-500 mb-4">
-                  <h3 className="text-lg font-semibold mb-2">분석 결과를 불러올 수 없습니다</h3>
-                  <p className="text-sm text-gray-600">
-                    {detailError instanceof Error ? detailError.message : '알 수 없는 오류가 발생했습니다.'}
-                  </p>
-                </div>
-                <div className="flex justify-center mt-4">
-                  <button
-                    onClick={() => {
-                      // 쿼리 무효화하고 다시 시도
-                      queryClient.invalidateQueries({ queryKey: ['analysisDetail', classId, selectedAnalysisId] });
-                    }}
-                    className="px-4 py-2 bg-indigo-500 text-white rounded-md text-sm hover:bg-indigo-600 transition-colors"
-                  >
-                    다시 시도
-                  </button>
-                </div>
-              </div>
-            ) : selectedAnalysis ? (
-              <AnalysisDetail analysis={selectedAnalysis} />
-            ) : (
-              <div className="bg-gray-100 text-gray-600 p-10 rounded-lg text-center">
-                <p className="mb-4">왼쪽에서 분석 결과를 선택해주세요.</p>
-                <p className="text-sm">분석 결과가 없다면 '새 분석 실행' 버튼을 눌러 분석을 시작해보세요.</p>
-              </div>
-            )}
-          </div>
+          {analysisResults && analysisResults.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <AnimatePresence>
+                {analysisResults.map((analysis) => (
+                  <AnalysisCard
+                    key={analysis.id}
+                    analysis={analysis}
+                  />
+                ))}
+              </AnimatePresence>
+            </div>
+          ) : (
+            <div className="bg-gray-100 text-gray-600 p-8 rounded-lg text-center">
+              <p className="mb-4">분석 결과가 없습니다.</p>
+              <p className="text-sm">위의 '새 분석 실행' 버튼을 눌러 분석을 시작해보세요.</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

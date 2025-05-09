@@ -7,12 +7,12 @@ import { Database } from '@/lib/database.types';
 // 분석 결과 저장 API
 export async function POST(
   request: NextRequest,
-  { params }: { params: { classId: string } }
+  context: any
 ) {
-  console.log('[POST API] 호출됨, params:', params);
+  console.log('[POST API] 호출됨, context.params:', context.params);
   
   try {
-    const { classId } = params;
+    const { classId } = context.params;
     
     // Supabase 클라이언트 생성
     const cookieStore = cookies();
@@ -140,13 +140,23 @@ export async function POST(
       
       // 분석 결과 저장
       console.log('[POST API] 분석 결과 저장 시작');
+      
+      // 요약 생성 - analysis가 문자열인지 확인하고 안전하게 처리
+      let summary = '';
+      if (typeof analysisResult.analysis === 'string') {
+        summary = analysisResult.analysis.substring(0, 200) + '...';
+      } else {
+        // 문자열이 아닌 경우 요약 대체
+        summary = '분석 결과 요약 (자세한 내용은 상세 페이지 참조)';
+      }
+      
       const { data: savedAnalysis, error: saveError } = await supabase
         .from('analysis_results')
         .insert([
           {
             class_id: classId,
             result_data: analysisResult,
-            summary: analysisResult.analysis.substring(0, 200) + '...',
+            summary: summary,
           }
         ])
         .select()
@@ -189,12 +199,12 @@ export async function POST(
 // 분석 결과 목록 조회 API
 export async function GET(
   request: NextRequest,
-  { params }: { params: { classId: string } }
+  context: any
 ) {
-  console.log('[GET API] 호출됨, params:', params);
+  console.log('[GET API] 호출됨, context.params:', context.params);
   
   try {
-    const { classId } = params;
+    const { classId } = context.params;
     
     // Supabase 클라이언트 생성
     const cookieStore = cookies();
