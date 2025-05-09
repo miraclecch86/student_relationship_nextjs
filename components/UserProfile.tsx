@@ -7,7 +7,11 @@ import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 
-export default function UserProfile() {
+type UserProfileProps = {
+  size?: 'sm' | 'md' | 'lg';
+};
+
+export default function UserProfile({ size = 'md' }: UserProfileProps) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
@@ -85,6 +89,10 @@ export default function UserProfile() {
   };
 
   const userColor = getColorByName(userName);
+  
+  // 크기 조정
+  const avatarSize = size === 'sm' ? 'w-7 h-7' : size === 'lg' ? 'w-10 h-10' : 'w-8 h-8';
+  const dropdownAvatarSize = size === 'sm' ? 'w-9 h-9' : size === 'lg' ? 'w-12 h-12' : 'w-10 h-10';
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -93,7 +101,7 @@ export default function UserProfile() {
         className="flex items-center justify-center rounded-full transition-all duration-300 focus:outline-none"
         aria-expanded={isOpen}
       >
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-medium shadow-lg hover:shadow-blue-200 transition-all duration-300 ${userColor}`}>
+        <div className={`${avatarSize} rounded-full flex items-center justify-center text-white font-medium shadow-lg transition-all duration-300 ${userColor}`}>
           {getInitial(userName)}
         </div>
       </button>
@@ -109,7 +117,7 @@ export default function UserProfile() {
           >
             <div className="px-4 py-3 bg-gradient-to-br from-blue-50 to-sky-50 border-b border-gray-100">
               <div className="flex items-center space-x-3">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-medium shadow ${userColor}`}>
+                <div className={`${dropdownAvatarSize} rounded-full flex items-center justify-center text-white font-medium shadow ${userColor}`}>
                   {getInitial(userName)}
                 </div>
                 <div>

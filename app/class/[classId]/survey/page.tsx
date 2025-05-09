@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, Survey } from '@/lib/supabase';
-import StudentListPanel from '@/components/StudentListPanel';
 import SurveyCard from '@/components/SurveyCard';
 import { ArrowPathIcon, ExclamationCircleIcon, PlusIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
@@ -220,11 +219,11 @@ export default function SurveyListPage() {
         <div className="flex-shrink-0 bg-white rounded-lg shadow-md border border-gray-200 p-4 lg:p-6">
           <header className="flex items-center justify-between">
             <button
-              onClick={() => router.push('/')}
+              onClick={() => router.push(`/class/${classId}/dashboard`)}
               className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
               <ArrowLeftIcon className="w-5 h-5 mr-2" />
-              학급 목록
+              대시보드
             </button>
             <h1 className="text-xl font-semibold text-gray-800">
               {classDetails?.name ?? '학급 정보 로딩 중...'} - 설문 목록
@@ -233,11 +232,7 @@ export default function SurveyListPage() {
           </header>
         </div>
 
-        <div className="flex flex-1 overflow-hidden gap-4 lg:gap-6">
-          <aside className="w-64 bg-white rounded-lg shadow-md flex flex-col flex-shrink-0 border border-gray-200 overflow-hidden">
-            <StudentListPanel classId={classId} />
-          </aside>
-
+        <div className="flex flex-1 overflow-hidden">
           <main className="flex-1 bg-white rounded-lg shadow-md border border-gray-200 p-6 lg:p-8 overflow-y-auto">
             <div className="mb-6 flex justify-end">
               <button

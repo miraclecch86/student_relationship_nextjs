@@ -35,6 +35,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { arrayMove } from '@dnd-kit/sortable';
 import UserProfile from '@/components/UserProfile';
+import RelationshipAnalysis from '@/components/RelationshipAnalysis';
 
 // 데이터 타입 정의 (D3.js용 노드 및 링크)
 export interface NodeData extends Student {
@@ -573,123 +574,137 @@ export default function ClassRelationshipPage() {
           </div>
         </div>
 
-        <div className="flex-grow flex flex-col md:flex-row gap-4">
-
-          <div className="w-full md:w-[230px] bg-white rounded-lg shadow-md flex flex-col flex-shrink-0">
-            <h3 className="text-base font-semibold p-3 border-b text-[#6366f1] flex-shrink-0">
-              학생 목록 ({students?.length || 0}명)
-            </h3>
-            <div className="p-3 border-b">
-              <div className="flex gap-2 items-center">
-                <input
-                  type="text"
-                  value={newStudentName}
-                  onChange={(e) => setNewStudentName(e.target.value)}
-                  onKeyPress={handleAddStudentKeyPress}
-                  placeholder="학생 이름 입력"
-                  className="flex-grow min-w-0 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-300 text-sm shadow-sm text-black placeholder:text-gray-500"
-                />
-                <button
-                  onClick={handleAddStudent}
-                  disabled={!newStudentName.trim() || addStudentMutation.isPending}
-                  className="px-3 py-1 text-sm bg-[#6366f1] text-white rounded-md shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:ring-offset-1 transition-all duration-200 cursor-pointer font-semibold disabled:opacity-70 disabled:cursor-not-allowed flex-shrink-0"
-                >
-                  {addStudentMutation.isPending ? '추가중...' : '추가'}
-                </button>
+        <div className="flex-grow flex flex-col gap-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="w-full md:w-[230px] bg-white rounded-lg shadow-md flex flex-col flex-shrink-0">
+              <h3 className="text-base font-semibold p-3 border-b text-[#6366f1] flex-shrink-0">
+                학생 목록 ({students?.length || 0}명)
+              </h3>
+              <div className="p-3 border-b">
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="text"
+                    value={newStudentName}
+                    onChange={(e) => setNewStudentName(e.target.value)}
+                    onKeyPress={handleAddStudentKeyPress}
+                    placeholder="학생 이름 입력"
+                    className="flex-grow min-w-0 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-300 text-sm shadow-sm text-black placeholder:text-gray-500"
+                  />
+                  <button
+                    onClick={handleAddStudent}
+                    disabled={!newStudentName.trim() || addStudentMutation.isPending}
+                    className="px-3 py-1 text-sm bg-[#6366f1] text-white rounded-md shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:ring-offset-1 transition-all duration-200 cursor-pointer font-semibold disabled:opacity-70 disabled:cursor-not-allowed flex-shrink-0"
+                  >
+                    {addStudentMutation.isPending ? '추가중...' : '추가'}
+                  </button>
+                </div>
+              </div>
+              <div className="flex-grow overflow-y-auto p-2 space-y-2">
+                <AnimatePresence mode='popLayout'>
+                  {students && students.length > 0 ? (
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragStart={handleDragStart}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <SortableContext
+                        items={studentOrder}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        <div className="space-y-2">
+                          {sortedStudents.map(student => (
+                            <SortableStudentItem
+                              key={student.id}
+                              student={student}
+                              classId={classId}
+                              onSelect={handleSelectStudent}
+                              isSelected={selectedStudent?.id === student.id}
+                              onUpdateStudent={handleUpdateStudent}
+                              onDeleteStudent={handleDeleteStudent}
+                            />
+                          ))}
+                        </div>
+                      </SortableContext>
+                      <DragOverlay>
+                        {activeId ? (
+                          <StudentListItem
+                            student={students.find(s => s.id === activeId)!}
+                            classId={classId}
+                            onSelect={handleSelectStudent}
+                            isSelected={selectedStudent?.id === activeId}
+                            onUpdateStudent={handleUpdateStudent}
+                            onDeleteStudent={handleDeleteStudent}
+                            isDragging={true}
+                          />
+                        ) : null}
+                      </DragOverlay>
+                    </DndContext>
+                  ) : (
+                    <p className="text-sm text-gray-500 p-3 italic text-center">등록된 학생이 없습니다.</p>
+                  )}
+                </AnimatePresence>
               </div>
             </div>
-            <div className="flex-grow overflow-y-auto p-2 space-y-2">
-              <AnimatePresence mode='popLayout'>
-                {students && students.length > 0 ? (
-                  <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragStart={handleDragStart}
-                    onDragEnd={handleDragEnd}
-                  >
-                    <SortableContext
-                      items={studentOrder}
-                      strategy={verticalListSortingStrategy}
-                    >
-                      <div className="space-y-2">
-                        {sortedStudents.map(student => (
-                          <SortableStudentItem
-                            key={student.id}
-                        student={student}
-                        classId={classId}
-                        onSelect={handleSelectStudent}
-                        isSelected={selectedStudent?.id === student.id}
-                        onUpdateStudent={handleUpdateStudent}
-                        onDeleteStudent={handleDeleteStudent}
-                      />
-                        ))}
-                      </div>
-                    </SortableContext>
-                    <DragOverlay>
-                      {activeId ? (
-                        <StudentListItem
-                          student={students.find(s => s.id === activeId)!}
-                          classId={classId}
-                          onSelect={handleSelectStudent}
-                          isSelected={selectedStudent?.id === activeId}
-                          onUpdateStudent={handleUpdateStudent}
-                          onDeleteStudent={handleDeleteStudent}
-                          isDragging={true}
-                        />
-                      ) : null}
-                    </DragOverlay>
-                  </DndContext>
+
+            <div className="flex-1 flex flex-col gap-5">
+              <div className="bg-white rounded-lg shadow-md overflow-hidden relative h-[720px] flex-shrink-0">
+                {students && relationships ? (
+                  <RelationshipGraph
+                    ref={graphRef}
+                    nodes={students}
+                    links={filteredRelationships}
+                    onNodeClick={handleSelectStudent}
+                    selectedNodeId={selectedStudent?.id}
+                    classId={classId}
+                  />
                 ) : (
-                  <p className="text-sm text-gray-500 p-3 italic text-center">등록된 학생이 없습니다.</p>
+                  <div className="flex justify-center items-center h-full text-gray-500 italic">학생 또는 관계 데이터가 없습니다.</div>
                 )}
-              </AnimatePresence>
+              </div>
+
+              <div className="w-full flex-shrink-0 mb-2">
+                <WeeklyAnswersBox
+                    questions={questions}
+                    answers={answers}
+                    selectedStudent={selectedStudent}
+                    isLoadingAnswers={isLoadingAnswers}
+                />
+              </div>
+
+              {/* 새 4가지 관계 유형 랭킹 박스 */} 
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 flex-shrink-0">
+                {Object.entries(RELATIONSHIP_TYPES).map(([type, title]) => (
+                    <div key={type} className="min-h-[180px]">
+                        {students && relationships ? (
+                            <RelationshipTypeRankBox
+                                title={title}
+                                students={rankedStudentsByType[type]?.slice(0, 10)}
+                                relationshipType={type} // key (e.g., FRIENDLY) 전달
+                            />
+                        ) : (
+                            <div className="bg-white rounded-lg shadow-md p-3 h-full flex items-center justify-center text-sm text-gray-500 italic">
+                                랭킹 데이터 로딩 중...
+                            </div>
+                        )}
+                    </div>
+                ))}
+              </div>
             </div>
           </div>
-
-          <div className="flex-1 flex flex-col gap-5">
-            <div className="bg-white rounded-lg shadow-md overflow-hidden relative h-[720px] flex-shrink-0">
-              {students && relationships ? (
-                <RelationshipGraph
-                  ref={graphRef}
-                  nodes={students}
-                  links={filteredRelationships}
-                  onNodeClick={handleSelectStudent}
-                  selectedNodeId={selectedStudent?.id}
-                  classId={classId}
-                />
-              ) : (
-                <div className="flex justify-center items-center h-full text-gray-500 italic">학생 또는 관계 데이터가 없습니다.</div>
-              )}
-            </div>
-
-            <div className="w-full flex-shrink-0 mb-2">
-              <WeeklyAnswersBox
-                  questions={questions}
-                  answers={answers}
-                  selectedStudent={selectedStudent}
-                  isLoadingAnswers={isLoadingAnswers}
+          
+          {/* AI 관계 분석 섹션 추가 */}
+          {students && relationships && (
+            <div className="mt-4">
+              <RelationshipAnalysis 
+                classId={classId}
+                students={students}
+                relationships={relationships}
+                questions={questions}
+                answers={answers}
               />
             </div>
-
-            {/* 새 4가지 관계 유형 랭킹 박스 */} 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 flex-shrink-0">
-              {Object.entries(RELATIONSHIP_TYPES).map(([type, title]) => (
-                  <div key={type} className="min-h-[180px]">
-                      {students && relationships ? (
-                          <RelationshipTypeRankBox
-                              title={title}
-                              students={rankedStudentsByType[type]?.slice(0, 10)}
-                              relationshipType={type} // key (e.g., FRIENDLY) 전달
-                          />
-                      ) : (
-                          <div className="bg-white rounded-lg shadow-md p-3 h-full flex items-center justify-center text-sm text-gray-500 italic">
-                              랭킹 데이터 로딩 중...
-                          </div>
-                      )}
-                  </div>
-              ))}
-            </div>
-          </div>
+          )}
         </div>
 
         {/* 확인 모달 */}

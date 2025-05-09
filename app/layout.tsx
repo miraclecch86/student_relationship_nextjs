@@ -6,6 +6,7 @@ import { Inter } from 'next/font/google';
 import React, { useState } from 'react'; // useState import
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'; // React Query Provider import
 import { Toaster } from 'react-hot-toast'; // Toaster 임포트
+import Navbar from '@/components/Navbar'; // Navbar 컴포넌트 임포트
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -27,7 +28,10 @@ export default function RootLayout({
     <html lang="ko">
       <body className={`${inter.className} bg-gray-50`}> {/* 기본 배경색 적용 */}
         <QueryClientProvider client={queryClient}> {/* Provider로 감싸기 */}
-          {children}
+          <Navbar /> {/* 상단 네비게이션 바 추가 */}
+          <main className="pt-14"> {/* 네비게이션 바 높이만큼 상단 패딩 추가 */}
+            {children}
+          </main>
           <Toaster position="top-center" /> {/* Toaster 위치를 top-center로 변경 */}
         </QueryClientProvider>
       </body>

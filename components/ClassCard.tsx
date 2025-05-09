@@ -90,7 +90,7 @@ export default function ClassCard({ classData, onEdit, onDelete }: ClassCardProp
   // 카드 클릭 핸들러
   const handleCardClick = () => {
     // 설문 목록 페이지로 이동하도록 경로 수정
-    router.push(`/class/${classData.id}/survey`); 
+    router.push(`/class/${classData.id}/dashboard`); 
   };
   // --- 이벤트 핸들러들 끝 ---
 
