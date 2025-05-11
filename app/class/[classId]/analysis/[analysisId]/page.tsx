@@ -225,30 +225,30 @@ export default function AnalysisDetailPage() {
           {/* 분석 내용 (마크다운 렌더링 적용) - 인라인 스타일 사용 */}
           <div style={{ 
             color: '#000', 
-            fontSize: '16px',
+            fontSize: '15px',
             backgroundColor: '#fff',
             padding: '16px',
             borderRadius: '8px',
           }}>
             <div style={{ 
               color: '#000',
-              fontSize: '17px',
-              lineHeight: '1.7',
+              fontSize: '15px',
+              lineHeight: '1.6',
               fontWeight: '450'
             }}>
               <ReactMarkdown
                 components={{
-                  h1: ({ node, ...props }) => <h1 style={{ fontSize: '2rem', fontWeight: '800', marginTop: '1.5rem', marginBottom: '1rem', color: '#000' }} {...props} />,
-                  h2: ({ node, ...props }) => <h2 style={{ fontSize: '1.6rem', fontWeight: '700', marginTop: '1.4rem', marginBottom: '1rem', color: '#000' }} {...props} />,
-                  h3: ({ node, ...props }) => <h3 style={{ fontSize: '1.3rem', fontWeight: '600', marginTop: '1.2rem', marginBottom: '0.8rem', color: '#000' }} {...props} />,
-                  p: ({ node, ...props }) => <p style={{ marginBottom: '1rem', lineHeight: '1.7', color: '#000', fontSize: '17px' }} {...props} />,
-                  ul: ({ node, ...props }) => <ul style={{ marginLeft: '1.8rem', marginBottom: '1.2rem', color: '#000' }} {...props} />,
-                  ol: ({ node, ...props }) => <ol style={{ marginLeft: '1.8rem', marginBottom: '1.2rem', color: '#000' }} {...props} />,
-                  li: ({ node, ...props }) => <li style={{ marginBottom: '0.5rem', color: '#000', fontSize: '17px' }} {...props} />,
+                  h1: ({ node, ...props }) => <h1 style={{ fontSize: '1.7rem', fontWeight: '800', marginTop: '1.5rem', marginBottom: '1rem', color: '#000' }} {...props} />,
+                  h2: ({ node, ...props }) => <h2 style={{ fontSize: '1.4rem', fontWeight: '700', marginTop: '1.3rem', marginBottom: '0.8rem', color: '#000' }} {...props} />,
+                  h3: ({ node, ...props }) => <h3 style={{ fontSize: '1.15rem', fontWeight: '600', marginTop: '1.1rem', marginBottom: '0.7rem', color: '#000' }} {...props} />,
+                  p: ({ node, ...props }) => <p style={{ marginBottom: '0.8rem', lineHeight: '1.6', color: '#000', fontSize: '15px' }} {...props} />,
+                  ul: ({ node, ...props }) => <ul style={{ marginLeft: '1.5rem', marginBottom: '1rem', color: '#000' }} {...props} />,
+                  ol: ({ node, ...props }) => <ol style={{ marginLeft: '1.5rem', marginBottom: '1rem', color: '#000' }} {...props} />,
+                  li: ({ node, ...props }) => <li style={{ marginBottom: '0.4rem', color: '#000', fontSize: '15px' }} {...props} />,
                   strong: ({ node, ...props }) => <strong style={{ fontWeight: '700', color: '#000' }} {...props} />,
-                  table: ({ node, ...props }) => <table style={{ borderCollapse: 'collapse', width: '100%', marginBottom: '1.5rem', marginTop: '1rem' }} {...props} />,
-                  th: ({ node, ...props }) => <th style={{ border: '1px solid #bbb', padding: '0.8rem', backgroundColor: '#f5f5f5', fontWeight: '600', color: '#000', fontSize: '17px' }} {...props} />,
-                  td: ({ node, ...props }) => <td style={{ border: '1px solid #bbb', padding: '0.8rem', color: '#000', fontSize: '17px' }} {...props} />,
+                  table: ({ node, ...props }) => <table style={{ borderCollapse: 'collapse', width: '100%', marginBottom: '1.2rem', marginTop: '0.8rem' }} {...props} />,
+                  th: ({ node, ...props }) => <th style={{ border: '1px solid #bbb', padding: '0.7rem', backgroundColor: '#f5f5f5', fontWeight: '600', color: '#000', fontSize: '15px' }} {...props} />,
+                  td: ({ node, ...props }) => <td style={{ border: '1px solid #bbb', padding: '0.7rem', color: '#000', fontSize: '15px' }} {...props} />,
                   blockquote: ({ node, ...props }) => <blockquote style={{ borderLeft: '4px solid #ddd', paddingLeft: '1rem', marginLeft: '0', marginRight: '0', fontStyle: 'italic', color: '#333' }} {...props} />
                 }}
               >
