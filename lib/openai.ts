@@ -42,8 +42,18 @@ export async function analyzeStudentRelationships(
   students: Student[],
   relationships: Relationship[],
   answers?: Answer[],
-  questions?: Question[]
-): Promise<OpenAIResponse> {
+  questions?: Question[],
+  additionalData?: {
+    classDetails?: any,
+    surveys?: Survey[],
+    surveyData?: Array<{
+      survey: Survey,
+      relationships: Relationship[],
+      questions: Question[],
+      answers: Answer[]
+    }>
+  }
+): Promise<string> {
   try {
     // 환경 변수에서 API 키 가져오기
     const apiKey = process.env.OPENAI_API_KEY;
@@ -57,24 +67,76 @@ export async function analyzeStudentRelationships(
 
     // 분석에 필요한 데이터 준비
     const analysisData = {
+      // 학급 정보
+      class: additionalData?.classDetails || { id: "unknown" },
+      
+      // 학생 정보
       students: students.map(s => ({
         id: s.id,
         name: s.name,
         gender: s.gender
       })),
-      relationships: relationships.map(r => ({
+      
+      // 기본 관계 정보 (설문과 연결되지 않은)
+      baseRelationships: relationships.map(r => ({
         from: students.find(s => s.id === r.from_student_id)?.name || r.from_student_id,
         to: students.find(s => s.id === r.to_student_id)?.name || r.to_student_id,
         type: r.relation_type
       })),
+      
+      // 기본 질문&응답 정보
+      questions: questions ? questions.map(q => ({
+        id: q.id,
+        text: q.question_text
+      })) : [],
+      
       answers: answers ? answers.map(a => {
         const question = questions?.find(q => q.id === a.question_id);
+        const student = students.find(s => s.id === a.student_id);
         return {
-          student: students.find(s => s.id === a.student_id)?.name || a.student_id,
+          student: student?.name || a.student_id,
           question: question?.question_text || a.question_id,
           answer: a.answer_text
         };
       }) : [],
+      
+      // 설문 정보
+      surveys: additionalData?.surveys?.map(survey => ({
+        id: survey.id,
+        name: survey.name,
+        description: survey.description,
+        created_at: survey.created_at
+      })) || [],
+      
+      // 설문별 상세 정보
+      surveyDetails: additionalData?.surveyData?.map(sd => {
+        return {
+          survey: {
+            id: sd.survey.id,
+            name: sd.survey.name,
+            description: sd.survey.description,
+            created_at: sd.survey.created_at
+          },
+          relationships: sd.relationships.map(r => ({
+            from: students.find(s => s.id === r.from_student_id)?.name || r.from_student_id,
+            to: students.find(s => s.id === r.to_student_id)?.name || r.to_student_id,
+            type: r.relation_type
+          })),
+          questions: sd.questions.map(q => ({
+            id: q.id,
+            text: q.question_text
+          })),
+          answers: sd.answers.map(a => {
+            const question = sd.questions.find(q => q.id === a.question_id);
+            const student = students.find(s => s.id === a.student_id);
+            return {
+              student: student?.name || a.student_id,
+              question: question?.question_text || a.question_id,
+              answer: a.answer_text
+            };
+          })
+        };
+      }) || []
     };
 
     // OpenAI API 요청 설정
@@ -89,48 +151,61 @@ export async function analyzeStudentRelationships(
         messages: [
           {
             role: 'system',
-            content: `당신은 학생 관계 분석 전문가입니다. 제공된 학생 목록, 관계 데이터, 설문 응답 데이터를 심층 분석하여 교실 내 사회적 역학과 학생 간 관계를 객관적이고 통찰력 있게 분석해주세요. **모든 분석 결과는 반드시 한글로 제공되어야 합니다.**
+            content: `당신은 학급 관계 분석 전문가입니다. 제공된 학급 정보, 학생 목록, 관계 데이터, 설문지 데이터, 설문 응답 데이터를 심층 분석하여 교실 내 사회적 역학과 학생 간 관계를 명확하고 통찰력 있게 분석해주세요. 모든 분석 결과는 한글로 작성해야 합니다.
 
-            다음 내용을 포함하는 상세하고 구체적인 보고서를 JSON 형식으로 제공해주세요. 각 항목에 대해서는 단순 나열이 아닌, 데이터 기반의 근거와 함께 심층적인 분석 및 실행 가능한 제안을 포함해야 합니다.
-
-            1.  **전반적인 학급 분석 (analysis):** 학급의 전체적인 분위기, 주요 특징, 강점과 약점을 명확히 기술해주세요.
-            2.  **학생 간 관계 분석 (relationships):**
-                *   **관계 설명 (description):** 주요 긍정적 및 부정적 관계 패턴을 상세히 설명해주세요.
-                *   **주요 이슈 (issues):** 관계에서 발견되는 갈등, 소외, 따돌림 등의 주요 이슈를 구체적으로 지적하고, 그 원인을 분석해주세요.
-                *   **개선 권장사항 (recommendations):** 발견된 이슈를 해결하고 긍정적인 관계를 증진시키기 위한 구체적이고 실행 가능한 권장 사항을 3가지 이상 제시해주세요.
-            3.  **학급 내 사회적 역학 (socialDynamics):**
-                *   **역학 설명 (description):** 학급 내 리더, 추종자, 방관자 등 다양한 역할과 그들 간의 역학 관계를 설명해주세요.
-                *   **강한 유대 관계 (strongConnections):** 긍정적인 또래 관계를 형성하고 있는 그룹이나 학생들을 명시하고, 그 요인을 분석해주세요.
-                *   **고립된 학생들 (isolatedStudents):** 사회적으로 고립되었거나 소외된 학생들을 식별하고, 그 원인과 가능한 지원 방안을 제시해주세요.
-            4.  **개별 학생 분석 (individualAnalysis):** (데이터가 충분한 경우 각 학생에 대해)
-                *   **이름 (name)**
-                *   **사회적 위치 (socialPosition):** 또래 집단 내에서의 사회적 위치(예: 중심, 주변, 고립)와 그 이유를 분석해주세요.
-                *   **강점 (strengths):** 해당 학생의 사회적 관계에서의 강점(예: 공감 능력, 리더십, 협동심)을 구체적 사례와 함께 제시해주세요.
-                *   **도전 과제 (challenges):** 사회적 관계 형성에 어려움을 겪는 부분이나 개선이 필요한 영역을 명확히 지적해주세요.
-                *   **개선 제안 (suggestions):** 해당 학생의 사회성 발달과 긍정적 관계 형성을 돕기 위한 맞춤형 제안을 2가지 이상 제시해주세요.
-            5.  **교실 환경 평가 (classroomEnvironment):**
-                *   **전반적 평가 (overall):** 현재 교실 환경이 학생들의 정서적 안정과 사회성 발달에 미치는 영향을 종합적으로 평가해주세요.
-                *   **긍정적 측면 (positiveAspects):** 현재 교실 환경의 긍정적인 요소들을 구체적으로 언급해주세요.
-                *   **개선이 필요한 부분 (challengingAreas):** 학생들의 관계 형성에 부정적인 영향을 미치거나 개선이 필요한 환경적 요소를 지적해주세요.
-                *   **환경 개선 제안 (improvementSuggestions):** 보다 긍정적이고 지지적인 교실 환경 조성을 위한 구체적인 개선 방안을 3가지 이상 제시해주세요.
-            6.  **시간에 따른 변화 예측 (timelineProjection):**
-                *   **단기 전망 (shortTerm):** (1-2개월) 현재 분석 결과를 바탕으로 단기적으로 예상되는 관계 변화와 주요 이슈를 예측해주세요.
-                *   **중기 전망 (midTerm):** (3-6개월) 중기적으로 예상되는 학급 역학의 변화와 필요한 지원을 전망해주세요.
-                *   **장기 전망 (longTerm):** (학년도 기준) 장기적인 관점에서 학급 관계 발전 방향과 교사의 역할을 제안해주세요.
-                *   **주요 이정표 (keyMilestones):** 관계 개선 및 사회성 발달을 위해 설정할 수 있는 주요 목표와 점검 시점을 제시해주세요.
-                *   **이전 분석과의 비교 분석:** (해당하는 경우) **각 설문지의 이름 또는 실시 날짜를 명시하며, 이전 분석 결과와의 비교를 통해 시간 경과에 따른 관계 변화 추세를 구체적으로 설명하고, 긍정적/부정적 변화 요인을 분석하여 향후 개선 방향을 제시해주세요.**
-
-            학급 내 사회적 환경을 개선하고 모든 학생이 건강하게 성장할 수 있도록, 분석 결과를 바탕으로 깊이 있는 통찰과 실질적인 도움을 줄 수 있는 권장 사항을 각 분야별로 구체적으로 제공해주세요. 응답은 반드시 JSON 형식이어야 하며, 모든 텍스트는 한글로 작성되어야 합니다.`
+            다음 내용을 포함한 구조화된 분석 보고서를 작성해주세요:
+            
+            # 2025 동부초등학교 2학년 N반 학급 관계 및 사회적 역학 분석 보고서
+            
+            ## 1. 학급 전체 분석
+            - 학급의 전반적인 분위기, 특징, 강점과 약점에 대한 분석
+            
+            ## 2. 학생 간 관계 분석
+            - 관계 패턴, 주요 이슈, 개선 권장사항 
+            
+            ## 3. 사회적 역학
+            - 리더와 추종자, 강한 유대 관계, 고립된 학생들
+            
+            ## 4. 개별 학생 상세 분석
+            - **반드시 모든 학생 개개인에 대한 상세 분석을 제공해주세요**
+            - 각 학생별로 다음 정보를 포함:
+              - 사회적 위치와 영향력
+              - 관계 패턴 및 주요 교우 관계
+              - 강점과 잠재력
+              - 직면한 어려움 또는 도전 과제
+              - 발전을 위한 구체적 교육적 제안
+            
+            ## 5. 설문 데이터 분석
+            - 설문별 응답 경향 및 학생들의 인식 변화
+            
+            ## 6. 시간 경과에 따른 변화
+            - 설문 날짜를 기준으로 학급 관계 변화 추적
+            
+            ## 7. 교사를 위한 제안
+            - 학급 관계 개선을 위한 구체적이고 실행 가능한 교육적 제안
+            
+            제공된 모든 데이터를 활용하되, 특히 다음 정보에 주목해주세요:
+            1. 학급 기본 정보와 모든 학생 정보
+            2. 학급 아래 생성된 모든 설문지 정보 (제목, 생성날짜 포함)
+            3. 설문지별 학생 관계 설정 정보와 그 변화
+            4. 주간식 대답 정보를 포함한 모든 질문-응답 데이터
+            
+            보고서는 반드시 마크다운 형식을 활용하여 구조화하고, 헤더(#, ##, ###)와 목록(-, *)을 적절히 사용하여 가독성을 높여주세요. 단순히 데이터를 나열하는 것이 아니라, 통찰력 있는 분석과 실행 가능한 교육적 제안을 제공해주세요.
+            
+            중요: 
+            1. 마크다운 서식이 올바르게 적용되도록 # 기호와 텍스트 사이에 반드시 공백을 넣어주세요 (예: '# 제목', '## 소제목')
+            2. 글자 색상은 기본 검정색으로 표시되므로 별도의 색상 코드를 넣지 마세요
+            3. 필요한 경우 표(table)를 사용하여 데이터를 정리해도 좋습니다
+            4. 모든 학생을 분석할 때 ### 수준의 헤더를 사용하여 학생 이름을 제목으로 하고, 구체적인 분석 내용을 제공해주세요`
           },
           {
             role: 'user',
-            content: `다음 데이터를 기반으로 학생들의 관계와 학급 내 사회적 역학을 분석해주세요: 
+            content: `다음 데이터를 기반으로 학생들의 관계와 학급 내 사회적 역학을 심층 분석해주세요: 
             ${JSON.stringify(analysisData, null, 2)}`
           }
         ],
-        temperature: 0.5,
-        max_tokens: 4000,
-        response_format: { type: "json_object" }
+        temperature: 0.7,
+        max_tokens: 4000
       })
     });
 
@@ -146,127 +221,8 @@ export async function analyzeStudentRelationships(
       throw new Error('API 응답에 콘텐츠가 없습니다.');
     }
 
-    // JSON 응답 파싱
-    let parsedContent: OpenAIResponse;
-    try {
-      parsedContent = JSON.parse(content);
-      
-      // 필수 필드 확인 및 기본값 설정
-      if (!parsedContent.analysis) {
-        parsedContent.analysis = '분석 데이터를 생성하는 중 오류가 발생했습니다.';
-      }
-      
-      if (!parsedContent.relationships) {
-        parsedContent.relationships = { 
-          description: '관계 분석 데이터를 생성하는 중 오류가 발생했습니다.' 
-        };
-      } else {
-        // relationships 내부 필드가 예상과 다른 경우에 대한 대비
-        if (!parsedContent.relationships.description) {
-          parsedContent.relationships.description = '관계 분석 데이터가 없습니다.';
-        }
-        
-        // issues, recommendations가 배열이 아닌 경우 처리
-        if (parsedContent.relationships.issues && !Array.isArray(parsedContent.relationships.issues)) {
-          console.warn('issues 필드가 배열이 아님:', parsedContent.relationships.issues);
-          parsedContent.relationships.issues = [];
-        }
-        
-        if (parsedContent.relationships.recommendations && !Array.isArray(parsedContent.relationships.recommendations)) {
-          console.warn('recommendations 필드가 배열이 아님:', parsedContent.relationships.recommendations);
-          parsedContent.relationships.recommendations = [];
-        }
-      }
-      
-      if (!parsedContent.socialDynamics) {
-        parsedContent.socialDynamics = { 
-          description: '사회적 역학 데이터를 생성하는 중 오류가 발생했습니다.' 
-        };
-      } else {
-        // socialDynamics 내부 필드가 예상과 다른 경우에 대한 대비
-        if (!parsedContent.socialDynamics.description) {
-          parsedContent.socialDynamics.description = '사회적 역학 데이터가 없습니다.';
-        }
-        
-        // strongConnections, isolatedStudents가 배열이 아닌 경우 처리
-        if (parsedContent.socialDynamics.strongConnections && !Array.isArray(parsedContent.socialDynamics.strongConnections)) {
-          console.warn('strongConnections 필드가 배열이 아님:', parsedContent.socialDynamics.strongConnections);
-          parsedContent.socialDynamics.strongConnections = [];
-        }
-        
-        if (parsedContent.socialDynamics.isolatedStudents && !Array.isArray(parsedContent.socialDynamics.isolatedStudents)) {
-          console.warn('isolatedStudents 필드가 배열이 아님:', parsedContent.socialDynamics.isolatedStudents);
-          parsedContent.socialDynamics.isolatedStudents = [];
-        }
-      }
-      
-      // 확장 필드에 대한 검증
-      if (parsedContent.individualAnalysis) {
-        // individualAnalysis가 문자열인 경우 객체로 변환
-        if (typeof parsedContent.individualAnalysis !== 'object') {
-          const message = parsedContent.individualAnalysis;
-          parsedContent.individualAnalysis = {
-            students: [],
-            message: message
-          };
-        } else if (!parsedContent.individualAnalysis.students) {
-          // students 필드가 없는 경우 빈 배열 추가
-          parsedContent.individualAnalysis.students = [];
-        } else if (!Array.isArray(parsedContent.individualAnalysis.students)) {
-          // students 필드가 배열이 아닌 경우 빈 배열로 변환
-          console.warn('students 필드가 배열이 아님:', parsedContent.individualAnalysis.students);
-          parsedContent.individualAnalysis.students = [];
-        } else {
-          // 각 학생 데이터의 배열 속성 검증
-          parsedContent.individualAnalysis.students.forEach(student => {
-            if (!Array.isArray(student.strengths)) {
-              student.strengths = [];
-            }
-            if (!Array.isArray(student.challenges)) {
-              student.challenges = [];
-            }
-            if (!Array.isArray(student.suggestions)) {
-              student.suggestions = [];
-            }
-          });
-        }
-      }
-      
-      if (parsedContent.classroomEnvironment) {
-        if (!Array.isArray(parsedContent.classroomEnvironment.positiveAspects)) {
-          console.warn('positiveAspects 필드가 배열이 아님:', parsedContent.classroomEnvironment.positiveAspects);
-          parsedContent.classroomEnvironment.positiveAspects = [];
-        }
-        
-        if (!Array.isArray(parsedContent.classroomEnvironment.challengingAreas)) {
-          console.warn('challengingAreas 필드가 배열이 아님:', parsedContent.classroomEnvironment.challengingAreas);
-          parsedContent.classroomEnvironment.challengingAreas = [];
-        }
-        
-        if (!Array.isArray(parsedContent.classroomEnvironment.improvementSuggestions)) {
-          console.warn('improvementSuggestions 필드가 배열이 아님:', parsedContent.classroomEnvironment.improvementSuggestions);
-          parsedContent.classroomEnvironment.improvementSuggestions = [];
-        }
-      }
-      
-      if (parsedContent.timelineProjection) {
-        if (!Array.isArray(parsedContent.timelineProjection.keyMilestones)) {
-          console.warn('keyMilestones 필드가 배열이 아님:', parsedContent.timelineProjection.keyMilestones);
-          parsedContent.timelineProjection.keyMilestones = [];
-        }
-      }
-      
-    } catch (error) {
-      console.error('JSON 파싱 오류:', error);
-      // 텍스트 응답을 기본 구조로 변환
-      parsedContent = {
-        analysis: content,
-        relationships: { description: '데이터 파싱 오류' },
-        socialDynamics: { description: '데이터 파싱 오류' }
-      };
-    }
-
-    return parsedContent;
+    // GPT 응답을 그대로 반환
+    return content;
 
   } catch (error) {
     console.error('학생 관계 분석 오류:', error);

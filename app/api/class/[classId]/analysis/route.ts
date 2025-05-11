@@ -144,42 +144,149 @@ export async function POST(
       
       console.log('[POST API] 환경 변수 확인 완료, API 키 길이:', process.env.OPENAI_API_KEY.length);
       
+      // 학급에 속한 모든 설문지 조회
+      console.log('[POST API] 설문지 정보 조회 시작');
+      const { data: surveys, error: surveysError } = await supabase
+        .from('surveys')
+        .select('*')
+        .eq('class_id', classId)
+        .order('created_at');
+
+      if (surveysError) {
+        console.error('[POST API] 설문지 목록 조회 오류:', surveysError);
+        // 설문지 오류는 치명적이지 않으므로 계속 진행
+        console.log('[POST API] 설문지 정보 없이 계속 진행');
+      }
+      
+      console.log('[POST API] 설문지 조회 완료, 설문지 수:', surveys ? surveys.length : 0);
+      
+      // 설문지별 관계 데이터 및 질문/응답 데이터 조회
+      const surveyData = [];
+      
+      if (surveys && surveys.length > 0) {
+        console.log('[POST API] 설문지별 데이터 조회 시작');
+        
+        for (const survey of surveys) {
+          // 설문지별 관계 데이터 조회
+          const { data: surveyRelationships, error: surveyRelError } = await supabase
+            .from('relations')
+            .select('*')
+            .in('from_student_id', ids)
+            .in('to_student_id', ids)
+            .eq('survey_id', survey.id);
+            
+          // 설문지별 질문 조회
+          const { data: questions, error: questionsError } = await supabase
+            .from('questions')
+            .select('*')
+            .eq('class_id', classId)
+            .eq('survey_id', survey.id);
+            
+          // 설문지의 모든 응답 조회
+          const { data: answers, error: answersError } = await supabase
+            .from('answers')
+            .select('*')
+            .in('student_id', ids)
+            .eq('survey_id', survey.id);
+            
+          surveyData.push({
+            survey: survey,
+            relationships: surveyRelationships || [],
+            questions: questions || [],
+            answers: answers || []
+          });
+        }
+        
+        console.log('[POST API] 설문지별 데이터 조회 완료');
+      }
+      
+      // 모든 질문 데이터 조회
+      console.log('[POST API] 전체 질문 데이터 조회 시작');
+      const { data: allQuestions, error: allQuestionsError } = await supabase
+        .from('questions')
+        .select('*')
+        .eq('class_id', classId);
+        
+      if (allQuestionsError) {
+        console.error('[POST API] 전체 질문 데이터 조회 오류:', allQuestionsError);
+      }
+      console.log('[POST API] 전체 질문 데이터 조회 완료, 질문 수:', allQuestions ? allQuestions.length : 0);
+      
+      // 모든 응답 데이터 조회
+      console.log('[POST API] 전체 응답 데이터 조회 시작');
+      const { data: allAnswers, error: allAnswersError } = await supabase
+        .from('answers')
+        .select('*')
+        .in('student_id', ids);
+        
+      if (allAnswersError) {
+        console.error('[POST API] 전체 응답 데이터 조회 오류:', allAnswersError);
+      }
+      console.log('[POST API] 전체 응답 데이터 조회 완료, 응답 수:', allAnswers ? allAnswers.length : 0);
+      
+      // 학급 정보 상세 조회
+      console.log('[POST API] 학급 상세 정보 조회 시작');
+      const { data: classDetails, error: classDetailsError } = await supabase
+        .from('classes')
+        .select('*')
+        .eq('id', classId)
+        .single();
+        
+      if (classDetailsError) {
+        console.error('[POST API] 학급 상세 정보 조회 오류:', classDetailsError);
+      }
+      console.log('[POST API] 학급 상세 정보 조회 완료');
+      
+      // GPT 분석을 위해 모든 데이터를 전달
       const analysisResult = await analyzeStudentRelationships(
         students,
-        relationships || []
+        relationships || [],
+        allAnswers || [],
+        allQuestions || [],
+        {
+          classDetails: classDetails || { id: classId },
+          surveys: surveys || [],
+          surveyData: surveyData,
+        }
       );
-      console.log('[POST API] GPT 분석 완료, 결과 구조:', Object.keys(analysisResult));
+      console.log('[POST API] GPT 분석 완료, 결과 타입:', typeof analysisResult);
       
       // 분석 결과 저장
       console.log('[POST API] 분석 결과 저장 시작');
       
-      // 요약 생성 - analysis가 문자열인지 확인하고 안전하게 처리
+      // 요약 생성 - 텍스트 응답에서 처음 200자를 요약으로 사용
       let summary = '';
-      if (typeof analysisResult.analysis === 'string') {
-        summary = analysisResult.analysis.substring(0, 200) + '...';
+      if (typeof analysisResult === 'string') {
+        summary = analysisResult.substring(0, 200) + '...';
       } else {
-        // 문자열이 아닌 경우 요약 대체
-        summary = '분석 결과 요약 (자세한 내용은 상세 페이지 참조)';
-        console.warn('[POST API] 분석 결과의 analysis 필드가 문자열이 아닙니다:', typeof analysisResult.analysis);
+        // 객체인 경우 (이전 형식과의 호환성 유지)
+        try {
+          const result = analysisResult as any;
+          if (result && typeof result.analysis === 'string') {
+            summary = result.analysis.substring(0, 200) + '...';
+          } else {
+            summary = '분석 결과 요약 (자세한 내용은 상세 페이지 참조)';
+          }
+        } catch (e) {
+          summary = '분석 결과 요약 (자세한 내용은 상세 페이지 참조)';
+          console.warn('[POST API] 분석 결과 요약 생성 중 오류:', e);
+        }
       }
       
-      // 결과가 이미 문자열인지 확인하고 필요한 경우 JSON 문자열로 변환하지 않음
+      // 결과 저장 준비 - 문자열로 변환
       const resultToSave = typeof analysisResult === 'string' 
         ? analysisResult 
-        : analysisResult;
+        : JSON.stringify(analysisResult);
       
       // 데이터 저장 전 형식 디버깅
       console.log('[POST API] 저장 전 데이터 형식:', {
         analysisResultType: typeof analysisResult,
         isString: typeof analysisResult === 'string',
         isObject: typeof analysisResult === 'object',
-        hasAnalysis: analysisResult && typeof analysisResult.analysis !== 'undefined',
-        hasRelationships: analysisResult && typeof analysisResult.relationships !== 'undefined'
+        resultToSaveType: typeof resultToSave
       });
       
-      // 결과를 JSON 문자열로 변환 (Supabase가 JSON 타입으로 저장하도록)
-      // 명시적으로 문자열화하여 저장하는 대신, JSON 객체 그대로 저장
-      // Supabase는 JSONB 타입을 사용하므로 자동으로 처리됨
+      // 결과를 명시적으로 JSON 문자열로 변환하여 저장
       
       const { data: savedAnalysis, error: saveError } = await supabase
         .from('analysis_results')
