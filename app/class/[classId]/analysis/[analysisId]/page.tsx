@@ -9,7 +9,12 @@ import {
   DocumentTextIcon,
   ArrowPathIcon,
   SparklesIcon,
-  DocumentDuplicateIcon
+  DocumentDuplicateIcon,
+  TableCellsIcon,
+  DocumentIcon,
+  ChartBarIcon,
+  UserGroupIcon,
+  UserIcon
 } from '@heroicons/react/24/outline';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -398,77 +403,91 @@ export default function AnalysisDetailPage() {
         </header>
         
         {/* 탭 네비게이션 */}
-        <div className="bg-white shadow-md rounded-lg p-4 mb-6">
+        <div className="bg-white shadow-md rounded-lg p-5 mb-6">
+          <h2 className="text-xl font-bold text-black mb-3">분석 결과</h2>
           <div className="flex flex-wrap border-b border-gray-200">
             <button
               onClick={() => setActiveTab('overview')}
-              className={`px-4 py-2 font-medium text-sm mr-2 ${
+              className={`px-4 py-3 font-medium text-sm mr-2 rounded-t-lg flex items-center ${
                 activeTab === 'overview'
-                  ? 'text-black font-bold'
-                  : 'text-black'
+                  ? 'text-indigo-700 font-bold bg-indigo-50'
+                  : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
               }`}
             >
+              <ChartBarIcon className="w-5 h-5 mr-2" />
               종합분석
             </button>
             <button
               onClick={() => setActiveTab('students-1')}
-              className={`px-4 py-2 font-medium text-sm mr-2 ${
+              className={`px-4 py-3 font-medium text-sm mr-2 rounded-t-lg flex items-center ${
                 activeTab === 'students-1'
-                  ? 'text-black font-bold'
-                  : 'text-black'
+                  ? 'text-indigo-700 font-bold bg-indigo-50'
+                  : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
               }`}
             >
+              <UserGroupIcon className="w-5 h-5 mr-2" />
               학생분석 1
             </button>
             <button
               onClick={() => setActiveTab('students-2')}
-              className={`px-4 py-2 font-medium text-sm mr-2 ${
+              className={`px-4 py-3 font-medium text-sm mr-2 rounded-t-lg flex items-center ${
                 activeTab === 'students-2'
-                  ? 'text-black font-bold'
-                  : 'text-black'
+                  ? 'text-indigo-700 font-bold bg-indigo-50'
+                  : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
               }`}
             >
+              <UserGroupIcon className="w-5 h-5 mr-2" />
               학생분석 2
             </button>
             <button
               onClick={() => setActiveTab('students-3')}
-              className={`px-4 py-2 font-medium text-sm ${
+              className={`px-4 py-3 font-medium text-sm rounded-t-lg flex items-center ${
                 activeTab === 'students-3'
-                  ? 'text-black font-bold'
-                  : 'text-black'
+                  ? 'text-indigo-700 font-bold bg-indigo-50'
+                  : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
               }`}
             >
+              <UserGroupIcon className="w-5 h-5 mr-2" />
               학생분석 3
             </button>
           </div>
-          <div className="mt-2">
-            <p className="text-sm text-gray-800 font-medium">
-              {activeTab === 'overview' ? '전체 학급에 대한 종합 분석 결과' :
-              activeTab === 'students-1' ? '학생 그룹 1에 대한 개별 분석 결과' :
-              activeTab === 'students-2' ? '학생 그룹 2에 대한 개별 분석 결과' :
-              '학생 그룹 3에 대한 개별 분석 결과'}
-            </p>
+          <div className={`mt-3 p-3 rounded-md ${activeTab === 'overview' ? 'bg-indigo-50 text-indigo-700' : activeTab.startsWith('students') ? 'bg-indigo-50 text-indigo-700' : 'bg-gray-50 text-gray-800'}`}>
+            <div className="flex items-center">
+              {activeTab === 'overview' ? (
+                <ChartBarIcon className="w-5 h-5 mr-2 flex-shrink-0" />
+              ) : activeTab === 'students-1' || activeTab === 'students-2' || activeTab === 'students-3' ? (
+                <UserGroupIcon className="w-5 h-5 mr-2 flex-shrink-0" />
+              ) : (
+                <UserGroupIcon className="w-5 h-5 mr-2 flex-shrink-0" />
+              )}
+              <p className="text-sm font-medium">
+                {activeTab === 'overview' ? '전체 학급에 대한 종합 분석 결과를 확인합니다. 학급 내 관계 패턴, 네트워크 구조, 그리고 사회적 역학에 대한 통찰을 제공합니다.' :
+                activeTab === 'students-1' ? '학생 그룹 1에 대한 개별 분석 결과를 확인합니다. 각 학생의 관계 현황, 강점 및 개선 가능한 영역을 확인할 수 있습니다.' :
+                activeTab === 'students-2' ? '학생 그룹 2에 대한 개별 분석 결과를 확인합니다. 각 학생의 관계 현황, 강점 및 개선 가능한 영역을 확인할 수 있습니다.' :
+                '학생 그룹 3에 대한 개별 분석 결과를 확인합니다. 각 학생의 관계 현황, 강점 및 개선 가능한 영역을 확인할 수 있습니다.'}
+              </p>
+            </div>
           </div>
         </div>
         
         {/* 분석 결과 내용 */}
         {isLoading || isRunning ? (
-          <div className="bg-white rounded-lg shadow-md p-6 flex flex-col justify-center items-center min-h-[400px]">
+          <div className="bg-white rounded-lg shadow-md p-6 flex flex-col justify-center items-center min-h-[400px] border border-indigo-100">
             <div className="mb-6 relative">
               <div className="w-20 h-20 rounded-full border-t-4 border-b-4 border-indigo-500 animate-spin"></div>
               <div className="absolute inset-0 flex items-center justify-center">
                 <SparklesIcon className="w-10 h-10 text-indigo-500 animate-pulse" />
               </div>
             </div>
-            <div className="text-xl text-black font-semibold mb-3 text-center">
-              {isRunning ? 'AI 분석을 실행 중입니다...' : '로딩 중...'}
+            <div className="text-xl text-indigo-700 font-semibold mb-3 text-center">
+              {isRunning ? 'AI 분석을 실행 중입니다...' : '분석 결과 로딩 중...'}
             </div>
-            <div className="text-sm text-gray-500 text-center max-w-md">
+            <div className="text-sm text-indigo-600 text-center max-w-md">
               {isRunning ? 
                 '분석에는 약 1~2분이 소요됩니다. 대량의 학생 데이터를 처리하는 과정이라 시간이 다소 걸리니 잠시만 기다려주세요.' : 
-                '분석 결과를 불러오고 있습니다...'}
+                `${getTabTitle(activeTab)} 결과를 불러오고 있습니다...`}
             </div>
-            <div className="mt-8 relative w-full max-w-md h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div className="mt-8 relative w-full max-w-md h-2 bg-indigo-100 rounded-full overflow-hidden">
               <div className="absolute top-0 left-0 h-full bg-indigo-500 animate-loading-bar"></div>
             </div>
             <style jsx>{`
@@ -509,38 +528,41 @@ export default function AnalysisDetailPage() {
                   color: black !important;
                 }
                 .prose h1 {
-                  font-size: 2.5rem !important;
+                  font-size: 2.75rem !important;
                   font-weight: 900 !important;
+                  margin-top: 2.5rem !important;
+                  margin-bottom: 1.75rem !important;
+                }
+                .prose h2 {
+                  font-size: 1.6rem !important;
+                  font-weight: 800 !important;
                   margin-top: 2rem !important;
                   margin-bottom: 1.5rem !important;
                 }
-                .prose h2 {
-                  font-size: 2rem !important;
-                  font-weight: 800 !important;
+                .prose h3 {
+                  font-size: 1.75rem !important;
+                  font-weight: 700 !important;
                   margin-top: 1.75rem !important;
                   margin-bottom: 1.25rem !important;
-                }
-                .prose h3 {
-                  font-size: 1.5rem !important;
-                  font-weight: 700 !important;
-                  margin-top: 1.5rem !important;
-                  margin-bottom: 1rem !important;
                 }
                 .prose p, .prose li, .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6, .prose strong, .prose em, .prose blockquote, .prose code, .prose pre {
                   color: black !important;
                 }
                 .prose p {
-                  margin-bottom: 1.25rem !important;
-                  line-height: 1.8 !important;
+                  font-size: 1.125rem !important;
+                  margin-bottom: 1.5rem !important;
+                  line-height: 1.9 !important;
                 }
                 .prose li {
-                  margin-bottom: 0.75rem !important;
+                  font-size: 1.125rem !important;
+                  margin-bottom: 0.85rem !important;
+                  line-height: 1.75 !important;
                 }
                 /* 학생 이름 강조 (### 다음의 이름) */
                 .prose h3 + p strong:first-child, 
                 .prose h3 strong:first-child,
                 .prose h3 strong {
-                  font-size: 1.3rem !important;
+                  font-size: 1.5rem !important;
                   font-weight: 800 !important;
                 }
               `}</style>
