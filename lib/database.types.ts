@@ -42,6 +42,7 @@ export interface Database {
           created_at: string
           result_data: Json
           summary: string
+          type: string
         }
         Insert: {
           id?: string
@@ -49,6 +50,7 @@ export interface Database {
           created_at?: string
           result_data: Json
           summary: string
+          type?: string
         }
         Update: {
           id?: string
@@ -56,6 +58,7 @@ export interface Database {
           created_at?: string
           result_data?: Json
           summary?: string
+          type?: string
         }
       }
     }

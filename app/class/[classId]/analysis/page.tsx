@@ -40,6 +40,7 @@ interface AnalysisResult {
     };
   };
   summary: string;
+  type: string; // 'full', 'overview', 'students-1', 'students-2', 'students-3'
 }
 
 // 학급 정보 조회 함수
@@ -63,18 +64,14 @@ async function fetchAnalysisResults(classId: string): Promise<AnalysisResult[]> 
   console.log(`분석 목록 요청: classId=${classId}`);
   
   try {
-    // API 라우트 대신 직접 Supabase 쿼리를 실행
-    const { data, error } = await supabase
-      .from('analysis_results')
-      .select('*')
-      .eq('class_id', classId)
-      .order('created_at', { ascending: false });
+    // API 엔드포인트에 직접 요청
+    const response = await fetch(`/api/class/${classId}/analysis`);
     
-    if (error) {
-      console.error('Supabase 쿼리 오류:', error);
-      throw new Error(`분석 결과를 불러오는데 실패했습니다: ${error.message}`);
+    if (!response.ok) {
+      throw new Error(`분석 결과를 불러오는데 실패했습니다 (${response.status})`);
     }
     
+    const data = await response.json();
     console.log(`분석 목록 수신 성공, ${data ? data.length : 0}개의 결과`);
     return data || [];
   } catch (error) {
@@ -121,6 +118,82 @@ async function runAnalysis(classId: string): Promise<AnalysisResult> {
   }
 }
 
+// 종합 분석 실행 함수
+async function runOverviewAnalysis(classId: string): Promise<AnalysisResult> {
+  console.log(`종합 분석 실행 요청: classId=${classId}`);
+  
+  try {
+    const response = await fetch(`/api/class/${classId}/analysis/overview`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage = '종합 분석을 실행하는데 실패했습니다.';
+      
+      try {
+        const errorData = JSON.parse(errorText);
+        if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+      } catch (e) {
+        console.error('오류 응답 파싱 실패:', e);
+      }
+      
+      console.error(`API 오류 (${response.status}):`, errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    const data = await response.json();
+    console.log('종합 분석 실행 성공, 결과 ID:', data.id);
+    return data;
+  } catch (error) {
+    console.error('종합 분석 실행 요청 오류:', error);
+    throw error;
+  }
+}
+
+// 학생 그룹별 분석 실행 함수
+async function runStudentGroupAnalysis(classId: string, groupIndex: number): Promise<AnalysisResult> {
+  console.log(`학생 그룹${groupIndex} 분석 실행 요청: classId=${classId}`);
+  
+  try {
+    const response = await fetch(`/api/class/${classId}/analysis/students?group=${groupIndex}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage = `학생 그룹${groupIndex} 분석을 실행하는데 실패했습니다.`;
+      
+      try {
+        const errorData = JSON.parse(errorText);
+        if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+      } catch (e) {
+        console.error('오류 응답 파싱 실패:', e);
+      }
+      
+      console.error(`API 오류 (${response.status}):`, errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    const data = await response.json();
+    console.log(`학생 그룹${groupIndex} 분석 실행 성공, 결과 ID:`, data.id);
+    return data;
+  } catch (error) {
+    console.error(`학생 그룹${groupIndex} 분석 실행 요청 오류:`, error);
+    throw error;
+  }
+}
+
 async function deleteAnalysis(classId: string, analysisId: string): Promise<void> {
   console.log(`분석 결과 삭제 요청: classId=${classId}, analysisId=${analysisId}`);
   
@@ -153,6 +226,23 @@ async function deleteAnalysis(classId: string, analysisId: string): Promise<void
   }
 }
 
+// 분석 유형에 따른 배지 색상 및 텍스트 가져오기
+const getAnalysisBadge = (type: string) => {
+  switch(type) {
+    case 'overview':
+      return { text: '종합분석', bgColor: '', textColor: 'text-black' };
+    case 'students-1':
+      return { text: '학생분석 1', bgColor: '', textColor: 'text-black' };
+    case 'students-2':
+      return { text: '학생분석 2', bgColor: '', textColor: 'text-black' };
+    case 'students-3':
+      return { text: '학생분석 3', bgColor: '', textColor: 'text-black' };
+    case 'full':
+    default:
+      return { text: '전체분석', bgColor: '', textColor: 'text-black' };
+  }
+};
+
 // 분석 카드 컴포넌트
 interface AnalysisCardProps {
   analysis: AnalysisResult;
@@ -168,6 +258,9 @@ function AnalysisCard({ analysis }: AnalysisCardProps) {
   const createdAt = new Date(analysis.created_at);
   const formattedDate = format(createdAt, 'yyyy년 MM월 dd일', { locale: ko });
   const formattedTime = format(createdAt, 'HH:mm', { locale: ko });
+  
+  // 분석 유형 배지 정보
+  const badge = getAnalysisBadge(analysis.type);
   
   // 삭제 Mutation
   const deleteAnalysisMutation = useMutation({
@@ -208,14 +301,16 @@ function AnalysisCard({ analysis }: AnalysisCardProps) {
                 <DocumentTextIcon className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-medium text-gray-800">{formattedDate}</h3>
-                <p className="text-sm text-gray-500">{formattedTime}</p>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-medium text-black">{formattedDate}</h3>
+                </div>
+                <p className="text-sm text-black">{formattedTime}</p>
               </div>
             </div>
             <ChevronRightIcon className="w-5 h-5 text-gray-400" />
           </div>
           <div className="mt-3">
-            <p className="text-sm text-gray-600 line-clamp-2">{analysis.summary}</p>
+            <p className="text-sm text-black line-clamp-2">{analysis.summary}</p>
           </div>
         </div>
         
@@ -249,94 +344,6 @@ function AnalysisCard({ analysis }: AnalysisCardProps) {
   );
 }
 
-// 분석 결과 상세 컴포넌트
-interface AnalysisDetailProps {
-  analysis: AnalysisResult;
-}
-
-function AnalysisDetail({ analysis }: AnalysisDetailProps) {
-  const createdAt = new Date(analysis.created_at);
-  const formattedDate = format(createdAt, 'yyyy년 MM월 dd일 HH:mm', { locale: ko });
-  
-  return (
-    <div className="bg-white rounded-lg shadow-md p-6 space-y-6">
-      <div className="flex items-center justify-between border-b pb-4">
-        <div className="flex items-center space-x-3">
-          <div className="bg-indigo-100 text-indigo-600 p-2 rounded-full">
-            <CalendarIcon className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="font-medium text-gray-800">분석 일시</h3>
-            <p className="text-sm text-gray-500">{formattedDate}</p>
-          </div>
-        </div>
-      </div>
-      
-      {/* 전체 분석 요약 */}
-      <div className="border-l-4 border-indigo-500 pl-4 py-2 bg-indigo-50 rounded-r-md">
-        <h3 className="text-lg font-semibold text-indigo-700 mb-2">분석 요약</h3>
-        <p className="text-gray-700 whitespace-pre-line">{analysis.result_data.analysis}</p>
-      </div>
-      
-      {/* 관계 분석 */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">관계 분석</h3>
-        <p className="text-gray-700">{analysis.result_data.relationships.description}</p>
-        
-        {analysis.result_data.relationships.issues && analysis.result_data.relationships.issues.length > 0 && (
-          <div className="mt-4">
-            <h4 className="font-medium text-gray-700 mb-2">주요 이슈</h4>
-            <ul className="list-disc list-inside space-y-1 pl-4">
-              {analysis.result_data.relationships.issues.map((issue, index) => (
-                <li key={index} className="text-gray-600">{issue}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-        
-        {analysis.result_data.relationships.recommendations && analysis.result_data.relationships.recommendations.length > 0 && (
-          <div className="mt-4">
-            <h4 className="font-medium text-gray-700 mb-2">권장 사항</h4>
-            <ul className="list-disc list-inside space-y-1 pl-4">
-              {analysis.result_data.relationships.recommendations.map((rec, index) => (
-                <li key={index} className="text-gray-600">{rec}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
-      
-      {/* 사회적 역학 */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">사회적 역학</h3>
-        <p className="text-gray-700">{analysis.result_data.socialDynamics.description}</p>
-        
-        {analysis.result_data.socialDynamics.strongConnections && analysis.result_data.socialDynamics.strongConnections.length > 0 && (
-          <div className="mt-4">
-            <h4 className="font-medium text-gray-700 mb-2">강한 유대 관계</h4>
-            <ul className="list-disc list-inside space-y-1 pl-4">
-              {analysis.result_data.socialDynamics.strongConnections.map((connection, index) => (
-                <li key={index} className="text-gray-600">{connection}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-        
-        {analysis.result_data.socialDynamics.isolatedStudents && analysis.result_data.socialDynamics.isolatedStudents.length > 0 && (
-          <div className="mt-4">
-            <h4 className="font-medium text-gray-700 mb-2">고립된 학생</h4>
-            <ul className="list-disc list-inside space-y-1 pl-4">
-              {analysis.result_data.socialDynamics.isolatedStudents.map((student, index) => (
-                <li key={index} className="text-gray-600">{student}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export default function ClassAnalysisPage() {
   const params = useParams();
   const router = useRouter();
@@ -350,7 +357,7 @@ export default function ClassAnalysisPage() {
     enabled: !!classId,
   });
   
-  // 분석 결과 목록 조회
+  // 분석 결과 목록 조회 (모든 결과)
   const { 
     data: analysisResults, 
     isLoading: isResultsLoading, 
@@ -362,7 +369,56 @@ export default function ClassAnalysisPage() {
     enabled: !!classId,
   });
   
-  // 분석 실행 Mutation
+  // 종합 분석 실행 Mutation
+  const runOverviewMutation = useMutation({
+    mutationFn: () => runOverviewAnalysis(classId),
+    onSuccess: (newAnalysis) => {
+      queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
+      toast.success('종합 분석이 완료되었습니다.');
+      router.push(`/class/${classId}/analysis/${newAnalysis.id}`);
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : '종합 분석 실행 중 오류가 발생했습니다.');
+    },
+  });
+  
+  // 학생 그룹1 분석 실행 Mutation
+  const runStudents1Mutation = useMutation({
+    mutationFn: () => runStudentGroupAnalysis(classId, 1),
+    onSuccess: (newAnalysis) => {
+      queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
+      toast.success('첫 번째 학생 그룹 분석이 완료되었습니다.');
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : '학생 그룹1 분석 실행 중 오류가 발생했습니다.');
+    },
+  });
+  
+  // 학생 그룹2 분석 실행 Mutation
+  const runStudents2Mutation = useMutation({
+    mutationFn: () => runStudentGroupAnalysis(classId, 2),
+    onSuccess: (newAnalysis) => {
+      queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
+      toast.success('두 번째 학생 그룹 분석이 완료되었습니다.');
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : '학생 그룹2 분석 실행 중 오류가 발생했습니다.');
+    },
+  });
+  
+  // 학생 그룹3 분석 실행 Mutation
+  const runStudents3Mutation = useMutation({
+    mutationFn: () => runStudentGroupAnalysis(classId, 3),
+    onSuccess: (newAnalysis) => {
+      queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
+      toast.success('세 번째 학생 그룹 분석이 완료되었습니다.');
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : '학생 그룹3 분석 실행 중 오류가 발생했습니다.');
+    },
+  });
+  
+  // 기존 분석 실행 Mutation (호환성 유지)
   const runAnalysisMutation = useMutation({
     mutationFn: () => runAnalysis(classId),
     onSuccess: (newAnalysis) => {
@@ -375,13 +431,36 @@ export default function ClassAnalysisPage() {
     },
   });
   
-  const handleRunAnalysis = () => {
-    runAnalysisMutation.mutate();
+  // 전체 분석 순차 실행 함수
+  const runFullAnalysisSequentially = async () => {
+    try {
+      toast.success('종합 분석을 시작합니다...');
+      await runOverviewMutation.mutateAsync();
+      
+      toast.success('첫 번째 학생 그룹 분석을 시작합니다...');
+      await runStudents1Mutation.mutateAsync();
+      
+      toast.success('두 번째 학생 그룹 분석을 시작합니다...');
+      await runStudents2Mutation.mutateAsync();
+      
+      toast.success('세 번째 학생 그룹 분석을 시작합니다...');
+      await runStudents3Mutation.mutateAsync();
+      
+      toast.success('모든 분석이 완료되었습니다!');
+    } catch (error) {
+      toast.error('분석 과정 중 오류가 발생했습니다. 일부 분석은 완료되었을 수 있습니다.');
+      console.error('순차 분석 오류:', error);
+    }
   };
   
   const isLoading = isClassLoading || isResultsLoading;
+  const isAnyRunning = runOverviewMutation.isPending || 
+                      runStudents1Mutation.isPending || 
+                      runStudents2Mutation.isPending || 
+                      runStudents3Mutation.isPending ||
+                      runAnalysisMutation.isPending;
   
-  if (isLoading) {
+  if (isLoading && !isAnyRunning) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-gray-100">
         <ArrowPathIcon className="w-8 h-8 animate-spin text-indigo-500" />
@@ -449,35 +528,51 @@ export default function ClassAnalysisPage() {
               <p className="text-sm text-gray-600 mt-1">
                 학생들의 관계 데이터를 AI가 분석하여 학급 내 사회적 역학 구조와 관계 패턴을 파악합니다.
               </p>
+              <p className="text-xs text-gray-500 mt-1">
+                분석은 종합분석 및 학생그룹별 분석으로 나누어 진행됩니다.
+              </p>
             </div>
-            <button
-              onClick={handleRunAnalysis}
-              disabled={runAnalysisMutation.isPending}
-              className="px-4 py-2 bg-indigo-500 text-white rounded-md hover:bg-indigo-600 shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 flex items-center disabled:opacity-70 disabled:cursor-not-allowed"
-            >
-              {runAnalysisMutation.isPending ? (
-                <>
-                  <ArrowPathIcon className="w-5 h-5 animate-spin mr-2" />
-                  분석 중...
-                </>
-              ) : (
-                <>
-                  <SparklesIcon className="w-5 h-5 mr-2" />
-                  새 분석 실행
-                </>
-              )}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={runFullAnalysisSequentially}
+                disabled={isAnyRunning}
+                className="px-4 py-2 bg-indigo-500 text-white rounded-md hover:bg-indigo-600 shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 flex items-center disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {isAnyRunning ? (
+                  <>
+                    <ArrowPathIcon className="w-5 h-5 animate-spin mr-2" />
+                    분석 중...
+                  </>
+                ) : (
+                  <>
+                    <SparklesIcon className="w-5 h-5 mr-2" />
+                    새 분석 실행
+                  </>
+                )}
+              </button>
+            </div>
           </div>
+        </div>
+        
+        {/* 분석 결과 설명 */}
+        <div className="bg-white shadow-md rounded-lg p-4 mb-6">
+          <div className="flex items-center space-x-2 mb-3">
+            <DocumentTextIcon className="w-5 h-5 text-indigo-600" />
+            <h2 className="text-lg font-semibold text-gray-800">분석 결과 목록</h2>
+          </div>
+          <p className="text-sm text-gray-600">
+            각 분석 결과를 클릭하면 상세 내용을 볼 수 있습니다. 상세 페이지에서 종합분석과 학생그룹별 분석을 탭으로 확인할 수 있습니다.
+          </p>
         </div>
         
         {/* 분석 결과 목록 */}
         <div className="mt-8">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-            <CalendarIcon className="w-5 h-5 text-indigo-500 mr-2" />
-            분석 결과 목록
-          </h2>
-          
-          {analysisResults && analysisResults.length > 0 ? (
+          {isResultsLoading ? (
+            <div className="flex justify-center items-center p-12">
+              <ArrowPathIcon className="w-6 h-6 animate-spin text-indigo-500" />
+              <span className="ml-2 text-indigo-500">로딩 중...</span>
+            </div>
+          ) : analysisResults && analysisResults.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <AnimatePresence>
                 {analysisResults.map((analysis) => (

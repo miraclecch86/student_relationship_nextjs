@@ -151,7 +151,7 @@ export async function analyzeStudentRelationships(
         messages: [
           {
             role: 'system',
-            content: `당신은 학급 관계 분석 전문가이자 아동 심리 분석 전문가입니다. 교육심리학, 발달심리학, 관계심리학 배경 지식을 활용하여 제공된 학급 정보, 학생 목록, 관계 데이터, 설문지 데이터, 설문 응답 데이터를 심층 분석해주세요. 교실 내 사회적 역학, 학생 간 관계, 그리고 각 학생의 심리적 특성과 발달 상태를 명확하고 통찰력 있게 분석해주세요. 모든 분석 결과는 한글로 작성해야 합니다.
+            content: `당신은 학급 관계 분석 전문가이자 아동 심리 분석 전문가입니다. 교육심리학, 발달심리학, 관계심리학 배경 지식을 활용하여 제공된 학급 정보, 학생 목록, 관계 데이터, 설문지 데이터를 심층 분석해주세요. 교실 내 사회적 역학, 학생 간 관계를 명확하고 통찰력 있게 분석해주세요. 모든 분석 결과는 한글로 작성해야 합니다.
 
             아래 내용을 포함한 구조화된 분석 보고서를 작성해주세요.
             학급 정보에서 학교명, 학년, 반을 추출하여 실제 데이터 기반의 제목을 사용하세요.
@@ -172,73 +172,32 @@ export async function analyzeStudentRelationships(
             - 학급 내 권력 구조 및 영향력 흐름
             - 집단 심리학적 관점에서의 학급 역학 분석
             
-            ## 4. 개별 학생 상세 분석
-            - **반드시 모든 학생 개개인에 대한 상세 분석을 제공해주세요**
-            - 각 학생별로 다음 정보를 포함:
-              - 심리적 특성 및 발달 단계 분석
-              - 사회적 위치와 영향력
-              - 관계 패턴 및 주요 교우 관계
-              - 강점과 잠재력
-              - 직면한 어려움 또는 도전 과제
-              - 성격 유형 및 행동 패턴
-              - **시간 경과에 따른 변화 상세 분석**: 
-                  - 설문지 데이터를 기반으로 시간에 따른 관계 변화와 발전 과정 분석
-                  - 학생의 정서적, 심리적 변화 추이
-                  - 변화 원인에 대한 심리학적 분석
-                  - 특정 사건이나 상황이 학생에게 미친 영향
-                  - 관계 변화의 진행 방향성과 예측되는 발전 과정
-              - 발전을 위한 구체적 교육적, 심리적 제안
-            
-            ## 5. 설문 데이터 심층 분석
+            ## 4. 설문 데이터 심층 분석
             - 각 설문지별 특징과 주요 발견점 요약
             - 설문별 응답 경향 및 패턴 분석
             - 주요 질문에 대한 응답 분석 및 학생들의 인식 변화
-            - 설문 응답에서 나타나는 숨겨진 학급 역학 파악
-            - 언어적, 비언어적 표현에서 드러난 심리적 신호 분석
-            - 설문 결과에서 도출된 교육적, 심리적 시사점
             
-            ## 6. 시간 경과에 따른 변화 상세 분석
+            ## 5. 시간 경과에 따른 변화 상세 분석
             - 설문 날짜를 기준으로 학급 관계 변화 추적
             - 학생 간 관계의 발전 및 변화 양상 분석
             - 기간별 주요 변화 포인트와 원인 분석
-            - 관계망의 안정성과 변동성 평가
-            - 시간에 따른 학급 역학 구조의 발전 방향 예측
-            - 집단 심리학적 관점에서의 학급 발달 단계 분석
             
-            ## 7. 교사를 위한 구체적 실행 방안
-            - 학급 관계 개선을 위한 단기(1-2주), 중기(1-2개월), 장기(3-6개월) 계획 제안
-            - 교우 관계 개선을 위한 구체적인 활동과 프로그램 5가지 이상 제안
+            ## 6. 교사를 위한 구체적 실행 방안
+            - 학급 관계 개선을 위한 단기, 중기, 장기 계획 제안
+            - 교우 관계 개선을 위한 구체적인 활동과 프로그램 제안
             - 고립 학생 지원을 위한 맞춤형 심리적 접근 전략
             - 학급 리더십 강화 방안
-            - 학급 관계 모니터링을 위한 효과적인 방법 제안
-            - 학부모와의 협력 전략
-            - 각 학생별 맞춤형 심리적 접근법 제안
             
-            제공된 모든 데이터를 활용하되, 특히 다음 정보에 주목해주세요:
-            1. 학급 기본 정보와 모든 학생 정보
-            2. 학급 아래 생성된 모든 설문지 정보 (제목, 생성날짜 포함)
-            3. 설문지별 학생 관계 설정 정보와 그 변화
-            4. 주간식 대답 정보를 포함한 모든 질문-응답 데이터
-            5. 학생들의 언어 사용, 표현 방식, 관계 패턴에서 드러나는 심리적 신호들
-            
-            보고서는 반드시 마크다운 형식을 활용하여 구조화하고, 헤더(#, ##, ###)와 목록(-, *)을 적절히 사용하여 가독성을 높여주세요. 단순히 데이터를 나열하는 것이 아니라, 통찰력 있는 분석과 실행 가능한 교육적, 심리적 제안을 제공해주세요.
-            
-            중요: 
-            1. 마크다운 서식이 올바르게 적용되도록 # 기호와 텍스트 사이에 반드시 공백을 넣어주세요 (예: '# 제목', '## 소제목')
-            2. 글자 색상은 기본 검정색으로 표시되므로 별도의 색상 코드를 넣지 마세요
-            3. 필요한 경우 표(table)를 사용하여 데이터를 정리해도 좋습니다
-            4. 모든 학생을 분석할 때 ### 수준의 헤더를 사용하여 학생 이름을 제목으로 하고, 구체적인 분석 내용을 제공해주세요
-            5. 학생별 분석이 짧지 않게, 충분히 상세하게 작성해주세요
-            6. 관계 변화를 분석할 때 모든 데이터를 종합적으로 검토하여 통찰력 있는 분석을 제공해주세요`
+            보고서는 마크다운 형식을 활용하여 구조화하고, 헤더(#, ##)와 목록(-, *)을 적절히 사용하여 가독성을 높여주세요.`
           },
           {
             role: 'user',
-            content: `다음 데이터를 기반으로 학생들의 관계와 학급 내 사회적 역학을 심층 분석해주세요: 
+            content: `다음 데이터를 기반으로 학급 전체에 대한 분석을 진행해주세요: 
             ${JSON.stringify(analysisData, null, 2)}`
           }
         ],
         temperature: 0.7,
-        max_tokens: 8000  // 토큰 수 증가
+        max_tokens: 3000
       })
     });
 
@@ -248,17 +207,9 @@ export async function analyzeStudentRelationships(
     }
 
     const result = await response.json();
-    const content = result.choices[0]?.message?.content;
-    
-    if (!content) {
-      throw new Error('API 응답에 콘텐츠가 없습니다.');
-    }
-
-    // GPT 응답을 그대로 반환
-    return content;
-
-  } catch (error) {
-    console.error('학생 관계 분석 오류:', error);
+    return result.choices[0].message.content;
+  } catch (error: any) {
+    console.error('analyzeClassOverview API 호출 오류:', error);
     throw error;
   }
 }
@@ -344,6 +295,335 @@ export async function analyzeSurveyResults(
 
   } catch (error) {
     console.error('설문 분석 오류:', error);
+    throw error;
+  }
+}
+
+// 종합분석을 위한 함수 (전체 학급에 대한 통찰과 주요 패턴)
+export async function analyzeClassOverview(
+  students: Student[],
+  relationships: Relationship[],
+  answers?: Answer[],
+  questions?: Question[],
+  additionalData?: {
+    classDetails?: any,
+    surveys?: Survey[],
+    surveyData?: Array<{
+      survey: Survey,
+      relationships: Relationship[],
+      questions: Question[],
+      answers: Answer[]
+    }>
+  }
+): Promise<string> {
+  try {
+    // 환경 변수에서 API 키 가져오기
+    const apiKey = process.env.OPENAI_API_KEY;
+    
+    if (!apiKey) {
+      console.error('OpenAI API 키가 설정되지 않았습니다. 환경 변수를 확인해주세요.');
+      throw new Error('OpenAI API 키가 설정되지 않았습니다. 환경 변수를 확인해주세요.');
+    }
+
+    // 분석에 필요한 데이터 준비 (기존 함수와 동일한 방식)
+    const analysisData = {
+      // 학급 정보
+      class: additionalData?.classDetails || { id: "unknown" },
+      
+      // 학생 정보
+      students: students.map(s => ({
+        id: s.id,
+        name: s.name,
+        gender: s.gender
+      })),
+      
+      // 기본 관계 정보 (설문과 연결되지 않은)
+      baseRelationships: relationships.map(r => ({
+        from: students.find(s => s.id === r.from_student_id)?.name || r.from_student_id,
+        to: students.find(s => s.id === r.to_student_id)?.name || r.to_student_id,
+        type: r.relation_type
+      })),
+      
+      // 기본 질문&응답 정보
+      questions: questions ? questions.map(q => ({
+        id: q.id,
+        text: q.question_text
+      })) : [],
+      
+      answers: answers ? answers.map(a => {
+        const question = questions?.find(q => q.id === a.question_id);
+        const student = students.find(s => s.id === a.student_id);
+        return {
+          student: student?.name || a.student_id,
+          question: question?.question_text || a.question_id,
+          answer: a.answer_text
+        };
+      }) : [],
+      
+      // 설문 정보
+      surveys: additionalData?.surveys?.map(survey => ({
+        id: survey.id,
+        name: survey.name,
+        description: survey.description,
+        created_at: survey.created_at
+      })) || [],
+      
+      // 설문별 상세 정보
+      surveyDetails: additionalData?.surveyData?.map(sd => {
+        return {
+          survey: {
+            id: sd.survey.id,
+            name: sd.survey.name,
+            description: sd.survey.description,
+            created_at: sd.survey.created_at
+          },
+          relationships: sd.relationships.map(r => ({
+            from: students.find(s => s.id === r.from_student_id)?.name || r.from_student_id,
+            to: students.find(s => s.id === r.to_student_id)?.name || r.to_student_id,
+            type: r.relation_type
+          })),
+          questions: sd.questions.map(q => ({
+            id: q.id,
+            text: q.question_text
+          })),
+          answers: sd.answers.map(a => {
+            const question = sd.questions.find(q => q.id === a.question_id);
+            const student = students.find(s => s.id === a.student_id);
+            return {
+              student: student?.name || a.student_id,
+              question: question?.question_text || a.question_id,
+              answer: a.answer_text
+            };
+          })
+        };
+      }) || []
+    };
+
+    // OpenAI API 요청 설정
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o', // 또는 사용 가능한 최신 모델
+        messages: [
+          {
+            role: 'system',
+            content: `당신은 학급 관계 분석 전문가이자 아동 심리 분석 전문가입니다. 교육심리학, 발달심리학, 관계심리학 배경 지식을 활용하여 제공된 학급 정보, 학생 목록, 관계 데이터, 설문지 데이터를 심층 분석해주세요. 교실 내 사회적 역학, 학생 간 관계를 명확하고 통찰력 있게 분석해주세요. 모든 분석 결과는 한글로 작성해야 합니다.
+
+            아래 내용을 포함한 구조화된 분석 보고서를 작성해주세요.
+            학급 정보에서 학교명, 학년, 반을 추출하여 실제 데이터 기반의 제목을 사용하세요.
+            현재 연도도 제목에 포함해주세요.
+            
+            # [연도] [학교명] [학년][반] 학급 관계 및 심리 분석 보고서
+            
+            ## 1. 학급 전체 분석
+            - 학급의 전반적인 분위기, 특징, 강점과 약점에 대한 분석
+            - 학급 심리적 역동성 및 집단적 성향 분석
+            
+            ## 2. 학생 간 관계 분석
+            - 관계 패턴, 주요 이슈, 개선 권장사항
+            - 관계 형성의 심리적 기제와 역학 분석
+            
+            ## 3. 사회적 역학
+            - 리더와 추종자, 강한 유대 관계, 고립된 학생들
+            - 학급 내 권력 구조 및 영향력 흐름
+            - 집단 심리학적 관점에서의 학급 역학 분석
+            
+            ## 4. 설문 데이터 심층 분석
+            - 각 설문지별 특징과 주요 발견점 요약
+            - 설문별 응답 경향 및 패턴 분석
+            - 주요 질문에 대한 응답 분석 및 학생들의 인식 변화
+            
+            ## 5. 시간 경과에 따른 변화 상세 분석
+            - 설문 날짜를 기준으로 학급 관계 변화 추적
+            - 학생 간 관계의 발전 및 변화 양상 분석
+            - 기간별 주요 변화 포인트와 원인 분석
+            
+            ## 6. 교사를 위한 구체적 실행 방안
+            - 학급 관계 개선을 위한 단기, 중기, 장기 계획 제안
+            - 교우 관계 개선을 위한 구체적인 활동과 프로그램 제안
+            - 고립 학생 지원을 위한 맞춤형 심리적 접근 전략
+            - 학급 리더십 강화 방안
+            
+            보고서는 마크다운 형식을 활용하여 구조화하고, 헤더(#, ##)와 목록(-, *)을 적절히 사용하여 가독성을 높여주세요.`
+          },
+          {
+            role: 'user',
+            content: `다음 데이터를 기반으로 학급 전체에 대한 분석을 진행해주세요: 
+            ${JSON.stringify(analysisData, null, 2)}`
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 3000
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`OpenAI API 오류: ${errorData.error?.message || response.statusText}`);
+    }
+
+    const result = await response.json();
+    return result.choices[0].message.content;
+  } catch (error: any) {
+    console.error('analyzeClassOverview API 호출 오류:', error);
+    throw error;
+  }
+}
+
+// 학생 그룹별 분석 함수 (특정 학생 그룹에 집중)
+export async function analyzeStudentGroup(
+  students: Student[],
+  relationships: Relationship[],
+  groupIndex: number, // 1, 2, 3 등 그룹 인덱스
+  answers?: Answer[],
+  questions?: Question[],
+  additionalData?: {
+    classDetails?: any,
+    surveys?: Survey[],
+    surveyData?: Array<{
+      survey: Survey,
+      relationships: Relationship[],
+      questions: Question[],
+      answers: Answer[]
+    }>
+  }
+): Promise<string> {
+  try {
+    const apiKey = process.env.OPENAI_API_KEY;
+    
+    if (!apiKey) {
+      console.error('OpenAI API 키가 설정되지 않았습니다. 환경 변수를 확인해주세요.');
+      throw new Error('OpenAI API 키가 설정되지 않았습니다. 환경 변수를 확인해주세요.');
+    }
+    
+    // 그룹별로 학생을 나누기 (예: 10명씩)
+    const GROUP_SIZE = 10;
+    const sortedStudents = [...students].sort((a, b) => 
+      (a.display_order || 0) - (b.display_order || 0)
+    );
+    
+    const startIdx = (groupIndex - 1) * GROUP_SIZE;
+    const endIdx = startIdx + GROUP_SIZE;
+    const studentGroup = sortedStudents.slice(startIdx, endIdx);
+    
+    if (studentGroup.length === 0) {
+      return `# 학생 그룹 ${groupIndex} 분석\n\n이 그룹에 해당하는 학생이 없습니다.`;
+    }
+    
+    // 선택된 학생 그룹에 대한 정보와 관계만 필터링
+    const studentIds = studentGroup.map(s => s.id);
+    const filteredRelationships = relationships.filter(r => 
+      studentIds.includes(r.from_student_id) || studentIds.includes(r.to_student_id)
+    );
+    
+    const filteredAnswers = answers ? answers.filter(a => 
+      studentIds.includes(a.student_id)
+    ) : [];
+    
+    // 분석 데이터 준비
+    const analysisData = {
+      class: additionalData?.classDetails || { id: "unknown" },
+      
+      // 선택된 학생 그룹
+      students: studentGroup.map(s => ({
+        id: s.id,
+        name: s.name,
+        gender: s.gender,
+        display_order: s.display_order
+      })),
+      
+      // 전체 학생 정보 (참조용)
+      allStudents: students.map(s => ({
+        id: s.id,
+        name: s.name,
+        gender: s.gender
+      })),
+      
+      // 필터링된 관계
+      relationships: filteredRelationships.map(r => ({
+        from: students.find(s => s.id === r.from_student_id)?.name || r.from_student_id,
+        fromId: r.from_student_id,
+        to: students.find(s => s.id === r.to_student_id)?.name || r.to_student_id,
+        toId: r.to_student_id,
+        type: r.relation_type
+      })),
+      
+      // 필터링된 질문&응답
+      questions: questions ? questions.map(q => ({
+        id: q.id,
+        text: q.question_text
+      })) : [],
+      
+      answers: filteredAnswers.map(a => {
+        const question = questions?.find(q => q.id === a.question_id);
+        const student = students.find(s => s.id === a.student_id);
+        return {
+          student: student?.name || a.student_id,
+          question: question?.question_text || a.question_id,
+          answer: a.answer_text
+        };
+      }),
+      
+      // 그룹 정보
+      groupInfo: {
+        index: groupIndex,
+        startIdx,
+        endIdx: Math.min(endIdx, students.length),
+        total: Math.ceil(students.length / GROUP_SIZE)
+      }
+    };
+
+    // OpenAI API 요청
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: `당신은 학급 관계 분석 전문가이자, 학생 개인별 심리 분석 전문가입니다. 교육심리학, 발달심리학, 관계심리학 지식을 활용하여 제공된 학생 그룹의 학생들을 개별적으로 분석해주세요. 모든 분석 결과는 한글로 작성해야 합니다.
+
+            아래 각 학생에 대해 다음 내용을 포함하는 상세 분석을 제공해주세요:
+            
+            ### [학생 이름]
+            - 심리적 특성 및 발달 단계 분석
+            - 사회적 위치와 영향력
+            - 관계 패턴 및 주요 교우 관계
+            - 강점과 잠재력
+            - 직면한 어려움 또는 도전 과제
+            - 성격 유형 및 행동 패턴
+            - 발전을 위한 구체적 교육적, 심리적 제안
+            
+            보고서는 마크다운 형식을 활용하여 구조화하고, 헤더(#, ##, ###)와 목록(-, *)을 적절히 사용하여 가독성을 높여주세요. 각 학생별 분석을 충분히 상세하게 작성해주세요.`
+          },
+          {
+            role: 'user',
+            content: `다음 데이터를 기반으로 학생 그룹 ${groupIndex}의 각 학생에 대한 상세 분석을 진행해주세요: 
+            ${JSON.stringify(analysisData, null, 2)}`
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 3000
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`OpenAI API 오류: ${errorData.error?.message || response.statusText}`);
+    }
+
+    const result = await response.json();
+    return result.choices[0].message.content;
+  } catch (error: any) {
+    console.error(`analyzeStudentGroup(${groupIndex}) API 호출 오류:`, error);
     throw error;
   }
 } 
