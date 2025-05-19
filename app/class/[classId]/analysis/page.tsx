@@ -14,6 +14,8 @@ import {
   TrashIcon,
   XCircleIcon,
   ExclamationTriangleIcon,
+  PencilIcon,
+  CheckIcon,
 } from '@heroicons/react/24/outline';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -59,13 +61,22 @@ async function fetchClassDetails(classId: string): Promise<Class | null> {
   return data;
 }
 
+// UUID 생성 함수 추가
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0,
+        v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 // 분석 결과 목록 조회 함수
 async function fetchAnalysisResults(classId: string): Promise<AnalysisResult[]> {
   console.log(`분석 목록 요청: classId=${classId}`);
   
   try {
-    // API 엔드포인트에 직접 요청
-    const response = await fetch(`/api/class/${classId}/analysis`);
+    // API 엔드포인트에 직접 요청 (group_by_session=true 추가)
+    const response = await fetch(`/api/class/${classId}/analysis?group_by_session=true`);
     
     if (!response.ok) {
       throw new Error(`분석 결과를 불러오는데 실패했습니다 (${response.status})`);
@@ -118,16 +129,17 @@ async function runAnalysis(classId: string): Promise<AnalysisResult> {
   }
 }
 
-// 종합 분석 실행 함수
-async function runOverviewAnalysis(classId: string): Promise<AnalysisResult> {
-  console.log(`종합 분석 실행 요청: classId=${classId}`);
+// 종합 분석 실행 함수 수정
+async function runOverviewAnalysis(classId: string, sessionId: string): Promise<AnalysisResult> {
+  console.log(`종합 분석 실행 요청: classId=${classId}, sessionId=${sessionId}`);
   
   try {
-    const response = await fetch(`/api/class/${classId}/analysis/overview`, {
+    const response = await fetch(`/api/class/${encodeURIComponent(classId)}/analysis/overview?sessionId=${encodeURIComponent(sessionId)}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
+      body: JSON.stringify({ session_id: sessionId }), // session_id 전달
     });
     
     if (!response.ok) {
@@ -156,16 +168,17 @@ async function runOverviewAnalysis(classId: string): Promise<AnalysisResult> {
   }
 }
 
-// 학생 그룹별 분석 실행 함수
-async function runStudentGroupAnalysis(classId: string, groupIndex: number): Promise<AnalysisResult> {
-  console.log(`학생 그룹${groupIndex} 분석 실행 요청: classId=${classId}`);
+// 학생 그룹별 분석 실행 함수 수정
+async function runStudentGroupAnalysis(classId: string, groupIndex: number, sessionId: string): Promise<AnalysisResult> {
+  console.log(`학생 그룹${groupIndex} 분석 실행 요청: classId=${classId}, sessionId=${sessionId}`);
   
   try {
-    const response = await fetch(`/api/class/${classId}/analysis/students?group=${groupIndex}`, {
+    const response = await fetch(`/api/class/${encodeURIComponent(classId)}/analysis/students?group=${groupIndex}&sessionId=${encodeURIComponent(sessionId)}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
+      body: JSON.stringify({ session_id: sessionId }), // session_id 전달
     });
     
     if (!response.ok) {
@@ -198,7 +211,7 @@ async function deleteAnalysis(classId: string, analysisId: string): Promise<void
   console.log(`분석 결과 삭제 요청: classId=${classId}, analysisId=${analysisId}`);
   
   try {
-    const response = await fetch(`/api/class/${classId}/analysis/${analysisId}`, {
+    const response = await fetch(`/api/class/${encodeURIComponent(classId)}/analysis/${encodeURIComponent(analysisId)}`, {
       method: 'DELETE',
     });
     
@@ -254,6 +267,9 @@ function AnalysisCard({ analysis }: AnalysisCardProps) {
   const queryClient = useQueryClient();
   const classId = params.classId as string;
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [description, setDescription] = useState(analysis.summary || '');
+  const [isSaving, setIsSaving] = useState(false);
   
   const createdAt = new Date(analysis.created_at);
   const formattedDate = format(createdAt, 'yyyy년 MM월 dd일', { locale: ko });
@@ -275,6 +291,21 @@ function AnalysisCard({ analysis }: AnalysisCardProps) {
     },
   });
   
+  // 설명 업데이트 Mutation
+  const updateDescriptionMutation = useMutation({
+    mutationFn: () => updateAnalysisDescription(classId, analysis.id, description),
+    onSuccess: () => {
+      toast.success('설명이 업데이트되었습니다.');
+      queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
+      setIsEditing(false);
+      setIsSaving(false);
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : '설명 업데이트 중 오류가 발생했습니다.');
+      setIsSaving(false);
+    },
+  });
+  
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.stopPropagation(); // 카드 클릭 이벤트 전파 방지
     setIsDeleteDialogOpen(true);
@@ -282,6 +313,23 @@ function AnalysisCard({ analysis }: AnalysisCardProps) {
   
   const confirmDelete = () => {
     deleteAnalysisMutation.mutate();
+  };
+  
+  const handleEditClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // 카드 클릭 이벤트 전파 방지
+    setIsEditing(true);
+  };
+  
+  const handleSaveClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // 카드 클릭 이벤트 전파 방지
+    setIsSaving(true);
+    updateDescriptionMutation.mutate();
+  };
+  
+  const handleCancelEdit = (e: React.MouseEvent) => {
+    e.stopPropagation(); // 카드 클릭 이벤트 전파 방지
+    setDescription(analysis.summary || '');
+    setIsEditing(false);
   };
   
   return (
@@ -292,8 +340,8 @@ function AnalysisCard({ analysis }: AnalysisCardProps) {
         layout
       >
         <div 
-          className="cursor-pointer pb-6" // 하단에 여백 추가하여 삭제 버튼 공간 확보
-          onClick={() => router.push(`/class/${classId}/analysis/${analysis.id}`)}
+          className={`${isEditing ? '' : 'cursor-pointer'} pb-6`} // 하단에 여백 추가하여 버튼 공간 확보
+          onClick={isEditing ? undefined : () => router.push(`/class/${classId}/analysis/${analysis.id}`)}
         >
           <div className="flex items-start justify-between">
             <div className="flex items-start space-x-3">
@@ -302,32 +350,75 @@ function AnalysisCard({ analysis }: AnalysisCardProps) {
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="font-medium text-black">{formattedDate}</h3>
+                  <h3 className="font-semibold text-black">{formattedDate}</h3>
                 </div>
-                <p className="text-sm text-black">{formattedTime}</p>
+                <p className="text-sm font-medium text-black">{formattedTime}</p>
               </div>
             </div>
-            <ChevronRightIcon className="w-5 h-5 text-gray-400" />
+            {!isEditing && <ChevronRightIcon className="w-5 h-5 text-gray-400" />}
           </div>
           <div className="mt-3">
-            <p className="text-sm text-black line-clamp-2">{analysis.summary}</p>
+            {isEditing ? (
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full h-24 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none text-black"
+                placeholder="이 분석에 대한 설명을 입력하세요..."
+              />
+            ) : (
+              <p className="text-sm text-black font-medium line-clamp-2">{description ? description : '설명을 추가해 주세요. 편집 버튼을 눌러 설명을 입력하세요.'}</p>
+            )}
           </div>
         </div>
         
-        {/* 삭제 버튼 */}
-        <div className="absolute bottom-3 right-3">
-          <button
-            onClick={handleDeleteClick}
-            disabled={deleteAnalysisMutation.isPending}
-            className="p-1.5 rounded-full bg-gray-50 hover:bg-red-50 text-gray-500 hover:text-red-600 transition-colors focus:outline-none focus:ring-2 focus:ring-red-300"
-            title="삭제"
-          >
-            {deleteAnalysisMutation.isPending ? (
-              <ArrowPathIcon className="w-4 h-4 animate-spin" />
-            ) : (
-              <TrashIcon className="w-4 h-4" />
-            )}
-          </button>
+        {/* 버튼 영역 */}
+        <div className="absolute bottom-3 right-3 flex space-x-2">
+          {isEditing ? (
+            <>
+              <button
+                onClick={handleCancelEdit}
+                className="p-1.5 rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300"
+                title="취소"
+              >
+                <XCircleIcon className="w-4 h-4" />
+              </button>
+              <button
+                onClick={handleSaveClick}
+                disabled={isSaving}
+                className="p-1.5 rounded-full bg-green-100 text-green-600 hover:bg-green-200 transition-colors focus:outline-none focus:ring-2 focus:ring-green-300"
+                title="저장"
+              >
+                {isSaving ? (
+                  <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                ) : (
+                  <CheckIcon className="w-4 h-4" />
+                )}
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={handleEditClick}
+                className="p-1.5 rounded-full bg-gray-50 hover:bg-blue-50 text-gray-500 hover:text-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-300"
+                title="편집"
+              >
+                <PencilIcon className="w-4 h-4" />
+              </button>
+              <button
+                onClick={handleDeleteClick}
+                disabled={deleteAnalysisMutation.isPending}
+                className="p-1.5 rounded-full bg-gray-50 hover:bg-red-50 text-gray-500 hover:text-red-600 transition-colors focus:outline-none focus:ring-2 focus:ring-red-300"
+                title="삭제"
+              >
+                {deleteAnalysisMutation.isPending ? (
+                  <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                ) : (
+                  <TrashIcon className="w-4 h-4" />
+                )}
+              </button>
+            </>
+          )}
         </div>
       </motion.div>
       
@@ -344,11 +435,88 @@ function AnalysisCard({ analysis }: AnalysisCardProps) {
   );
 }
 
+// 모든 분석 결과 삭제 함수 추가
+async function deleteAllAnalysis(classId: string): Promise<void> {
+  console.log(`모든 분석 결과 삭제 요청: classId=${classId}`);
+  
+  try {
+    const response = await fetch(`/api/class/${classId}/analysis?deleteAll=true`, {
+      method: 'DELETE',
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage = '분석 결과를 삭제하는데 실패했습니다.';
+      
+      try {
+        const errorData = JSON.parse(errorText);
+        if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+      } catch (e) {
+        console.error('오류 응답 파싱 실패:', e);
+      }
+      
+      console.error(`API 오류 (${response.status}):`, errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    console.log('모든 분석 결과 삭제 성공');
+  } catch (error: any) {
+    console.error('분석 삭제 요청 오류:', error);
+    throw error;
+  }
+}
+
+// 사용자 정의 설명 저장 함수 추가
+async function updateAnalysisDescription(
+  classId: string, 
+  analysisId: string, 
+  description: string
+): Promise<void> {
+  console.log(`분석 설명 업데이트 요청: classId=${classId}, analysisId=${analysisId}`);
+  
+  try {
+    const response = await fetch(`/api/class/${classId}/analysis/${analysisId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ summary: description }),
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage = '설명을 업데이트하는데 실패했습니다.';
+      
+      try {
+        const errorData = JSON.parse(errorText);
+        if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+      } catch (e) {
+        console.error('오류 응답 파싱 실패:', e);
+      }
+      
+      console.error(`API 오류 (${response.status}):`, errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    console.log('분석 설명 업데이트 성공');
+  } catch (error: any) {
+    console.error('설명 업데이트 요청 오류:', error);
+    throw error;
+  }
+}
+
 export default function ClassAnalysisPage() {
   const params = useParams();
   const router = useRouter();
   const queryClient = useQueryClient();
   const classId = params.classId as string;
+  const [isDeleteAllDialogOpen, setIsDeleteAllDialogOpen] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState('');
   
   // 학급 정보 조회
   const { data: classDetails, isLoading: isClassLoading } = useQuery({
@@ -371,20 +539,20 @@ export default function ClassAnalysisPage() {
   
   // 종합 분석 실행 Mutation
   const runOverviewMutation = useMutation({
-    mutationFn: () => runOverviewAnalysis(classId),
+    mutationFn: (sessionId: string) => runOverviewAnalysis(classId, sessionId),
     onSuccess: (newAnalysis) => {
       queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
       toast.success('종합 분석이 완료되었습니다.');
-      router.push(`/class/${classId}/analysis/${newAnalysis.id}`);
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : '종합 분석 실행 중 오류가 발생했습니다.');
+      setIsAnalyzing(false);
     },
   });
   
   // 학생 그룹1 분석 실행 Mutation
   const runStudents1Mutation = useMutation({
-    mutationFn: () => runStudentGroupAnalysis(classId, 1),
+    mutationFn: (sessionId: string) => runStudentGroupAnalysis(classId, 1, sessionId),
     onSuccess: (newAnalysis) => {
       queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
       toast.success('첫 번째 학생 그룹 분석이 완료되었습니다.');
@@ -396,7 +564,7 @@ export default function ClassAnalysisPage() {
   
   // 학생 그룹2 분석 실행 Mutation
   const runStudents2Mutation = useMutation({
-    mutationFn: () => runStudentGroupAnalysis(classId, 2),
+    mutationFn: (sessionId: string) => runStudentGroupAnalysis(classId, 2, sessionId),
     onSuccess: (newAnalysis) => {
       queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
       toast.success('두 번째 학생 그룹 분석이 완료되었습니다.');
@@ -408,7 +576,7 @@ export default function ClassAnalysisPage() {
   
   // 학생 그룹3 분석 실행 Mutation
   const runStudents3Mutation = useMutation({
-    mutationFn: () => runStudentGroupAnalysis(classId, 3),
+    mutationFn: (sessionId: string) => runStudentGroupAnalysis(classId, 3, sessionId),
     onSuccess: (newAnalysis) => {
       queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
       toast.success('세 번째 학생 그룹 분석이 완료되었습니다.');
@@ -418,39 +586,154 @@ export default function ClassAnalysisPage() {
     },
   });
   
-  // 기존 분석 실행 Mutation (호환성 유지)
-  const runAnalysisMutation = useMutation({
-    mutationFn: () => runAnalysis(classId),
+  // 학생 그룹4 분석 실행 Mutation
+  const runStudents4Mutation = useMutation({
+    mutationFn: (sessionId: string) => runStudentGroupAnalysis(classId, 4, sessionId),
     onSuccess: (newAnalysis) => {
       queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
-      toast.success('분석이 완료되었습니다.');
-      router.push(`/class/${classId}/analysis/${newAnalysis.id}`);
+      toast.success('네 번째 학생 그룹 분석이 완료되었습니다.');
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : '분석 실행 중 오류가 발생했습니다.');
+      toast.error(error instanceof Error ? error.message : '학생 그룹4 분석 실행 중 오류가 발생했습니다.');
     },
   });
   
-  // 전체 분석 순차 실행 함수
+  // 학생 그룹5 분석 실행 Mutation
+  const runStudents5Mutation = useMutation({
+    mutationFn: (sessionId: string) => runStudentGroupAnalysis(classId, 5, sessionId),
+    onSuccess: (newAnalysis) => {
+      queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
+      toast.success('다섯 번째 학생 그룹 분석이 완료되었습니다.');
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : '학생 그룹5 분석 실행 중 오류가 발생했습니다.');
+    },
+  });
+  
+  // 학생 그룹6 분석 실행 Mutation
+  const runStudents6Mutation = useMutation({
+    mutationFn: (sessionId: string) => runStudentGroupAnalysis(classId, 6, sessionId),
+    onSuccess: (newAnalysis) => {
+      queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
+      toast.success('여섯 번째 학생 그룹 분석이 완료되었습니다.');
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : '학생 그룹6 분석 실행 중 오류가 발생했습니다.');
+    },
+  });
+  
+  // 학생 그룹7 분석 실행 Mutation
+  const runStudents7Mutation = useMutation({
+    mutationFn: (sessionId: string) => runStudentGroupAnalysis(classId, 7, sessionId),
+    onSuccess: (newAnalysis) => {
+      queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
+      toast.success('일곱 번째 학생 그룹 분석이 완료되었습니다.');
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : '학생 그룹7 분석 실행 중 오류가 발생했습니다.');
+    },
+  });
+  
+  // 학생 그룹8 분석 실행 Mutation
+  const runStudents8Mutation = useMutation({
+    mutationFn: (sessionId: string) => runStudentGroupAnalysis(classId, 8, sessionId),
+    onSuccess: (newAnalysis) => {
+      queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
+      toast.success('여덟 번째 학생 그룹 분석이 완료되었습니다.');
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : '학생 그룹8 분석 실행 중 오류가 발생했습니다.');
+    },
+  });
+  
+  // 전체 분석 순차 실행 함수 수정 - 모든 분석 완료 후에도 이동하지 않음
   const runFullAnalysisSequentially = async () => {
     try {
+      // 분석 상태 시작
+      setIsAnalyzing(true);
+      
+      // 모든 분석에 사용할 공통 세션 ID 생성
+      const sessionId = generateUUID();
+      console.log('분석 세션 ID 생성:', sessionId);
+
+      // 종합 분석 실행
+      setAnalysisProgress('학급 종합 분석을 진행 중입니다...');
       toast.success('종합 분석을 시작합니다...');
-      await runOverviewMutation.mutateAsync();
+      const overviewResult = await runOverviewMutation.mutateAsync(sessionId);
       
+      // 학생 그룹1 분석 실행
+      setAnalysisProgress('첫 번째 학생 그룹 분석을 진행 중입니다...');
       toast.success('첫 번째 학생 그룹 분석을 시작합니다...');
-      await runStudents1Mutation.mutateAsync();
+      await runStudents1Mutation.mutateAsync(sessionId);
       
+      // 학생 그룹2 분석 실행
+      setAnalysisProgress('두 번째 학생 그룹 분석을 진행 중입니다...');
       toast.success('두 번째 학생 그룹 분석을 시작합니다...');
-      await runStudents2Mutation.mutateAsync();
+      await runStudents2Mutation.mutateAsync(sessionId);
       
+      // 학생 그룹3 분석 실행
+      setAnalysisProgress('세 번째 학생 그룹 분석을 진행 중입니다...');
       toast.success('세 번째 학생 그룹 분석을 시작합니다...');
-      await runStudents3Mutation.mutateAsync();
+      await runStudents3Mutation.mutateAsync(sessionId);
       
+      // 학생 그룹4 분석 실행
+      setAnalysisProgress('네 번째 학생 그룹 분석을 진행 중입니다...');
+      toast.success('네 번째 학생 그룹 분석을 시작합니다...');
+      await runStudents4Mutation.mutateAsync(sessionId);
+      
+      // 학생 그룹5 분석 실행
+      setAnalysisProgress('다섯 번째 학생 그룹 분석을 진행 중입니다...');
+      toast.success('다섯 번째 학생 그룹 분석을 시작합니다...');
+      await runStudents5Mutation.mutateAsync(sessionId);
+      
+      // 학생 그룹6 분석 실행
+      setAnalysisProgress('여섯 번째 학생 그룹 분석을 진행 중입니다...');
+      toast.success('여섯 번째 학생 그룹 분석을 시작합니다...');
+      await runStudents6Mutation.mutateAsync(sessionId);
+      
+      // 학생 그룹7 분석 실행
+      setAnalysisProgress('일곱 번째 학생 그룹 분석을 진행 중입니다...');
+      toast.success('일곱 번째 학생 그룹 분석을 시작합니다...');
+      await runStudents7Mutation.mutateAsync(sessionId);
+      
+      // 학생 그룹8 분석 실행
+      setAnalysisProgress('여덟 번째 학생 그룹 분석을 진행 중입니다...');
+      toast.success('여덟 번째 학생 그룹 분석을 시작합니다...');
+      await runStudents8Mutation.mutateAsync(sessionId);
+      
+      // 모든 분석 완료 
       toast.success('모든 분석이 완료되었습니다!');
+      setIsAnalyzing(false);
+      
+      // 페이지 이동 코드 제거
     } catch (error) {
       toast.error('분석 과정 중 오류가 발생했습니다. 일부 분석은 완료되었을 수 있습니다.');
       console.error('순차 분석 오류:', error);
+      setIsAnalyzing(false);
     }
+  };
+  
+  // 모든 분석 결과 삭제 Mutation
+  const deleteAllAnalysisMutation = useMutation({
+    mutationFn: () => deleteAllAnalysis(classId),
+    onSuccess: () => {
+      toast.success('모든 분석 결과가 삭제되었습니다.');
+      queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
+      setIsDeleteAllDialogOpen(false);
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : '삭제 중 오류가 발생했습니다.');
+    },
+  });
+  
+  // 모든 분석 결과 삭제 핸들러
+  const handleDeleteAllClick = () => {
+    setIsDeleteAllDialogOpen(true);
+  };
+  
+  // 모든 분석 결과 삭제 확인
+  const confirmDeleteAll = () => {
+    deleteAllAnalysisMutation.mutate();
   };
   
   const isLoading = isClassLoading || isResultsLoading;
@@ -458,9 +741,13 @@ export default function ClassAnalysisPage() {
                       runStudents1Mutation.isPending || 
                       runStudents2Mutation.isPending || 
                       runStudents3Mutation.isPending ||
-                      runAnalysisMutation.isPending;
+                      runStudents4Mutation.isPending ||
+                      runStudents5Mutation.isPending ||
+                      runStudents6Mutation.isPending ||
+                      runStudents7Mutation.isPending ||
+                      runStudents8Mutation.isPending;
   
-  if (isLoading && !isAnyRunning) {
+  if (isLoading && !isAnyRunning && !isAnalyzing) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-gray-100">
         <ArrowPathIcon className="w-8 h-8 animate-spin text-indigo-500" />
@@ -501,7 +788,31 @@ export default function ClassAnalysisPage() {
   }
   
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 relative">
+      {/* 분석 진행 중 팝업 */}
+      {isAnalyzing && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center">
+          <div className="bg-white p-8 rounded-lg shadow-xl max-w-md text-center border-2 border-indigo-200">
+            {/* AI 스타일 로딩 아이콘 */}
+            <div className="flex justify-center items-center mb-4">
+              <div className="relative w-16 h-16">
+                {/* 바깥쪽 원 */}
+                <div className="absolute inset-0 border-4 border-indigo-200 rounded-full"></div>
+                {/* 회전하는 부분 */}
+                <div className="absolute inset-0 border-4 border-transparent border-t-indigo-600 rounded-full animate-spin"></div>
+                {/* 중앙 AI 아이콘 */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <SparklesIcon className="w-8 h-8 text-indigo-600" />
+                </div>
+              </div>
+            </div>
+            <h3 className="text-xl font-semibold text-gray-800 mb-2">분석 진행 중</h3>
+            <p className="text-gray-600 mb-4">{analysisProgress}</p>
+            <p className="text-sm text-gray-500">분석에는 몇 분 정도 소요될 수 있습니다. 잠시만 기다려주세요.</p>
+          </div>
+        </div>
+      )}
+      
       <div className="max-w-screen-xl mx-auto px-4 py-8">
         {/* 헤더 */}
         <header className="mb-8 bg-white p-4 rounded-lg shadow-md">
@@ -535,10 +846,10 @@ export default function ClassAnalysisPage() {
             <div className="flex gap-2">
               <button
                 onClick={runFullAnalysisSequentially}
-                disabled={isAnyRunning}
+                disabled={isAnyRunning || isAnalyzing}
                 className="px-4 py-2 bg-indigo-500 text-white rounded-md hover:bg-indigo-600 shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 flex items-center disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                {isAnyRunning ? (
+                {isAnyRunning || isAnalyzing ? (
                   <>
                     <ArrowPathIcon className="w-5 h-5 animate-spin mr-2" />
                     분석 중...
@@ -556,9 +867,23 @@ export default function ClassAnalysisPage() {
         
         {/* 분석 결과 설명 */}
         <div className="bg-white shadow-md rounded-lg p-4 mb-6">
-          <div className="flex items-center space-x-2 mb-3">
-            <DocumentTextIcon className="w-5 h-5 text-indigo-600" />
-            <h2 className="text-lg font-semibold text-gray-800">분석 결과 목록</h2>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center space-x-2">
+              <DocumentTextIcon className="w-5 h-5 text-indigo-600" />
+              <h2 className="text-lg font-semibold text-gray-800">분석 결과 목록</h2>
+            </div>
+            <button
+              onClick={handleDeleteAllClick}
+              disabled={deleteAllAnalysisMutation.isPending}
+              className="p-2 rounded-full text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors focus:outline-none focus:ring-2 focus:ring-red-300"
+              title="모든 분석 결과 삭제"
+            >
+              {deleteAllAnalysisMutation.isPending ? (
+                <ArrowPathIcon className="w-5 h-5 animate-spin" />
+              ) : (
+                <TrashIcon className="w-5 h-5" />
+              )}
+            </button>
           </div>
           <p className="text-sm text-gray-600">
             각 분석 결과를 클릭하면 상세 내용을 볼 수 있습니다. 상세 페이지에서 종합분석과 학생그룹별 분석을 탭으로 확인할 수 있습니다.
@@ -590,6 +915,17 @@ export default function ClassAnalysisPage() {
             </div>
           )}
         </div>
+        
+        {/* 모든 분석 결과 삭제 확인 모달 */}
+        <ConfirmModal
+          isOpen={isDeleteAllDialogOpen}
+          onClose={() => setIsDeleteAllDialogOpen(false)}
+          onConfirm={confirmDeleteAll}
+          title="모든 분석 결과 삭제 확인"
+          message="정말 모든 분석 결과를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다."
+          confirmText="모두 삭제"
+          isLoading={deleteAllAnalysisMutation.isPending}
+        />
       </div>
     </div>
   );

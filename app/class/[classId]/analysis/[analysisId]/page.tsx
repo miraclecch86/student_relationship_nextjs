@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase, Class } from '@/lib/supabase';
+import { supabase, Class, Student } from '@/lib/supabase';
 import {
   ArrowLeftIcon,
   DocumentTextIcon,
@@ -19,6 +19,7 @@ import {
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
 import toast from 'react-hot-toast';
 
 // 분석 결과 타입 정의
@@ -28,7 +29,8 @@ interface AnalysisResult {
   created_at: string;
   result_data: string; // 마크다운 또는 JSON 문자열
   summary: string;
-  type: string; // 'full', 'overview', 'students-1', 'students-2', 'students-3'
+  type: string; // 'full', 'overview', 'students-1', 'students-2', 'students-3', 'students-4', 'students-5', 'students-6', 'students-7', 'students-8'
+  session_id?: string; // 분석 세션 ID (여러 분석 결과가 같은 세션에 속함)
 }
 
 // 학급 정보 조회 함수
@@ -42,6 +44,23 @@ async function fetchClassDetails(classId: string): Promise<Class | null> {
   if (error) {
     console.error('Error fetching class details:', error);
     return null;
+  }
+  
+  return data;
+}
+
+// 학생 목록 조회 함수 추가
+async function fetchStudents(classId: string): Promise<Student[]> {
+  const { data, error } = await supabase
+    .from('students')
+    .select('*')
+    .eq('class_id', classId)
+    .order('display_order', { ascending: true })
+    .order('created_at', { ascending: true });
+  
+  if (error) {
+    console.error('Error fetching students:', error);
+    return [];
   }
   
   return data;
@@ -99,6 +118,21 @@ async function runAnalysis(classId: string, type: string): Promise<AnalysisResul
     case 'students-3':
       url = `/api/class/${classId}/analysis/students?group=3`;
       break;
+    case 'students-4':
+      url = `/api/class/${classId}/analysis/students?group=4`;
+      break;
+    case 'students-5':
+      url = `/api/class/${classId}/analysis/students?group=5`;
+      break;
+    case 'students-6':
+      url = `/api/class/${classId}/analysis/students?group=6`;
+      break;
+    case 'students-7':
+      url = `/api/class/${classId}/analysis/students?group=7`;
+      break;
+    case 'students-8':
+      url = `/api/class/${classId}/analysis/students?group=8`;
+      break;
     default:
       url = `/api/class/${classId}/analysis`;
   }
@@ -140,6 +174,13 @@ export default function AnalysisDetailPage() {
     enabled: !!classId,
   });
   
+  // 학생 목록 조회
+  const { data: students = [] } = useQuery({
+    queryKey: ['students', classId],
+    queryFn: () => fetchStudents(classId),
+    enabled: !!classId,
+  });
+  
   // 현재 분석 결과 조회
   const { data: currentAnalysis, isLoading: isCurrentLoading } = useQuery({
     queryKey: ['analysisResult', analysisId],
@@ -147,48 +188,310 @@ export default function AnalysisDetailPage() {
     enabled: !!analysisId,
   });
   
-  // 종합 분석 결과 조회
+  // 현재 분석 세션 ID 조회를 위한 쿼리
+  const { data: analysisSession } = useQuery({
+    queryKey: ['analysisSession', analysisId],
+    queryFn: async () => {
+      // 현재 분석 결과에서 세션 ID 가져오기
+      if (currentAnalysis?.session_id) {
+        return { sessionId: currentAnalysis.session_id };
+      }
+      
+      // 세션 ID가 없는 경우: 기본 동작 유지 (이전 버전 호환성)
+      return { sessionId: null };
+    },
+    enabled: !!currentAnalysis,
+  });
+  
+  // 세션 ID 추출
+  const sessionId = analysisSession?.sessionId;
+  
+  // 종합 분석 결과 조회 - 세션 ID가 있으면 해당 세션의 결과, 없으면 최신 결과
   const { 
     data: overviewAnalysis, 
     isLoading: isOverviewLoading,
     refetch: refetchOverview
   } = useQuery({
-    queryKey: ['analysisResult', classId, 'overview'],
-    queryFn: () => fetchLatestAnalysisResultByType(classId, 'overview'),
+    queryKey: ['analysisResult', classId, 'overview', sessionId],
+    queryFn: async () => {
+      if (sessionId) {
+        // 같은 세션의 'overview' 타입 분석 조회
+        const { data, error } = await supabase
+          .from('analysis_results')
+          .select('*')
+          .eq('class_id', classId)
+          .eq('type', 'overview')
+          .eq('session_id', sessionId)
+          .single();
+          
+        if (error || !data) {
+          // 세션 결과가 없으면 최신 결과 조회
+          return fetchLatestAnalysisResultByType(classId, 'overview');
+        }
+        
+        return data;
+      } else {
+        // 세션 ID가 없으면 기존 방식으로 최신 결과 조회
+        return fetchLatestAnalysisResultByType(classId, 'overview');
+      }
+    },
     enabled: !!classId && activeTab === 'overview',
   });
   
-  // 학생 그룹1 분석 결과 조회
+  // 학생 그룹1 분석 결과 조회 - 세션 ID 기반
   const { 
     data: students1Analysis, 
     isLoading: isStudents1Loading,
     refetch: refetchStudents1
   } = useQuery({
-    queryKey: ['analysisResult', classId, 'students-1'],
-    queryFn: () => fetchLatestAnalysisResultByType(classId, 'students-1'),
+    queryKey: ['analysisResult', classId, 'students-1', sessionId],
+    queryFn: async () => {
+      if (sessionId) {
+        // 같은 세션의 'students-1' 타입 분석 조회
+        const { data, error } = await supabase
+          .from('analysis_results')
+          .select('*')
+          .eq('class_id', classId)
+          .eq('type', 'students-1')
+          .eq('session_id', sessionId)
+          .single();
+          
+        if (error || !data) {
+          // 세션 결과가 없으면 최신 결과 조회
+          return fetchLatestAnalysisResultByType(classId, 'students-1');
+        }
+        
+        return data;
+      } else {
+        // 세션 ID가 없으면 기존 방식으로 최신 결과 조회
+        return fetchLatestAnalysisResultByType(classId, 'students-1');
+      }
+    },
     enabled: !!classId && activeTab === 'students-1',
   });
   
-  // 학생 그룹2 분석 결과 조회
+  // 학생 그룹2 분석 결과 조회 - 세션 ID 기반
   const { 
     data: students2Analysis, 
     isLoading: isStudents2Loading,
     refetch: refetchStudents2
   } = useQuery({
-    queryKey: ['analysisResult', classId, 'students-2'],
-    queryFn: () => fetchLatestAnalysisResultByType(classId, 'students-2'),
+    queryKey: ['analysisResult', classId, 'students-2', sessionId],
+    queryFn: async () => {
+      if (sessionId) {
+        // 같은 세션의 'students-2' 타입 분석 조회
+        const { data, error } = await supabase
+          .from('analysis_results')
+          .select('*')
+          .eq('class_id', classId)
+          .eq('type', 'students-2')
+          .eq('session_id', sessionId)
+          .single();
+          
+        if (error || !data) {
+          // 세션 결과가 없으면 최신 결과 조회
+          return fetchLatestAnalysisResultByType(classId, 'students-2');
+        }
+        
+        return data;
+      } else {
+        // 세션 ID가 없으면 기존 방식으로 최신 결과 조회
+        return fetchLatestAnalysisResultByType(classId, 'students-2');
+      }
+    },
     enabled: !!classId && activeTab === 'students-2',
   });
   
-  // 학생 그룹3 분석 결과 조회
+  // 학생 그룹3 분석 결과 조회 - 세션 ID 기반
   const { 
     data: students3Analysis, 
     isLoading: isStudents3Loading,
     refetch: refetchStudents3
   } = useQuery({
-    queryKey: ['analysisResult', classId, 'students-3'],
-    queryFn: () => fetchLatestAnalysisResultByType(classId, 'students-3'),
+    queryKey: ['analysisResult', classId, 'students-3', sessionId],
+    queryFn: async () => {
+      if (sessionId) {
+        // 같은 세션의 'students-3' 타입 분석 조회
+        const { data, error } = await supabase
+          .from('analysis_results')
+          .select('*')
+          .eq('class_id', classId)
+          .eq('type', 'students-3')
+          .eq('session_id', sessionId)
+          .single();
+          
+        if (error || !data) {
+          // 세션 결과가 없으면 최신 결과 조회
+          return fetchLatestAnalysisResultByType(classId, 'students-3');
+        }
+        
+        return data;
+      } else {
+        // 세션 ID가 없으면 기존 방식으로 최신 결과 조회
+        return fetchLatestAnalysisResultByType(classId, 'students-3');
+      }
+    },
     enabled: !!classId && activeTab === 'students-3',
+  });
+  
+  // 학생 그룹4 분석 결과 조회 - 세션 ID 기반
+  const { 
+    data: students4Analysis, 
+    isLoading: isStudents4Loading,
+    refetch: refetchStudents4
+  } = useQuery({
+    queryKey: ['analysisResult', classId, 'students-4', sessionId],
+    queryFn: async () => {
+      if (sessionId) {
+        // 같은 세션의 'students-4' 타입 분석 조회
+        const { data, error } = await supabase
+          .from('analysis_results')
+          .select('*')
+          .eq('class_id', classId)
+          .eq('type', 'students-4')
+          .eq('session_id', sessionId)
+          .single();
+          
+        if (error || !data) {
+          // 세션 결과가 없으면 최신 결과 조회
+          return fetchLatestAnalysisResultByType(classId, 'students-4');
+        }
+        
+        return data;
+      } else {
+        // 세션 ID가 없으면 기존 방식으로 최신 결과 조회
+        return fetchLatestAnalysisResultByType(classId, 'students-4');
+      }
+    },
+    enabled: !!classId && activeTab === 'students-4',
+  });
+  
+  // 학생 그룹5 분석 결과 조회 - 세션 ID 기반
+  const { 
+    data: students5Analysis, 
+    isLoading: isStudents5Loading,
+    refetch: refetchStudents5
+  } = useQuery({
+    queryKey: ['analysisResult', classId, 'students-5', sessionId],
+    queryFn: async () => {
+      if (sessionId) {
+        // 같은 세션의 'students-5' 타입 분석 조회
+        const { data, error } = await supabase
+          .from('analysis_results')
+          .select('*')
+          .eq('class_id', classId)
+          .eq('type', 'students-5')
+          .eq('session_id', sessionId)
+          .single();
+          
+        if (error || !data) {
+          // 세션 결과가 없으면 최신 결과 조회
+          return fetchLatestAnalysisResultByType(classId, 'students-5');
+        }
+        
+        return data;
+      } else {
+        // 세션 ID가 없으면 기존 방식으로 최신 결과 조회
+        return fetchLatestAnalysisResultByType(classId, 'students-5');
+      }
+    },
+    enabled: !!classId && activeTab === 'students-5',
+  });
+  
+  // 학생 그룹6 분석 결과 조회 - 세션 ID 기반
+  const { 
+    data: students6Analysis, 
+    isLoading: isStudents6Loading,
+    refetch: refetchStudents6
+  } = useQuery({
+    queryKey: ['analysisResult', classId, 'students-6', sessionId],
+    queryFn: async () => {
+      if (sessionId) {
+        // 같은 세션의 'students-6' 타입 분석 조회
+        const { data, error } = await supabase
+          .from('analysis_results')
+          .select('*')
+          .eq('class_id', classId)
+          .eq('type', 'students-6')
+          .eq('session_id', sessionId)
+          .single();
+          
+        if (error || !data) {
+          // 세션 결과가 없으면 최신 결과 조회
+          return fetchLatestAnalysisResultByType(classId, 'students-6');
+        }
+        
+        return data;
+      } else {
+        // 세션 ID가 없으면 기존 방식으로 최신 결과 조회
+        return fetchLatestAnalysisResultByType(classId, 'students-6');
+      }
+    },
+    enabled: !!classId && activeTab === 'students-6',
+  });
+  
+  // 학생 그룹7 분석 결과 조회 - 세션 ID 기반
+  const { 
+    data: students7Analysis, 
+    isLoading: isStudents7Loading,
+    refetch: refetchStudents7
+  } = useQuery({
+    queryKey: ['analysisResult', classId, 'students-7', sessionId],
+    queryFn: async () => {
+      if (sessionId) {
+        // 같은 세션의 'students-7' 타입 분석 조회
+        const { data, error } = await supabase
+          .from('analysis_results')
+          .select('*')
+          .eq('class_id', classId)
+          .eq('type', 'students-7')
+          .eq('session_id', sessionId)
+          .single();
+          
+        if (error || !data) {
+          // 세션 결과가 없으면 최신 결과 조회
+          return fetchLatestAnalysisResultByType(classId, 'students-7');
+        }
+        
+        return data;
+      } else {
+        // 세션 ID가 없으면 기존 방식으로 최신 결과 조회
+        return fetchLatestAnalysisResultByType(classId, 'students-7');
+      }
+    },
+    enabled: !!classId && activeTab === 'students-7',
+  });
+  
+  // 학생 그룹8 분석 결과 조회 - 세션 ID 기반
+  const { 
+    data: students8Analysis, 
+    isLoading: isStudents8Loading,
+    refetch: refetchStudents8
+  } = useQuery({
+    queryKey: ['analysisResult', classId, 'students-8', sessionId],
+    queryFn: async () => {
+      if (sessionId) {
+        // 같은 세션의 'students-8' 타입 분석 조회
+        const { data, error } = await supabase
+          .from('analysis_results')
+          .select('*')
+          .eq('class_id', classId)
+          .eq('type', 'students-8')
+          .eq('session_id', sessionId)
+          .single();
+          
+        if (error || !data) {
+          // 세션 결과가 없으면 최신 결과 조회
+          return fetchLatestAnalysisResultByType(classId, 'students-8');
+        }
+        
+        return data;
+      } else {
+        // 세션 ID가 없으면 기존 방식으로 최신 결과 조회
+        return fetchLatestAnalysisResultByType(classId, 'students-8');
+      }
+    },
+    enabled: !!classId && activeTab === 'students-8',
   });
   
   // 새 분석 실행 Mutation
@@ -218,6 +521,21 @@ export default function AnalysisDetailPage() {
         case 'students-3':
           refetchStudents3();
           break;
+        case 'students-4':
+          refetchStudents4();
+          break;
+        case 'students-5':
+          refetchStudents5();
+          break;
+        case 'students-6':
+          refetchStudents6();
+          break;
+        case 'students-7':
+          refetchStudents7();
+          break;
+        case 'students-8':
+          refetchStudents8();
+          break;
       }
     },
     onError: (error, type) => {
@@ -239,6 +557,11 @@ export default function AnalysisDetailPage() {
       case 'students-1': return '학생 분석 1';
       case 'students-2': return '학생 분석 2';
       case 'students-3': return '학생 분석 3';
+      case 'students-4': return '학생 분석 4';
+      case 'students-5': return '학생 분석 5';
+      case 'students-6': return '학생 분석 6';
+      case 'students-7': return '학생 분석 7';
+      case 'students-8': return '학생 분석 8';
       case 'current': return currentAnalysis?.type ? getTabTitle(currentAnalysis.type) : '분석 결과';
       default: return '분석 결과';
     }
@@ -257,8 +580,24 @@ export default function AnalysisDetailPage() {
           // JSON 파싱 시도
           const parsed = JSON.parse(analysis.result_data);
           
+          // 통합 분석인 경우 (type='combined')
+          if (analysis.type === 'combined') {
+            // 현재 활성 탭에 따라 다른 내용 표시
+            if (activeTab === 'overview' && parsed.overview) {
+              content = typeof parsed.overview === 'string' ? parsed.overview : JSON.stringify(parsed.overview);
+            } else if (activeTab === 'students-1' && parsed['students-1']) {
+              content = typeof parsed['students-1'] === 'string' ? parsed['students-1'] : JSON.stringify(parsed['students-1']);
+            } else if (activeTab === 'students-2' && parsed['students-2']) {
+              content = typeof parsed['students-2'] === 'string' ? parsed['students-2'] : JSON.stringify(parsed['students-2']);
+            } else if (activeTab === 'students-3' && parsed['students-3']) {
+              content = typeof parsed['students-3'] === 'string' ? parsed['students-3'] : JSON.stringify(parsed['students-3']);
+            } else {
+              // 기본값: 종합 분석
+              content = typeof parsed.overview === 'string' ? parsed.overview : JSON.stringify(parsed.overview);
+            }
+          }
           // 이전 형식 호환성 (분석 결과가 객체 내 필드로 있는 경우)
-          if (parsed.analysis) {
+          else if (parsed.analysis) {
             content = parsed.analysis;
           } else {
             // 그냥 문자열로 간주
@@ -276,9 +615,39 @@ export default function AnalysisDetailPage() {
       // 필요없는 제목 제거 및 숫자 변환 
       content = content.replace(/# .*학급 .*보고서(\n|\r\n)?/g, '');
       
-      // 학생분석 페이지 제목 제거
+      // ===== 1. 최상위 제목 스타일 통일화 =====
+      // 최상위 제목 변환 (학급 전체 분석, 교사를 위한 구체적 실행 방안 등) - 모두 강조표시
+      content = content.replace(/^학급 전체 분석/gm, '# **학급 전체 분석**');
+      content = content.replace(/^(\d+)\.\s*교사를 위한 구체적 실행 방안/gm, '# **$1. 교사를 위한 구체적 실행 방안**');
+      
+      // ===== 2. 하위 섹션 제목 스타일 통일화 =====
+      // 종합분석의 하위 섹션 제목 변환 (전반적인 분위기 및 특징, 강점, 약점 등) - 모두 강조표시 
+      content = content.replace(/^(전반적인 분위기 및 특징|강점|약점|심리적 역동성 및 집단적 성향)/gm, '## **$1**');
+      content = content.replace(/^(\d+\.\d+)\s*(학급 환경 및 분위기 개선 전략|교우 관계 촉진 프로그램)/gm, '## **$1 $2**');
+      
+      // 모든 숫자 시작 제목 변환 (1. 학급 전체 분석, 2. 학생 간 관계 분석 등)
+      content = content.replace(/^(\d+)\.\s*([^\n]+)/gm, '## **$1. $2**');
+      
+      // ===== 추가: 특정 제목 보라색으로 강조 =====
+      // 보라색으로 강조할 패턴 목록
+      const purpleTitlePatterns = [
+        // 숫자로 시작하는 제목들 (1. 학급 전체 분석, 2. 학생 간 관계 분석 등)
+        /## \*\*(\d+)\.\s*([^\n]+?)\*\*/g,
+        // 세부 숫자 시작 제목 (6.1, 6.2 등)
+        /## \*\*(\d+\.\d+)\s*([^\n]+?)\*\*/g,
+      ];
+      
+      // 각 패턴에 대해 보라색 클래스 추가
+      purpleTitlePatterns.forEach(pattern => {
+        content = content.replace(pattern, (match, num, title) => {
+          // strong 태그를 제거하고 직접 스타일 적용
+          return `<div style="color: #4338ca; font-weight: bold; border-bottom: 1px solid #e5e7eb; margin-top: 1.5rem; margin-bottom: 0.5rem; padding-bottom: 0.3rem;">${num}. ${title}</div>`;
+        });
+      });
+      
+      // ===== 3. 학생분석 페이지 정리 =====
       if (activeTab.startsWith('students-')) {
-        // 다양한 형태의 제목/소제목 제거
+        // 불필요한 제목 및 설명 제거
         content = content.replace(/# 학생 그룹 \d+ 개별 분석(\n|\r\n)?/g, '');
         content = content.replace(/## 개별 학생 분석(\n|\r\n)?/g, '');
         content = content.replace(/# 학생 그룹 \d+ 분석(\n|\r\n)?/g, '');
@@ -292,39 +661,177 @@ export default function AnalysisDetailPage() {
         // 그룹에 관한 설명 제거
         content = content.replace(/이 그룹에 해당하는 학생이 없습니다\.(\n|\r\n)?/g, '분석할 학생이 없습니다.');
         
-        // 학생분석이 바로 시작하도록 상단 텍스트 완전히 제거
+        // 첫 번째 학생 제목부터 시작하도록 상단 텍스트 제거
         const firstHeadingIndex = content.indexOf('### ');
         if (firstHeadingIndex > 0) {
-          // "### " 앞의 모든 텍스트 제거
           content = content.substring(firstHeadingIndex);
         } else {
-          // 학생 목록이 없는 페이지의 특수 처리
+          // 학생이 없는 경우 처리
           const noStudentPattern = /학생 그룹 \d+ 분석[\s\S]*?이 그룹에 해당하는 학생이 없습니다/g;
-          content = content.replace(noStudentPattern, '분석할 학생이 없습니다');
+          content = content.replace(noStudentPattern, '# 분석할 학생이 없습니다');
         }
+        
+        // 구분선 형식 통일
+        content = content.replace(/---+/g, '\n\n---\n\n');
+        
+        // 학생 이름/번호 형식 통일 
+        content = content.replace(/### ([^\n]+)/g, '## $1');
+        
+        // 다양한 형식의 학생 헤더를 숫자로 통일
+        // "학생 1" -> "1. 학생"
+        content = content.replace(/### 학생\s*(\d+)([^\*]*)/gi, '### $1. 학생');
+        
+        // "이름 (숫자)" -> "숫자. 학생"
+        content = content.replace(/### (.+?)\s*\((\d+)\)\s*/g, '### $2. 학생');
+        
+        // "이름 숫자" -> "숫자. 학생"
+        content = content.replace(/### (.+?)\s+(\d+)\s*/g, '### $2. 학생');
+        
+                 // 제목 변환을 정교하게 처리
+        // 1. h3 태그: "숫자. 이름" -> "숫자. 학생" (단, "발전을 위한 구체적 제안"은 제외)
+        content = content.replace(/### (\d+)\.\s+(.+?)(\s*|$)/g, (match, num, name) => {
+          if (name.includes("발전을 위한 구체적 제안")) {
+            return match;
+          }
+          return `### ${num}. 학생`;
+        });
+        
+        // 2. h4 태그: "숫자. 이름" -> "숫자. 학생" (단, "발전을 위한 구체적 제안"은 제외)
+        content = content.replace(/#### (\d+)\.\s+(.+?)(\s*|$)/g, (match, num, name) => {
+          if (name.includes("발전을 위한 구체적 제안")) {
+            return match;
+          }
+          return `#### ${num}. 학생`;
+        });
+        
+        // display_order 활용 (이미 숫자로 시작하는 경우 건너뛰기)
+        content = content.replace(/### ([^\d\*][^\*]+)/g, (match, name) => {
+          const student = students.find(s => s.name === name.trim());
+          if (student && student.display_order) {
+            return `### ${student.display_order}. 학생`;
+          }
+          return match;
+        });
       }
       
-      // 종합분석 번호 변경
-      content = content.replace(/## 4\./g, '## 4.');
-      content = content.replace(/## 5\./g, '## 5.');
-      content = content.replace(/## 6\./g, '## 6.');
-      content = content.replace(/## 7\./g, '## 6.');
+      // ===== 4. 섹션 제목 볼드체 처리 =====
+      // 심리적 특성 분석, 관계 분석 등 섹션 제목 처리 (콜론 포함 및 제외 모두 처리)
+      const sectionTitles = [
+        '심리적 특성 분석', '심리적 특성 및 발달 단계 분석', '성격 유형 및 행동 패턴',
+        '관계 분석', '사회적 위치와 영향력', '관계 패턴 및 주요 교우 관계',
+        '강점과 과제', '강점과 잠재력', '직면한 어려움 또는 도전 과제', '발전을 위한 구체적 제안'
+      ];
+      
+      sectionTitles.forEach(title => {
+        // "제목:" 형식
+        content = content.replace(new RegExp(`^\\s*(${title}):\\s*$`, 'gm'), `### ${title}:`);
+        // "제목" 형식
+        content = content.replace(new RegExp(`^\\s*(${title})\\s*$`, 'gm'), `### ${title}`);
+      });
+      
+      // ===== 5. 하위 항목 제목 볼드체 처리 =====
+      // 교실 활동, 교우 관계 전략 등
+      const subSectionTitles = [
+        '교실 활동', '교우 관계 전략', '그룹 활동 참여', '갈등 해결 및 의사소통 기술',
+        '심리적 건강 지원', '자신감과 자아존중감 향상', '스트레스 관리', '동기 부여와 학습 탄력성'
+      ];
+      
+      subSectionTitles.forEach(title => {
+        content = content.replace(new RegExp(`^\\s*(${title}):\\s*(.*)$`, 'gm'), `**${title}:** $2`);
+      });
+      
+      // ===== 6. 번호 매김 통일 =====
+      // 번호가 있는 제안 항목 처리
+      content = content.replace(/^(\d+\)\s*[^\n:]+)$/gm, '- **$1**');
+      content = content.replace(/^(\d+\.\s*[^\n:]+)$/gm, '- **$1**');
+      
+      // ===== 7. 기타 키워드 및 특수 항목 강조 =====
+      // 단기, 중기, 장기 계획 키워드 강조
+      content = content.replace(/단기\(1-2주\):/g, '**단기(1-2주):**');
+      content = content.replace(/중기\(1-2개월\):/g, '**중기(1-2개월):**');
+      content = content.replace(/장기\(학기 전체\):/g, '**장기(학기 전체):**');
+      
+      // 활동 정보 강조
+      const activityInfoItems = ['소요시간', '준비물', '진행 방법'];
+      activityInfoItems.forEach(item => {
+        content = content.replace(new RegExp(`${item}:`, 'g'), `**${item}:**`);
+      });
+      
+      // 목적, 방법, 기대효과, 참고자료 스타일 통일 및 보라색으로 변경
+      const keyItems = ['목적', '방법', '기대효과', '참고자료', '활동명', '준비물', '진행 방법', '소요시간'];
+      
+      keyItems.forEach(item => {
+        // "항목:" 형식 (스페이스 없음)
+        content = content.replace(new RegExp(`^(\\s*)${item}:(?![\\s\\S]*?<span)`, 'gm'), 
+          `$1<span style="color: #4338ca; font-weight: bold; font-family: 'Pretendard', sans-serif !important;">${item}:</span> `);
+        
+        // "항목: " 형식 (스페이스 있음)
+        content = content.replace(new RegExp(`^(\\s*)${item}: (?![\\s\\S]*?<span)`, 'gm'), 
+          `$1<span style="color: #4338ca; font-weight: bold; font-family: 'Pretendard', sans-serif !important;">${item}:</span> `);
+        
+        // **항목:** 형식 (마크다운 볼드)
+        content = content.replace(new RegExp(`\\*\\*${item}:\\*\\*`, 'g'), 
+          `<span style="color: #4338ca; font-weight: bold; font-family: 'Pretendard', sans-serif !important;">${item}:</span>`);
+      });
+      
+      // 이미 처리된 strong 태그가 있을 경우 처리 (기존 하드코딩된 항목들도 일관성을 위해 남겨둠)
+      content = content.replace(/\*\*목적:\*\*/g, 
+        `<span style="color: #4338ca; font-weight: bold; font-family: 'Pretendard', sans-serif !important;">목적:</span>`);
+      
+      content = content.replace(/\*\*방법:\*\*/g, 
+        `<span style="color: #4338ca; font-weight: bold; font-family: 'Pretendard', sans-serif !important;">방법:</span>`);
+      
+      content = content.replace(/\*\*기대효과:\*\*/g, 
+        `<span style="color: #4338ca; font-weight: bold; font-family: 'Pretendard', sans-serif !important;">기대효과:</span>`);
+      
+      content = content.replace(/\*\*참고자료:\*\*/g, 
+        `<span style="color: #4338ca; font-weight: bold; font-family: 'Pretendard', sans-serif !important;">참고자료:</span>`);
+      
+      // 활동명, 준비물, 진행 방법, 소요시간 등도 추가 처리
+      content = content.replace(/\*\*활동명:\*\*/g, 
+        `<span style="color: #4338ca; font-weight: bold; font-family: 'Pretendard', sans-serif !important;">활동명:</span>`);
+        
+      content = content.replace(/\*\*준비물:\*\*/g, 
+        `<span style="color: #4338ca; font-weight: bold; font-family: 'Pretendard', sans-serif !important;">준비물:</span>`);
+        
+      content = content.replace(/\*\*진행 방법:\*\*/g, 
+        `<span style="color: #4338ca; font-weight: bold; font-family: 'Pretendard', sans-serif !important;">진행 방법:</span>`);
+        
+      content = content.replace(/\*\*소요시간:\*\*/g, 
+        `<span style="color: #4338ca; font-weight: bold; font-family: 'Pretendard', sans-serif !important;">소요시간:</span>`);
+      
+      // 줄바꿈 일관성: 불필요한 여러 줄 바꿈을 최대 2개로 제한
+      content = content.replace(/\n{3,}/g, '\n\n');
+      
+      // 링크 형식 유지
+      content = content.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '[$1]($2)');
       
     } catch (e) {
       console.error('분석 결과 파싱 오류:', e);
       content = '분석 결과를 표시할 수 없습니다.';
     }
-    
+
     return content;
   };
   
   // 현재 활성화된 탭에 대한 분석 결과 가져오기
   const getActiveAnalysis = () => {
+    // 만약 currentAnalysis가 있고, 그 type이 현재 활성 탭과 일치하면 현재 분석 결과를 반환
+    if (currentAnalysis && currentAnalysis.type === activeTab) {
+      return currentAnalysis;
+    }
+    
+    // 그렇지 않으면 세션 기반으로 가져온 결과 반환
     switch (activeTab) {
       case 'overview': return overviewAnalysis;
       case 'students-1': return students1Analysis;
       case 'students-2': return students2Analysis;
       case 'students-3': return students3Analysis;
+      case 'students-4': return students4Analysis;
+      case 'students-5': return students5Analysis;
+      case 'students-6': return students6Analysis;
+      case 'students-7': return students7Analysis;
+      case 'students-8': return students8Analysis;
       default: return overviewAnalysis;
     }
   };
@@ -336,6 +843,11 @@ export default function AnalysisDetailPage() {
       case 'students-1': return isStudents1Loading;
       case 'students-2': return isStudents2Loading;
       case 'students-3': return isStudents3Loading;
+      case 'students-4': return isStudents4Loading;
+      case 'students-5': return isStudents5Loading;
+      case 'students-6': return isStudents6Loading;
+      case 'students-7': return isStudents7Loading;
+      case 'students-8': return isStudents8Loading;
       default: return false;
     }
   };
@@ -405,57 +917,112 @@ export default function AnalysisDetailPage() {
         {/* 탭 네비게이션 */}
         <div className="bg-white shadow-md rounded-lg p-5 mb-6">
           <h2 className="text-xl font-bold text-black mb-3">분석 결과</h2>
-          <div className="flex flex-wrap border-b border-gray-200">
+          <div className="flex flex-wrap border-b border-gray-200 gap-1">
             <button
               onClick={() => setActiveTab('overview')}
-              className={`px-4 py-3 font-medium text-sm mr-2 rounded-t-lg flex items-center ${
+              className={`px-3 py-2 font-medium text-sm rounded-t-lg flex items-center ${
                 activeTab === 'overview'
-                  ? 'text-indigo-700 font-bold bg-indigo-50'
-                  : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
+                  ? 'text-indigo-700 font-bold border-b-2 border-indigo-500'
+                  : 'text-gray-500 hover:text-gray-800'
               }`}
             >
-              <ChartBarIcon className="w-5 h-5 mr-2" />
+              <ChartBarIcon className="w-4 h-4 mr-1" />
               종합분석
             </button>
             <button
               onClick={() => setActiveTab('students-1')}
-              className={`px-4 py-3 font-medium text-sm mr-2 rounded-t-lg flex items-center ${
+              className={`px-3 py-2 font-medium text-sm rounded-t-lg flex items-center ${
                 activeTab === 'students-1'
-                  ? 'text-indigo-700 font-bold bg-indigo-50'
-                  : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
+                  ? 'text-indigo-700 font-bold border-b-2 border-indigo-500'
+                  : 'text-gray-500 hover:text-gray-800'
               }`}
             >
-              <UserGroupIcon className="w-5 h-5 mr-2" />
+              <UserGroupIcon className="w-4 h-4 mr-1" />
               학생분석 1
             </button>
             <button
               onClick={() => setActiveTab('students-2')}
-              className={`px-4 py-3 font-medium text-sm mr-2 rounded-t-lg flex items-center ${
+              className={`px-3 py-2 font-medium text-sm rounded-t-lg flex items-center ${
                 activeTab === 'students-2'
-                  ? 'text-indigo-700 font-bold bg-indigo-50'
-                  : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
+                  ? 'text-indigo-700 font-bold border-b-2 border-indigo-500'
+                  : 'text-gray-500 hover:text-gray-800'
               }`}
             >
-              <UserGroupIcon className="w-5 h-5 mr-2" />
+              <UserGroupIcon className="w-4 h-4 mr-1" />
               학생분석 2
             </button>
             <button
               onClick={() => setActiveTab('students-3')}
-              className={`px-4 py-3 font-medium text-sm rounded-t-lg flex items-center ${
+              className={`px-3 py-2 font-medium text-sm rounded-t-lg flex items-center ${
                 activeTab === 'students-3'
-                  ? 'text-indigo-700 font-bold bg-indigo-50'
-                  : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
+                  ? 'text-indigo-700 font-bold border-b-2 border-indigo-500'
+                  : 'text-gray-500 hover:text-gray-800'
               }`}
             >
-              <UserGroupIcon className="w-5 h-5 mr-2" />
+              <UserGroupIcon className="w-4 h-4 mr-1" />
               학생분석 3
             </button>
+            <button
+              onClick={() => setActiveTab('students-4')}
+              className={`px-3 py-2 font-medium text-sm rounded-t-lg flex items-center ${
+                activeTab === 'students-4'
+                  ? 'text-indigo-700 font-bold border-b-2 border-indigo-500'
+                  : 'text-gray-500 hover:text-gray-800'
+              }`}
+            >
+              <UserGroupIcon className="w-4 h-4 mr-1" />
+              학생분석 4
+            </button>
+            <button
+              onClick={() => setActiveTab('students-5')}
+              className={`px-3 py-2 font-medium text-sm rounded-t-lg flex items-center ${
+                activeTab === 'students-5'
+                  ? 'text-indigo-700 font-bold border-b-2 border-indigo-500'
+                  : 'text-gray-500 hover:text-gray-800'
+              }`}
+            >
+              <UserGroupIcon className="w-4 h-4 mr-1" />
+              학생분석 5
+            </button>
+            <button
+              onClick={() => setActiveTab('students-6')}
+              className={`px-3 py-2 font-medium text-sm rounded-t-lg flex items-center ${
+                activeTab === 'students-6'
+                  ? 'text-indigo-700 font-bold border-b-2 border-indigo-500'
+                  : 'text-gray-500 hover:text-gray-800'
+              }`}
+            >
+              <UserGroupIcon className="w-4 h-4 mr-1" />
+              학생분석 6
+            </button>
+            <button
+              onClick={() => setActiveTab('students-7')}
+              className={`px-3 py-2 font-medium text-sm rounded-t-lg flex items-center ${
+                activeTab === 'students-7'
+                  ? 'text-indigo-700 font-bold border-b-2 border-indigo-500'
+                  : 'text-gray-500 hover:text-gray-800'
+              }`}
+            >
+              <UserGroupIcon className="w-4 h-4 mr-1" />
+              학생분석 7
+            </button>
+            <button
+              onClick={() => setActiveTab('students-8')}
+              className={`px-3 py-2 font-medium text-sm rounded-t-lg flex items-center ${
+                activeTab === 'students-8'
+                  ? 'text-indigo-700 font-bold border-b-2 border-indigo-500'
+                  : 'text-gray-500 hover:text-gray-800'
+              }`}
+            >
+              <UserGroupIcon className="w-4 h-4 mr-1" />
+              학생분석 8
+            </button>
           </div>
-          <div className={`mt-3 p-3 rounded-md ${activeTab === 'overview' ? 'bg-indigo-50 text-indigo-700' : activeTab.startsWith('students') ? 'bg-indigo-50 text-indigo-700' : 'bg-gray-50 text-gray-800'}`}>
+          <div className={`mt-3 p-3 rounded-md border border-gray-200 text-gray-700`}>
             <div className="flex items-center">
               {activeTab === 'overview' ? (
                 <ChartBarIcon className="w-5 h-5 mr-2 flex-shrink-0" />
-              ) : activeTab === 'students-1' || activeTab === 'students-2' || activeTab === 'students-3' ? (
+              ) : activeTab === 'students-1' || activeTab === 'students-2' || activeTab === 'students-3' || activeTab === 'students-4' || activeTab === 'students-5' || activeTab === 'students-6' || activeTab === 'students-7' || activeTab === 'students-8' ? (
                 <UserGroupIcon className="w-5 h-5 mr-2 flex-shrink-0" />
               ) : (
                 <UserGroupIcon className="w-5 h-5 mr-2 flex-shrink-0" />
@@ -464,7 +1031,12 @@ export default function AnalysisDetailPage() {
                 {activeTab === 'overview' ? '전체 학급에 대한 종합 분석 결과를 확인합니다. 학급 내 관계 패턴, 네트워크 구조, 그리고 사회적 역학에 대한 통찰을 제공합니다.' :
                 activeTab === 'students-1' ? '학생 그룹 1에 대한 개별 분석 결과를 확인합니다. 각 학생의 관계 현황, 강점 및 개선 가능한 영역을 확인할 수 있습니다.' :
                 activeTab === 'students-2' ? '학생 그룹 2에 대한 개별 분석 결과를 확인합니다. 각 학생의 관계 현황, 강점 및 개선 가능한 영역을 확인할 수 있습니다.' :
-                '학생 그룹 3에 대한 개별 분석 결과를 확인합니다. 각 학생의 관계 현황, 강점 및 개선 가능한 영역을 확인할 수 있습니다.'}
+                activeTab === 'students-3' ? '학생 그룹 3에 대한 개별 분석 결과를 확인합니다. 각 학생의 관계 현황, 강점 및 개선 가능한 영역을 확인할 수 있습니다.' :
+                activeTab === 'students-4' ? '학생 그룹 4에 대한 개별 분석 결과를 확인합니다. 각 학생의 관계 현황, 강점 및 개선 가능한 영역을 확인할 수 있습니다.' :
+                activeTab === 'students-5' ? '학생 그룹 5에 대한 개별 분석 결과를 확인합니다. 각 학생의 관계 현황, 강점 및 개선 가능한 영역을 확인할 수 있습니다.' :
+                activeTab === 'students-6' ? '학생 그룹 6에 대한 개별 분석 결과를 확인합니다. 각 학생의 관계 현황, 강점 및 개선 가능한 영역을 확인할 수 있습니다.' :
+                activeTab === 'students-7' ? '학생 그룹 7에 대한 개별 분석 결과를 확인합니다. 각 학생의 관계 현황, 강점 및 개선 가능한 영역을 확인할 수 있습니다.' :
+                '학생 그룹 8에 대한 개별 분석 결과를 확인합니다. 각 학생의 관계 현황, 강점 및 개선 가능한 영역을 확인할 수 있습니다.'}
               </p>
             </div>
           </div>
@@ -472,7 +1044,7 @@ export default function AnalysisDetailPage() {
         
         {/* 분석 결과 내용 */}
         {isLoading || isRunning ? (
-          <div className="bg-white rounded-lg shadow-md p-6 flex flex-col justify-center items-center min-h-[400px] border border-indigo-100">
+          <div className="bg-white rounded-lg shadow-md p-6 flex flex-col justify-center items-center min-h-[400px] border border-gray-200">
             <div className="mb-6 relative">
               <div className="w-20 h-20 rounded-full border-t-4 border-b-4 border-indigo-500 animate-spin"></div>
               <div className="absolute inset-0 flex items-center justify-center">
@@ -482,12 +1054,12 @@ export default function AnalysisDetailPage() {
             <div className="text-xl text-indigo-700 font-semibold mb-3 text-center">
               {isRunning ? 'AI 분석을 실행 중입니다...' : '분석 결과 로딩 중...'}
             </div>
-            <div className="text-sm text-indigo-600 text-center max-w-md">
+            <div className="text-sm text-gray-600 text-center max-w-md">
               {isRunning ? 
                 '분석에는 약 1~2분이 소요됩니다. 대량의 학생 데이터를 처리하는 과정이라 시간이 다소 걸리니 잠시만 기다려주세요.' : 
                 `${getTabTitle(activeTab)} 결과를 불러오고 있습니다...`}
             </div>
-            <div className="mt-8 relative w-full max-w-md h-2 bg-indigo-100 rounded-full overflow-hidden">
+            <div className="mt-8 relative w-full max-w-md h-2 bg-gray-100 rounded-full overflow-hidden">
               <div className="absolute top-0 left-0 h-full bg-indigo-500 animate-loading-bar"></div>
             </div>
             <style jsx>{`
@@ -503,7 +1075,7 @@ export default function AnalysisDetailPage() {
             `}</style>
           </div>
         ) : activeAnalysis ? (
-          <div className="bg-white rounded-lg shadow-md p-10 relative">
+          <div className="bg-white rounded-lg shadow-md p-6 relative">
             <button 
               onClick={() => {
                 if (activeAnalysis) {
@@ -522,51 +1094,275 @@ export default function AnalysisDetailPage() {
               </div>
               <span className="text-sm text-gray-700">복사</span>
             </button>
-            <div className="prose prose-headings:text-black prose-headings:font-extrabold prose-headings:mb-6 prose-h1:text-3xl prose-h2:text-2xl prose-h3:text-xl prose-p:text-black prose-p:mb-6 prose-p:leading-7 prose-li:text-black prose-li:mb-2 prose-strong:font-bold prose-ul:mb-6 prose-ol:mb-6 max-w-none text-black leading-8" style={{ color: 'black !important' }}>
+            <div className="prose max-w-none text-black">
               <style>{`
+                /* 기본 텍스트 스타일 설정 */
                 .prose * {
                   color: black !important;
+                  font-size: 1rem !important;
+                  line-height: 1.6 !important;
+                  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
                 }
-                .prose h1 {
-                  font-size: 2.75rem !important;
-                  font-weight: 900 !important;
-                  margin-top: 2.5rem !important;
-                  margin-bottom: 1.75rem !important;
-                }
-                .prose h2 {
-                  font-size: 1.6rem !important;
-                  font-weight: 800 !important;
-                  margin-top: 2rem !important;
-                  margin-bottom: 1.5rem !important;
-                }
-                .prose h3 {
-                  font-size: 1.75rem !important;
+                
+                /* 모든 제목 크기와 스타일 통일 */
+                .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+                  font-size: 1rem !important;
                   font-weight: 700 !important;
-                  margin-top: 1.75rem !important;
-                  margin-bottom: 1.25rem !important;
+                  margin-top: 1.5rem !important;
+                  margin-bottom: 0.5rem !important;
+                  padding-bottom: 0.3rem !important;
+                  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
                 }
-                .prose p, .prose li, .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6, .prose strong, .prose em, .prose blockquote, .prose code, .prose pre {
-                  color: black !important;
-                }
-                .prose p {
-                  font-size: 1.125rem !important;
-                  margin-bottom: 1.5rem !important;
-                  line-height: 1.9 !important;
-                }
-                .prose li {
-                  font-size: 1.125rem !important;
-                  margin-bottom: 0.85rem !important;
-                  line-height: 1.75 !important;
-                }
-                /* 학생 이름 강조 (### 다음의 이름) */
-                .prose h3 + p strong:first-child, 
-                .prose h3 strong:first-child,
-                .prose h3 strong {
+                
+                /* 제목 계층별 밑줄 스타일만 차별화 */
+                /* 학생 이름을 위한 h1 스타일 */
+                .prose h1 {
                   font-size: 1.5rem !important;
-                  font-weight: 800 !important;
+                  font-weight: 700 !important;
+                  color: #4338ca !important;
+                  border-bottom: 2px solid #4338ca !important;
+                  margin-top: 2.5rem !important;
+                  margin-bottom: 1rem !important;
+                  padding-bottom: 0.5rem !important;
+                }
+                
+                .prose h2 {
+                  border-bottom: 1px solid #e5e7eb !important;
+                }
+                
+                .prose h3 {
+                  border-bottom: 1px dotted #e5e7eb !important;
+                }
+                
+                /* 숫자가 달린 소제목과 학생 이름 모두 파란색으로 통일 */
+                .prose h1, .prose h2, .prose h3,
+                .prose h1 strong, 
+                .prose h2 strong,
+                .prose h3 strong,
+                .prose strong {
+                  color: #4338ca !important; /* 파란색(#2563eb)에서 보라색(#4338ca)으로 변경 */
+                  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+                }
+                
+                /* 일관된 단락 스타일 */
+                .prose p {
+                  margin-top: 0.75rem !important;
+                  margin-bottom: 0.75rem !important;
+                  line-height: 1.6 !important;
+                  text-align: justify !important;
+                }
+                
+                /* 목록 스타일 통일 */
+                .prose ul, .prose ol {
+                  margin-top: 0.5rem !important;
+                  margin-bottom: 0.5rem !important;
+                  padding-left: 1.5rem !important;
+                }
+                
+                .prose li {
+                  margin-top: 0.3rem !important;
+                  margin-bottom: 0.3rem !important;
+                  line-height: 1.5 !important;
+                }
+                
+                /* 단기/중기/장기 계획 스타일 통일 */
+                .prose p:has(strong:contains("단기(1-2주)")) {
+                  border-left: 3px solid #3b82f6 !important;
+                  padding-left: 0.75rem !important;
+                  margin: 0.75rem 0 !important;
+                  background-color: #f9fafb !important;
+                  padding: 0.5rem 0.75rem !important;
+                }
+                
+                .prose p:has(strong:contains("중기(1-2개월)")) {
+                  border-left: 3px solid #8b5cf6 !important;
+                  padding-left: 0.75rem !important;
+                  margin: 0.75rem 0 !important;
+                  background-color: #f9fafb !important;
+                  padding: 0.5rem 0.75rem !important;
+                }
+                
+                .prose p:has(strong:contains("장기(학기 전체)")) {
+                  border-left: 3px solid #10b981 !important;
+                  padding-left: 0.75rem !important;
+                  margin: 0.75rem 0 !important;
+                  background-color: #f9fafb !important;
+                  padding: 0.5rem 0.75rem !important;
+                }
+                
+                /* 하위 섹션 제목 스타일 통일 */
+                .prose p:has(strong:first-child) {
+                  margin-top: 1rem !important;
+                  font-weight: 600 !important;
+                }
+                
+                /* 심리적 특성 분석 등 주요 섹션 제목 강조 */
+                p:has(strong:contains("심리적 특성 분석")),
+                p:has(strong:contains("심리적 특성 및 발달 단계 분석")),
+                p:has(strong:contains("성격 유형 및 행동 패턴")),
+                p:has(strong:contains("관계 분석")),
+                p:has(strong:contains("사회적 위치와 영향력")),
+                p:has(strong:contains("관계 패턴 및 주요 교우 관계")),
+                p:has(strong:contains("강점과 과제")),
+                p:has(strong:contains("강점과 잠재력")),
+                p:has(strong:contains("직면한 어려움 또는 도전 과제")),
+                p:has(strong:contains("발전을 위한 구체적 제안")) {
+                  background-color: #f3f4f6 !important;
+                  padding: 0.5rem 0.75rem !important;
+                  border-radius: 0.25rem !important;
+                  margin-top: 1.25rem !important;
+                  font-weight: 700 !important;
+                }
+                
+                /* 볼드체 강조 일관성 */
+                .prose strong {
+                  font-weight: 700 !important;
+                  color: #4b5563 !important;
+                }
+                
+                /* 링크 스타일 통일 */
+                .prose a {
+                  color: #4338ca !important; /* 파란색(#2563eb)에서 보라색(#4338ca)으로 변경 */
+                  text-decoration: underline !important;
+                  font-weight: 500 !important;
+                }
+                
+                /* 구분선 스타일 */
+                .prose hr {
+                  margin: 1.5rem 0 !important;
+                  border-color: #e5e7eb !important;
+                  border-width: 1px !important;
+                }
+                
+                /* 학생분석 섹션 간 간격 통일 */
+                .prose > * + * {
+                  margin-top: 1rem !important;
+                }
+                
+                /* 인용구 스타일 통일 */
+                .prose blockquote {
+                  border-left: 4px solid #d1d5db !important;
+                  margin: 1rem 0 !important;
+                  padding-left: 1rem !important;
+                  font-style: italic !important;
+                  color: #6b7280 !important;
+                }
+                
+                /* 코드 블록 스타일 통일 */
+                .prose pre {
+                  background-color: #f3f4f6 !important;
+                  padding: 1rem !important;
+                  border-radius: 0.375rem !important;
+                  overflow-x: auto !important;
+                }
+                
+                /* 인라인 코드 스타일 */
+                .prose code {
+                  background-color: #f3f4f6 !important;
+                  padding: 0.2rem 0.4rem !important;
+                  border-radius: 0.25rem !important;
+                  font-size: 0.875rem !important;
+                }
+                
+                /* 전체 컨테이너 패딩 */
+                .prose {
+                  padding: 1rem !important;
+                }
+
+                /* 활동명, 목적 등의 키워드 스타일 */
+                .prose span[style*="color: #4338ca"] {
+                  font-family: 'Pretendard', sans-serif !important;
+                  font-weight: bold !important;
+                  display: inline-block !important;
+                }
+                
+                /* 활동명, 목적 등 키워드 관련 태그 직접 지정 */
+                span[style*="활동명"], span[style*="목적"], span[style*="방법"], 
+                span[style*="준비물"], span[style*="진행 방법"], span[style*="소요시간"],
+                span[style*="기대효과"], span[style*="참고자료"] {
+                  font-family: 'Pretendard', sans-serif !important;
+                  font-weight: bold !important;
+                  color: #4338ca !important;
+                }
+                
+                /* 보라색으로 표시되는 모든 텍스트 */
+                [style*="color: #4338ca"] {
+                  font-family: 'Pretendard', sans-serif !important;
                 }
               `}</style>
-              <ReactMarkdown>
+              <ReactMarkdown rehypePlugins={[rehypeRaw]}
+                components={{
+                  // h1, h2: 보라색 제목 렌더링
+                  h1: ({ node, ...props }) => {
+                    const text = props.children?.toString() || '';
+                    // 학생 이름을 위한 특별 스타일링 (모든 h1 태그 적용)
+                    return (
+                      <h1 style={{ 
+                        color: '#4338ca', 
+                        fontWeight: 'bold',
+                        fontSize: '1.5rem',
+                        fontFamily: 'Pretendard, sans-serif !important',
+                        borderBottom: '2px solid #4338ca',
+                        marginTop: '2.5rem',
+                        marginBottom: '1rem',
+                        paddingBottom: '0.5rem'
+                      }} {...props} />
+                    );
+                  },
+                  h2: ({ node, ...props }) => {
+                    const text = props.children?.toString() || '';
+                    // 숫자로 시작하는 타이틀인지 확인 (예: "1. 학급 전체 분석", "6.1 학급 환경 개선")
+                    if (/^\d+(\.\d+)?\./.test(text)) {
+                      return (
+                        <h2 style={{ 
+                          color: '#4338ca', 
+                          fontWeight: 'bold',
+                          fontFamily: 'Pretendard, sans-serif !important',
+                          borderBottom: '1px solid #e5e7eb',
+                          marginTop: '1.5rem',
+                          marginBottom: '0.5rem',
+                          paddingBottom: '0.3rem'
+                        }} {...props} />
+                      );
+                    }
+                    return <h2 {...props} />;
+                  },
+                  p: ({ node, ...props }) => {
+                    const text = props.children?.toString() || '';
+                    
+                    // 목적, 방법, 기대효과, 참고자료가 포함된 텍스트를 찾아 스타일 적용
+                    const keyItems = ['목적', '방법', '기대효과', '참고자료', '활동명', '준비물', '진행 방법', '소요시간'];
+                    for (const item of keyItems) {
+                      if (text.startsWith(`${item}:`) || text.includes(`${item}: `)) {
+                        // 라벨과 내용 분리
+                        const colonIndex = text.indexOf(':');
+                        if (colonIndex !== -1) {
+                          const label = text.substring(0, colonIndex + 1);
+                          const content = text.substring(colonIndex + 1);
+                          
+                          // 스타일이 적용된 라벨과 내용을 결합해 반환
+                          return (
+                            <p>
+                              <span style={{ 
+                                color: '#4338ca', 
+                                fontWeight: 'bold',
+                                fontFamily: 'Pretendard, sans-serif !important',
+                                display: 'inline-block'
+                              }}>
+                                {label}
+                              </span>
+                              {content}
+                            </p>
+                          );
+                        }
+                      }
+                    }
+                    
+                    // 일반 텍스트는 그대로 반환
+                    return <p {...props} />;
+                  },
+                }}
+              >
                 {getFormattedContent(activeAnalysis)}
               </ReactMarkdown>
             </div>

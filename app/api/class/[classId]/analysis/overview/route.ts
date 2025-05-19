@@ -16,6 +16,11 @@ export async function POST(
   try {
     const { classId } = context.params;
     
+    // 요청 본문에서 session_id 추출
+    const requestData = await request.json().catch(() => ({}));
+    const sessionId = requestData.session_id || null;
+    console.log('[종합분석 API] 세션 ID:', sessionId);
+    
     // Supabase 클라이언트 생성
     const cookieStore = cookies();
     console.log('[종합분석 API] 쿠키 스토어 생성됨');
@@ -256,24 +261,8 @@ export async function POST(
       // 분석 결과 저장
       console.log('[종합분석 API] 분석 결과 저장 시작');
       
-      // 요약 생성 - 텍스트 응답에서 처음 200자를 요약으로 사용
+      // 요약 필드를 빈 문자열로 설정하여 사용자가 직접 입력하도록 유도
       let summary = '';
-      if (typeof analysisResult === 'string') {
-        summary = analysisResult.substring(0, 200) + '...';
-      } else {
-        // 객체인 경우 (이전 형식과의 호환성 유지)
-        try {
-          const result = analysisResult as any;
-          if (result && typeof result.analysis === 'string') {
-            summary = result.analysis.substring(0, 200) + '...';
-          } else {
-            summary = '종합 분석 결과 요약 (자세한 내용은 상세 페이지 참조)';
-          }
-        } catch (e) {
-          summary = '종합 분석 결과 요약 (자세한 내용은 상세 페이지 참조)';
-          console.warn('[종합분석 API] 분석 결과 요약 생성 중 오류:', e);
-        }
-      }
       
       // 결과 저장 준비 - 문자열로 변환
       const resultToSave = typeof analysisResult === 'string' 
@@ -285,7 +274,8 @@ export async function POST(
         analysisResultType: typeof analysisResult,
         isString: typeof analysisResult === 'string',
         isObject: typeof analysisResult === 'object',
-        resultToSaveType: typeof resultToSave
+        resultToSaveType: typeof resultToSave,
+        sessionId
       });
       
       // 결과를 명시적으로 JSON 문자열로 변환하여 저장
@@ -297,7 +287,8 @@ export async function POST(
             class_id: classId,
             result_data: resultToSave,
             summary: summary,
-            type: 'overview' // 분석 유형 지정
+            type: 'overview', // 분석 유형 지정
+            session_id: sessionId // 세션 ID 추가
           }
         ])
         .select()

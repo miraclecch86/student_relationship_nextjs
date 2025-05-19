@@ -9,7 +9,7 @@ export async function POST(
   request: NextRequest,
   context: any
 ) {
-  console.log('[POST API] 호출됨, context.params:', context.params);
+  console.log('[POST API] 호출됨, params:', context.params);
   
   try {
     const { classId } = context.params;
@@ -254,24 +254,8 @@ export async function POST(
       // 분석 결과 저장
       console.log('[POST API] 분석 결과 저장 시작');
       
-      // 요약 생성 - 텍스트 응답에서 처음 200자를 요약으로 사용
+      // 요약 필드를 빈 문자열로 설정하여 사용자가 직접 입력하도록 유도
       let summary = '';
-      if (typeof analysisResult === 'string') {
-        summary = analysisResult.substring(0, 200) + '...';
-      } else {
-        // 객체인 경우 (이전 형식과의 호환성 유지)
-        try {
-          const result = analysisResult as any;
-          if (result && typeof result.analysis === 'string') {
-            summary = result.analysis.substring(0, 200) + '...';
-          } else {
-            summary = '분석 결과 요약 (자세한 내용은 상세 페이지 참조)';
-          }
-        } catch (e) {
-          summary = '분석 결과 요약 (자세한 내용은 상세 페이지 참조)';
-          console.warn('[POST API] 분석 결과 요약 생성 중 오류:', e);
-        }
-      }
       
       // 결과 저장 준비 - 문자열로 변환
       const resultToSave = typeof analysisResult === 'string' 
@@ -347,10 +331,17 @@ export async function GET(
 ) {
   console.log('[GET API] 호출됨, context.params:', context.params);
   
-  // 쿼리 파라미터에서 type 가져오기
-  const searchParams = request.nextUrl.searchParams;
+  // URL 파라미터 가져오기
+  const { searchParams } = request.nextUrl;
+  console.log('[GET API] 검색 파라미터:', searchParams.toString());
+  
+  // 타입 필터
   const typeFilter = searchParams.get('type');
   console.log('[GET API] 타입 필터:', typeFilter);
+  
+  // 세션별 그룹화
+  const groupBySession = searchParams.get('group_by_session') === 'true';
+  console.log('[GET API] 세션별 그룹화:', groupBySession);
   
   try {
     const { classId } = context.params;
@@ -417,7 +408,7 @@ export async function GET(
     // 분석 결과 목록 조회
     console.log('[GET API] 분석 결과 목록 조회 시작');
     
-    // 쿼리 생성 (기본: .from('analysis_results').select('*').eq('class_id', classId))
+    // 모든 결과를 가져옴
     let query = supabase
       .from('analysis_results')
       .select('*')
@@ -433,7 +424,7 @@ export async function GET(
     query = query.order('created_at', { ascending: false });
     
     // 쿼리 실행
-    const { data: analysisResults, error: resultsError } = await query;
+    const { data: allResults, error: resultsError } = await query;
 
     if (resultsError) {
       console.error('[GET API] 분석 결과 조회 오류:', resultsError);
@@ -442,11 +433,163 @@ export async function GET(
         { status: 500 }
       );
     }
-    console.log('[GET API] 분석 결과 조회 완료, 결과 수:', analysisResults ? analysisResults.length : 0);
     
-    return NextResponse.json(analysisResults || []);
+    // 세션별 그룹화가 필요한 경우
+    if (groupBySession && allResults) {
+      console.log('[GET API] 세션별 그룹화 적용');
+      
+      // 세션별로 그룹화
+      const sessionGroups: { [key: string]: any[] } = {};
+      const regularResults: any[] = [];
+      
+      allResults.forEach(result => {
+        if (result.session_id) {
+          if (!sessionGroups[result.session_id]) {
+            sessionGroups[result.session_id] = [];
+          }
+          sessionGroups[result.session_id].push(result);
+        } else {
+          // session_id가 없는 기존 결과는 그대로 유지
+          regularResults.push(result);
+        }
+      });
+      
+      // 각 세션의 첫 번째 분석 결과만 카드로 표시하기 위해 처리
+      // 각 세션마다 하나의 카드만 보여주지만, 이 카드의 ID로 세션의 모든 분석에 접근 가능
+      const groupedResults = Object.values(sessionGroups).map(group => {
+        // 분석 결과들을 생성 날짜 역순으로 정렬 (최신 결과가 먼저 오도록)
+        group.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        
+        // 세션 내에서 표시될 대표 카드 선택 (우선순위: overview > 첫 번째 결과)
+        // 이 카드의 ID를 통해 같은 세션의 다른 분석 결과에 접근 가능
+        const overviewResult = group.find(r => r.type === 'overview');
+        return overviewResult || group[0];
+      });
+      
+      // 세션별 결과와 일반 결과 합치기
+      const finalResults = [...groupedResults, ...regularResults];
+      // 날짜 기준 내림차순 정렬
+      finalResults.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      
+      console.log('[GET API] 분석 결과 조회 완료, 그룹화 전 결과 수:', allResults.length, '그룹화 후 결과 수:', finalResults.length);
+      return NextResponse.json(finalResults);
+    }
+    
+    // 일반 결과 반환
+    console.log('[GET API] 분석 결과 조회 완료, 결과 수:', allResults ? allResults.length : 0);
+    return NextResponse.json(allResults || []);
   } catch (error: any) {
     console.error('[GET API] 예외 발생:', error);
+    return NextResponse.json(
+      { error: `서버 오류: ${error.message}`, stack: error.stack },
+      { status: 500 }
+    );
+  }
+}
+
+// 분석 결과 삭제 API
+export async function DELETE(
+  request: NextRequest,
+  context: any
+) {
+  console.log('[DELETE API] 호출됨, params:', context.params);
+  
+  // 전체 삭제 여부 확인
+  const searchParams = request.nextUrl.searchParams;
+  const deleteAll = searchParams.get('deleteAll') === 'true'; // 전체 삭제 여부
+  console.log('[DELETE API] 전체 삭제 요청:', deleteAll);
+  
+  try {
+    const { classId } = context.params;
+    
+    // Supabase 클라이언트 생성
+    const cookieStore = cookies();
+    console.log('[DELETE API] 쿠키 스토어 생성됨');
+    
+    const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
+    console.log('[DELETE API] Supabase 클라이언트 생성됨');
+
+    // 인증 확인
+    console.log('[DELETE API] 인증 세션 확인 시작');
+    const { data: { session }, error: authError } = await supabase.auth.getSession();
+    if (authError) {
+      console.error('[DELETE API] 인증 오류:', authError);
+      return NextResponse.json(
+        { error: '인증되지 않은 사용자입니다.' },
+        { status: 401 }
+      );
+    }
+    
+    if (!session) {
+      console.error('[DELETE API] 세션이 존재하지 않음');
+      return NextResponse.json(
+        { error: '인증되지 않은 사용자입니다.' },
+        { status: 401 }
+      );
+    }
+    console.log('[DELETE API] 인증 확인 완료, 사용자 ID:', session.user.id);
+
+    // 학급 소유권 확인
+    const { data: classData, error: classError } = await supabase
+      .from('classes')
+      .select('user_id')
+      .eq('id', classId)
+      .single();
+
+    if (classError) {
+      console.error('[DELETE API] 학급 조회 오류:', classError);
+      return NextResponse.json(
+        { error: '학급을 찾을 수 없습니다.' },
+        { status: 404 }
+      );
+    }
+    
+    if (!classData) {
+      console.error('[DELETE API] 학급 데이터가 null임');
+      return NextResponse.json(
+        { error: '학급을 찾을 수 없습니다.' },
+        { status: 404 }
+      );
+    }
+
+    if (classData.user_id !== session.user.id) {
+      console.log('[DELETE API] 권한 없음. 학급 소유자:', classData.user_id, '요청자:', session.user.id);
+      return NextResponse.json(
+        { error: '학급에 대한 권한이 없습니다.' },
+        { status: 403 }
+      );
+    }
+    console.log('[DELETE API] 학급 권한 확인 완료');
+
+    // 전체 삭제 요청인 경우
+    if (deleteAll) {
+      console.log('[DELETE API] 모든 분석 결과 삭제 시작');
+      
+      // 해당 클래스의 모든 분석 결과 삭제
+      const { error: deleteError } = await supabase
+        .from('analysis_results')
+        .delete()
+        .eq('class_id', classId);
+      
+      if (deleteError) {
+        console.error('[DELETE API] 모든 분석 결과 삭제 오류:', deleteError);
+        return NextResponse.json(
+          { error: '분석 결과를 삭제하는 중 오류가 발생했습니다.' },
+          { status: 500 }
+        );
+      }
+      
+      console.log('[DELETE API] 모든 분석 결과 삭제 완료');
+      return NextResponse.json({ success: true, message: '모든 분석 결과가 삭제되었습니다.' });
+    } else {
+      console.error('[DELETE API] 삭제할 분석 ID가 지정되지 않음');
+      return NextResponse.json(
+        { error: '삭제할 분석 ID 또는 전체 삭제 옵션을 지정해야 합니다.' },
+        { status: 400 }
+      );
+    }
+  } catch (error: any) {
+    console.error('[DELETE API] 예외 발생:', error);
     return NextResponse.json(
       { error: `서버 오류: ${error.message}`, stack: error.stack },
       { status: 500 }
