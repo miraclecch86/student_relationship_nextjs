@@ -227,7 +227,7 @@ export async function analyzeStudentRelationships(
           }
         ],
         temperature: 0.7,
-        max_tokens: 8000
+        max_tokens: 10000
       })
     });
 
@@ -305,7 +305,7 @@ export async function analyzeSurveyResults(
           }
         ],
         temperature: 0.5,
-        max_tokens: 1000,
+        max_tokens: 10000,
       })
     });
 
@@ -517,7 +517,7 @@ export async function analyzeClassOverview(
           }
         ],
         temperature: 0.7,
-        max_tokens: 8000
+        max_tokens: 10000
       })
     });
 
@@ -717,7 +717,7 @@ export async function analyzeStudentGroup(
           }
         ],
         temperature: 0.7,
-        max_tokens: 8000
+        max_tokens: 10000
       })
     });
 
