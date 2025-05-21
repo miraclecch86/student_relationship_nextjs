@@ -9,6 +9,7 @@ import {
   UserGroupIcon,
   ChartBarIcon,
   ArrowLeftIcon,
+  DocumentTextIcon,
 } from '@heroicons/react/24/outline';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -43,18 +44,18 @@ function DashboardCard({ title, description, icon, href, color }: DashboardCardP
   
   return (
     <motion.div
-      className="bg-white rounded-xl shadow-md overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
+      className="bg-white rounded-xl shadow-md overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300 hover:-translate-y-1 max-w-sm mx-auto"
       whileHover={{ scale: 1.02 }}
       onClick={() => router.push(href)}
     >
-      <div className={`${color} px-4 py-6 flex items-center justify-center`}>
-        <div className="bg-white/20 p-4 rounded-full">
+      <div className={`${color} px-3 py-4 flex items-center justify-center`}>
+        <div className="bg-white/20 p-3 rounded-full">
           {icon}
         </div>
       </div>
-      <div className="p-6">
-        <h3 className="text-xl font-bold mb-2 text-gray-800">{title}</h3>
-        <p className="text-gray-600">{description}</p>
+      <div className="p-5">
+        <h3 className="text-lg font-bold mb-1.5 text-gray-800">{title}</h3>
+        <p className="text-sm text-gray-600 line-clamp-3">{description}</p>
       </div>
     </motion.div>
   );
@@ -99,9 +100,9 @@ export default function ClassDashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <div className="max-w-screen-2xl mx-auto px-4 py-8">
+      <div className="max-w-screen-2xl mx-auto px-6 py-10">
         {/* 헤더 */}
-        <header className="mb-8 flex justify-between items-center bg-white p-4 rounded-lg shadow-md">
+        <header className="mb-10 flex justify-between items-center bg-white p-5 rounded-lg shadow-md">
           <div className="flex items-center gap-4">
             <button
               onClick={() => router.push('/teacher')}
@@ -115,12 +116,12 @@ export default function ClassDashboardPage() {
         </header>
 
         {/* 대시보드 카드 그리드 */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 px-2">
           {/* 설문 작성 카드 */}
           <DashboardCard
             title="설문 작성"
             description="학급 설문을 생성하고 관리합니다. 학생들의 관계를 파악하기 위한 설문을 만들어보세요."
-            icon={<ClipboardDocumentListIcon className="w-8 h-8 text-white" />}
+            icon={<ClipboardDocumentListIcon className="w-7 h-7 text-white" />}
             href={`/class/${classId}/survey`}
             color="bg-indigo-500"
           />
@@ -129,7 +130,7 @@ export default function ClassDashboardPage() {
           <DashboardCard
             title="학생 목록"
             description="학급의 학생들을 관리합니다. 학생을 추가, 수정, 삭제할 수 있습니다."
-            icon={<UserGroupIcon className="w-8 h-8 text-white" />}
+            icon={<UserGroupIcon className="w-7 h-7 text-white" />}
             href={`/class/${classId}/students`}
             color="bg-emerald-500"
           />
@@ -138,9 +139,18 @@ export default function ClassDashboardPage() {
           <DashboardCard
             title="학급 분석"
             description="AI 기반 학급 분석 결과를 확인합니다. 학생 관계에 대한 인사이트를 얻어보세요."
-            icon={<ChartBarIcon className="w-8 h-8 text-white" />}
+            icon={<ChartBarIcon className="w-7 h-7 text-white" />}
             href={`/class/${classId}/analysis`}
             color="bg-purple-500"
+          />
+          
+          {/* 쫑알쫑알 카드 (생활기록부) */}
+          <DashboardCard
+            title="쫑알쫑알"
+            description="학생별 생활기록부 문구를 AI로 생성합니다. 학생의 특성과 활동 내용을 반영한 맞춤형 문구를 작성해보세요."
+            icon={<DocumentTextIcon className="w-7 h-7 text-white" />}
+            href={`/class/${classId}/schoolrecord`}
+            color="bg-amber-500"
           />
         </div>
       </div>

@@ -480,7 +480,7 @@ export async function analyzeClassOverview(
     
     모든 제안에는 활동명, 목적, 준비물, 진행 방법, 소요시간, 기대효과, 발달심리학적/교육심리학적 근거 등을 포함하여 교사가 바로 실행할 수 있도록 구체적으로 작성해주세요. 이론적 제안보다는 실제 교실에서 즉시 활용 가능한 구체적인 활동에 중점을 두세요. 참고 자료 링크는 한국 교사들이 쉽게 접근할 수 있는 국내 교육 사이트를 중심으로 제공해주세요 (예: 에듀넷, 학교알리미, 교육부, 교육청, 한국교육개발원, 한국교육학술정보원, 아이스크림 등).
     
-    보고서는 마크다운 형식을 활용하여 구조화하고, 헤더(#, ##, ###)와 목록(-, *)을 적절히 사용하여 가독성을 높여주세요. 각 섹션별로 핵심 요약을 먼저 제시한 후 상세 내용을 전개하는 방식으로 구성하여 쉽게 읽을 수 있게 해주세요. 중요한 인사이트나 제안은 **강조 표시**를 활용하여 눈에 띄게 만들어주세요.`;
+    보고서는 마크다운 형식을 활용하여 구조화하고, 헤더(#, ##, ###, ####, #####)와 목록(-, *)을 적절히 사용하여 가독성을 높여주세요. 각 섹션별로 핵심 요약을 먼저 제시한 후 상세 내용을 전개하는 방식으로 구성하여 쉽게 읽을 수 있게 해주세요. 중요한 인사이트나 제안은 **강조 표시**를 활용하여 눈에 띄게 만들어주세요.`;
 
     const userContent = `다음 데이터를 기반으로 학급 전체에 대한 분석을 진행해주세요: 
     ${JSON.stringify(analysisData, null, 2)}`;
@@ -655,6 +655,148 @@ export async function analyzeStudentGroup(
     return await callOpenAI(OPENAI_MODEL, systemPrompt, userContent, 0.7, 10000);
   } catch (error: any) {
     console.error(`analyzeStudentGroup(${groupIndex}) API 호출 오류:`, error);
+    throw error;
+  }
+}
+
+// 학생 생활기록부 문구 생성 함수
+export async function generateSchoolRecord(
+  students: Student[],
+  relationships: Relationship[],
+  answers?: Answer[],
+  questions?: Question[],
+  additionalData?: {
+    classDetails?: any,
+    surveys?: Survey[],
+    surveyData?: Array<{
+      survey: Survey,
+      relationships: Relationship[],
+      questions: Question[],
+      answers: Answer[]
+    }>
+  }
+): Promise<string> {
+  try {
+    // 분석에 필요한 데이터 준비
+    const analysisData = {
+      // 학급 정보
+      class: additionalData?.classDetails || { id: "unknown" },
+      
+      // 학생 정보
+      students: students.map(s => ({
+        id: s.id,
+        name: s.name,
+        gender: s.gender
+      })),
+      
+      // 기본 관계 정보 (설문과 연결되지 않은)
+      baseRelationships: relationships.map(r => ({
+        from: students.find(s => s.id === r.from_student_id)?.name || r.from_student_id,
+        to: students.find(s => s.id === r.to_student_id)?.name || r.to_student_id,
+        type: r.relation_type
+      })),
+      
+      // 기본 질문&응답 정보
+      questions: questions ? questions.map(q => ({
+        id: q.id,
+        text: q.question_text
+      })) : [],
+      
+      answers: answers ? answers.map(a => {
+        const question = questions?.find(q => q.id === a.question_id);
+        const student = students.find(s => s.id === a.student_id);
+        return {
+          student: student?.name || a.student_id,
+          question: question?.question_text || a.question_id,
+          answer: a.answer_text
+        };
+      }) : [],
+      
+      // 설문 정보
+      surveys: additionalData?.surveys?.map(survey => ({
+        id: survey.id,
+        name: survey.name,
+        description: survey.description,
+        created_at: survey.created_at
+      })) || [],
+      
+      // 설문별 상세 정보
+      surveyDetails: additionalData?.surveyData?.map(sd => {
+        return {
+          survey: {
+            id: sd.survey.id,
+            name: sd.survey.name,
+            description: sd.survey.description,
+            created_at: sd.survey.created_at
+          },
+          relationships: sd.relationships.map(r => ({
+            from: students.find(s => s.id === r.from_student_id)?.name || r.from_student_id,
+            to: students.find(s => s.id === r.to_student_id)?.name || r.to_student_id,
+            type: r.relation_type
+          })),
+          questions: sd.questions.map(q => ({
+            id: q.id,
+            text: q.question_text
+          })),
+          answers: sd.answers.map(a => {
+            const question = sd.questions.find(q => q.id === a.question_id);
+            const student = students.find(s => s.id === a.student_id);
+            return {
+              student: student?.name || a.student_id,
+              question: question?.question_text || a.question_id,
+              answer: a.answer_text
+            };
+          })
+        };
+      }) || []
+    };
+
+    const systemPrompt = `당신은 초등학교·중학교·고등학교 생활기록부 작성 경력이 20년 이상인 베테랑 교사입니다. 학생들에 대한 생활기록부 문구를 작성해주세요.
+    
+    제공된 학급 정보, 학생 목록, 관계 데이터, 설문지 응답 등을 종합적으로 분석하여 각 학생별로 약 500자 분량의 생활기록부 문구를 작성해주세요.
+    
+    생활기록부 문구는 다음 사항을 포함해야 합니다:
+    1. 학생의 성격, 행동 특성, 정서적 측면에 대한 객관적 서술
+    2. 교우 관계 및 학급 내 사회성 발달 상황
+    3. 학생의 강점과 특기사항
+    4. 학생의 태도, 가치관, 인성 등에 대한 관찰 내용
+    5. 미래 성장 가능성 및 발전 방향
+    
+    생활기록부 문구 작성 시 주의사항:
+    - 객관적인 사실을 바탕으로 기술하되, 긍정적인 서술어 사용
+    - 부정적 특성은 '발전 가능성'이나 '노력 중인 부분'으로 완곡하게 표현
+    - 구체적인 사례나 관찰 내용을 포함하여 신뢰성 높은 문구 작성
+    - 교육적 관점에서 학생의 성장을 지원하는 방향으로 서술
+    - 문법적으로 정확하고 맞춤법에 오류가 없도록 작성
+    - 교육 분야에서 사용되는 전문적인 용어를 적절히 활용
+    - 학생별로 비슷한 표현이 반복되지 않도록 다양한 어휘 사용
+    
+    다음 형식으로 결과를 제공해주세요:
+    
+    # 학생별 생활기록부 문구
+    
+    ## [학생1 이름]
+    
+    [학생1에 대한 500자 내외의 생활기록부 문구]
+    
+    ## [학생2 이름]
+    
+    [학생2에 대한 500자 내외의 생활기록부 문구]
+    
+    ## [학생3 이름]
+    
+    [학생3에 대한 500자 내외의 생활기록부 문구]
+    
+    ...
+    
+    모든 문구는 한글로 작성해야 합니다.`;
+
+    const userContent = `다음 데이터를 기반으로 각 학생별 생활기록부 문구를 작성해주세요: 
+    ${JSON.stringify(analysisData, null, 2)}`;
+
+    return await callOpenAI(OPENAI_MODEL, systemPrompt, userContent, 0.7, 10000);
+  } catch (error: any) {
+    console.error('생활기록부 생성 API 호출 오류:', error);
     throw error;
   }
 }

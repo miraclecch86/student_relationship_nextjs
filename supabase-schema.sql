@@ -432,3 +432,68 @@ DROP POLICY IF EXISTS "Users can delete surveys for their classes" ON public.sur
 CREATE POLICY "Users can delete surveys for their classes"
     ON public.surveys FOR DELETE
     USING (class_id IN (SELECT id FROM public.classes WHERE user_id = auth.uid()));
+
+-- ✅ 생활기록부 테이블
+CREATE TABLE IF NOT EXISTS public.school_records (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  class_id uuid REFERENCES public.classes(id) ON DELETE CASCADE,
+  result_data text NOT NULL,
+  summary text,
+  created_at timestamp with time zone DEFAULT now()
+);
+
+-- 인덱스 생성
+CREATE INDEX IF NOT EXISTS idx_school_records_class_id ON public.school_records(class_id);
+
+-- RLS 활성화
+ALTER TABLE public.school_records ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.school_records FORCE ROW LEVEL SECURITY;
+
+-- 생활기록부 테이블 RLS 정책 설정
+CREATE POLICY "Users can view their own school records"
+ON public.school_records FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1 FROM public.classes
+    WHERE classes.id = school_records.class_id
+    AND classes.user_id = auth.uid()
+  )
+);
+
+CREATE POLICY "Users can insert their own school records"
+ON public.school_records FOR INSERT
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.classes
+    WHERE classes.id = class_id
+    AND classes.user_id = auth.uid()
+  )
+);
+
+CREATE POLICY "Users can update their own school records"
+ON public.school_records FOR UPDATE
+USING (
+  EXISTS (
+    SELECT 1 FROM public.classes
+    WHERE classes.id = school_records.class_id
+    AND classes.user_id = auth.uid()
+  )
+);
+
+CREATE POLICY "Users can delete their own school records"
+ON public.school_records FOR DELETE
+USING (
+  EXISTS (
+    SELECT 1 FROM public.classes
+    WHERE classes.id = school_records.class_id
+    AND classes.user_id = auth.uid()
+  )
+);
+
+-- Supabase 테이블 주석 추가
+COMMENT ON TABLE public.school_records IS '학생 생활기록부 문구 저장 테이블';
+COMMENT ON COLUMN public.school_records.id IS '생활기록부 고유 식별자';
+COMMENT ON COLUMN public.school_records.class_id IS '관련 학급 ID';
+COMMENT ON COLUMN public.school_records.result_data IS 'AI가 생성한 생활기록부 내용 (마크다운 형식)';
+COMMENT ON COLUMN public.school_records.summary IS '사용자 정의 생활기록부 설명';
+COMMENT ON COLUMN public.school_records.created_at IS '생성 시간';
