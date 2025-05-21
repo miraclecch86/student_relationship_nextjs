@@ -268,8 +268,11 @@ function AnalysisCard({ analysis }: AnalysisCardProps) {
   const classId = params.classId as string;
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [description, setDescription] = useState(analysis.summary || '');
+  const [description, setDescription] = useState(analysis.summary || '편집 버튼을 눌러 설명을 입력하세요.');
   const [isSaving, setIsSaving] = useState(false);
+  
+  // 설명이 기본 텍스트인지 확인
+  const isDefaultDescription = description === '편집 버튼을 눌러 설명을 입력하세요.';
   
   const createdAt = new Date(analysis.created_at);
   const formattedDate = format(createdAt, 'yyyy년 MM월 dd일', { locale: ko });
@@ -328,7 +331,7 @@ function AnalysisCard({ analysis }: AnalysisCardProps) {
   
   const handleCancelEdit = (e: React.MouseEvent) => {
     e.stopPropagation(); // 카드 클릭 이벤트 전파 방지
-    setDescription(analysis.summary || '');
+    setDescription(analysis.summary || '편집 버튼을 눌러 설명을 입력하세요.');
     setIsEditing(false);
   };
   
@@ -340,7 +343,7 @@ function AnalysisCard({ analysis }: AnalysisCardProps) {
         layout
       >
         <div 
-          className={`${isEditing ? '' : 'cursor-pointer'} pb-6`} // 하단에 여백 추가하여 버튼 공간 확보
+          className={`${isEditing ? '' : 'cursor-pointer'} pb-6`}
           onClick={isEditing ? undefined : () => router.push(`/class/${classId}/analysis/${analysis.id}`)}
         >
           <div className="flex items-start justify-between">
@@ -367,7 +370,9 @@ function AnalysisCard({ analysis }: AnalysisCardProps) {
                 placeholder="이 분석에 대한 설명을 입력하세요..."
               />
             ) : (
-              <p className="text-sm text-black font-medium line-clamp-2">{description ? description : '설명을 추가해 주세요. 편집 버튼을 눌러 설명을 입력하세요.'}</p>
+              <p className={`text-sm font-medium line-clamp-2 ${isDefaultDescription ? 'text-gray-500 italic' : 'text-black'}`}>
+                {description}
+              </p>
             )}
           </div>
         </div>
@@ -477,12 +482,15 @@ async function updateAnalysisDescription(
   console.log(`분석 설명 업데이트 요청: classId=${classId}, analysisId=${analysisId}`);
   
   try {
+    // description이 기본 텍스트인 경우 빈 문자열로 처리
+    const summary = description === '편집 버튼을 눌러 설명을 입력하세요.' ? '' : description;
+    
     const response = await fetch(`/api/class/${classId}/analysis/${analysisId}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ summary: description }),
+      body: JSON.stringify({ summary }),
     });
     
     if (!response.ok) {
@@ -834,7 +842,7 @@ export default function ClassAnalysisPage() {
             <div>
               <h2 className="text-lg font-semibold text-gray-800 flex items-center">
                 <SparklesIcon className="w-5 h-5 text-indigo-500 mr-2" />
-                GPT 기반 학급 관계 분석
+                AI 기반 학급 관계 분석
               </h2>
               <p className="text-sm text-gray-600 mt-1">
                 학생들의 관계 데이터를 AI가 분석하여 학급 내 사회적 역학 구조와 관계 패턴을 파악합니다.

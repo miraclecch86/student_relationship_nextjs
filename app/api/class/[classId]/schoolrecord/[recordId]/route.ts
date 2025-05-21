@@ -172,7 +172,8 @@ export async function PATCH(
     const body = await request.json();
     const { summary } = body;
     
-    if (!summary) {
+    // summary가 undefined인 경우에만 오류 반환 (빈 문자열은 허용)
+    if (summary === undefined) {
       return NextResponse.json(
         { error: '설명 내용이 필요합니다.' },
         { status: 400 }

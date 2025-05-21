@@ -291,16 +291,6 @@ export default function SchoolRecordDetailPage() {
             </div>
           )}
         </div>
-        
-        {/* 원본 마크다운 보기 (개발 중에만 표시) */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">원본 마크다운 내용 (개발용)</h2>
-            <pre className="bg-gray-100 p-4 rounded-lg overflow-x-auto text-sm">
-              {schoolRecord.result_data}
-            </pre>
-          </div>
-        )}
       </div>
     </div>
   );

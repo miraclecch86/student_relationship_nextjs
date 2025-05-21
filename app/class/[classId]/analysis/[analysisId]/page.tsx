@@ -101,7 +101,7 @@ async function fetchLatestAnalysisResultByType(classId: string, type: string): P
   return data;
 }
 
-// 직접 GPT API를 호출하여 새 분석 실행하기
+// 직접 AI API를 호출하여 새 분석 실행하기
 async function runAnalysis(classId: string, type: string): Promise<AnalysisResult> {
   let url = '';
   
@@ -623,7 +623,7 @@ export default function AnalysisDetailPage() {
       // ===== 2. 하위 섹션 제목 스타일 통일화 =====
       // 종합분석의 하위 섹션 제목 변환 (전반적인 분위기 및 특징, 강점, 약점 등) - 모두 강조표시 
       content = content.replace(/^(전반적인 분위기 및 특징|강점|약점|심리적 역동성 및 집단적 성향)/gm, '## **$1**');
-      content = content.replace(/^(\d+\.\d+)\s*(학급 환경 및 분위기 개선 전략|교우 관계 촉진 프로그램)/gm, '## **$1 $2**');
+      content = content.replace(/^(\d+\.\d+)\s*(학급 환경 및 분위기 개선 전략|교우 관계 촉진 프로그램|고립 및 취약 학생 지원 방안|학급 리더십 및 긍정적 영향력 개발)/gm, '## **$1 $2**');
       
       // 모든 숫자 시작 제목 변환 (1. 학급 전체 분석, 2. 학생 간 관계 분석 등)
       content = content.replace(/^(\d+)\.\s*([^\n]+)/gm, '## **$1. $2**');
@@ -687,7 +687,7 @@ export default function AnalysisDetailPage() {
         // "이름 숫자" -> "숫자. 학생"
         content = content.replace(/### (.+?)\s+(\d+)\s*/g, '### $2. 학생');
         
-                 // 제목 변환을 정교하게 처리
+        // 제목 변환을 정교하게 처리
         // 1. h3 태그: "숫자. 이름" -> "숫자. 학생" (단, "발전을 위한 구체적 제안"은 제외)
         content = content.replace(/### (\d+)\.\s+(.+?)(\s*|$)/g, (match, num, name) => {
           if (name.includes("발전을 위한 구체적 제안")) {
@@ -768,51 +768,32 @@ export default function AnalysisDetailPage() {
         // "항목: " 형식 (스페이스 있음)
         content = content.replace(new RegExp(`^(\\s*)${item}: (?![\\s\\S]*?<span)`, 'gm'), 
           `$1<span style="color: #4338ca; font-weight: bold; font-family: 'Pretendard', sans-serif !important;">${item}:</span> `);
-        
-        // **항목:** 형식 (마크다운 볼드)
-        content = content.replace(new RegExp(`\\*\\*${item}:\\*\\*`, 'g'), 
-          `<span style="color: #4338ca; font-weight: bold; font-family: 'Pretendard', sans-serif !important;">${item}:</span>`);
       });
       
-      // 이미 처리된 strong 태그가 있을 경우 처리 (기존 하드코딩된 항목들도 일관성을 위해 남겨둠)
-      content = content.replace(/\*\*목적:\*\*/g, 
-        `<span style="color: #4338ca; font-weight: bold; font-family: 'Pretendard', sans-serif !important;">목적:</span>`);
+      // ===== 8. 실행 가능한 활동 제안 처리 개선 =====
+      // "실행 가능한 활동 제안" 섹션 강조 
+      content = content.replace(/^(실행 가능한 활동 제안|실행 가능한 활동|구체적 활동 제안)(\s*|:)/gm, 
+        '<div style="color: #4338ca; font-weight: bold; margin-top: 1rem; margin-bottom: 0.5rem;">실행 가능한 활동 제안</div>');
       
-      content = content.replace(/\*\*방법:\*\*/g, 
-        `<span style="color: #4338ca; font-weight: bold; font-family: 'Pretendard', sans-serif !important;">방법:</span>`);
+      // 활동명 패턴 처리 (다양한 형식 포함)
+      // 예: 1. **학급 안전감 규칙 만들기, 2. **아침 인사 루틴 등
+      content = content.replace(/(\d+\.\s*)\*\*([^*\n]+)\*\*/g, 
+        '<div style="color: #4338ca; font-weight: bold; margin-top: 1rem;">$1$2</div>');
       
-      content = content.replace(/\*\*기대효과:\*\*/g, 
-        `<span style="color: #4338ca; font-weight: bold; font-family: 'Pretendard', sans-serif !important;">기대효과:</span>`);
+      // 참고 자료 링크 처리 개선
+      content = content.replace(/\*\*참고 자료 링크\*\*:\s*\[(.*?)\]\((https?:\/\/[^\s)]+)\)/g, 
+        '<div style="margin-top: 0.5rem;"><span style="color: #4338ca; font-weight: bold;">참고 자료:</span> <a href="$2" target="_blank" style="color: #2563eb; text-decoration: underline;">$1</a></div>');
       
-      content = content.replace(/\*\*참고자료:\*\*/g, 
-        `<span style="color: #4338ca; font-weight: bold; font-family: 'Pretendard', sans-serif !important;">참고자료:</span>`);
+      // 괄호 안의 URL 형식 처리 (https://www.edunet.net/... 형식)
+      content = content.replace(/\((https?:\/\/[^\s)]+)\)/g, 
+        '<a href="$1" target="_blank" style="color: #2563eb; text-decoration: underline;">$1</a>');
       
-      // 활동명, 준비물, 진행 방법, 소요시간 등도 추가 처리
-      content = content.replace(/\*\*활동명:\*\*/g, 
-        `<span style="color: #4338ca; font-weight: bold; font-family: 'Pretendard', sans-serif !important;">활동명:</span>`);
-        
-      content = content.replace(/\*\*준비물:\*\*/g, 
-        `<span style="color: #4338ca; font-weight: bold; font-family: 'Pretendard', sans-serif !important;">준비물:</span>`);
-        
-      content = content.replace(/\*\*진행 방법:\*\*/g, 
-        `<span style="color: #4338ca; font-weight: bold; font-family: 'Pretendard', sans-serif !important;">진행 방법:</span>`);
-        
-      content = content.replace(/\*\*소요시간:\*\*/g, 
-        `<span style="color: #4338ca; font-weight: bold; font-family: 'Pretendard', sans-serif !important;">소요시간:</span>`);
-      
-      // 줄바꿈 일관성: 불필요한 여러 줄 바꿈을 최대 2개로 제한
-      content = content.replace(/\n{3,}/g, '\n\n');
-      
-      // 링크 형식 유지
-      content = content.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '[$1]($2)');
-      
-    } catch (e) {
-      console.error('분석 결과 파싱 오류:', e);
-      content = '분석 결과를 표시할 수 없습니다.';
+      return content;
+    } catch (error) {
+      console.error('분석 결과 포맷팅 오류:', error);
+      return analysis?.result_data || '분석 결과를 불러오는 중 오류가 발생했습니다.';
     }
-
-    return content;
-  };
+  }
   
   // 현재 활성화된 탭에 대한 분석 결과 가져오기
   const getActiveAnalysis = () => {

@@ -258,7 +258,7 @@ export async function POST(
         .insert({
           class_id: classId,
           result_data: schoolRecordContent,
-          summary: `${classDetails?.name || ''}의 학생별 생활기록부 (${new Date().toLocaleDateString('ko-KR')})`
+          summary: ''
         })
         .select()
         .single();

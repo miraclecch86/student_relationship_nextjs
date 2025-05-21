@@ -131,7 +131,7 @@ export async function POST(
 
     // OpenAI API를 통해 분석 수행
     try {
-      console.log('[POST API] GPT 분석 시작');
+      console.log('[POST API] AI 분석 시작');
       
       // 환경 변수 확인
       if (!process.env.OPENAI_API_KEY) {
@@ -237,7 +237,7 @@ export async function POST(
       }
       console.log('[POST API] 학급 상세 정보 조회 완료');
       
-      // GPT 분석을 위해 모든 데이터를 전달
+      // AI 분석을 위해 모든 데이터를 전달
       const analysisResult = await analyzeStudentRelationships(
         students,
         relationships || [],
@@ -249,7 +249,7 @@ export async function POST(
           surveyData: surveyData,
         }
       );
-      console.log('[POST API] GPT 분석 완료, 결과 타입:', typeof analysisResult);
+      console.log('[POST API] AI 분석 완료, 결과 타입:', typeof analysisResult);
       
       // 분석 결과 저장
       console.log('[POST API] 분석 결과 저장 시작');
@@ -308,10 +308,10 @@ export async function POST(
       
       return NextResponse.json(savedAnalysis);
     } catch (error: any) {
-      console.error('[POST API] GPT 분석 오류:', error.message);
+      console.error('[POST API] AI 분석 오류:', error.message);
       console.error('[POST API] 오류 스택:', error.stack);
       return NextResponse.json(
-        { error: `GPT 분석 중 오류가 발생했습니다: ${error.message}` },
+        { error: `AI 분석 중 오류가 발생했습니다: ${error.message}` },
         { status: 500 }
       );
     }
