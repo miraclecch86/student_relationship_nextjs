@@ -125,9 +125,9 @@ export default function TeacherPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [newClassName, setNewClassName] = useState('');
-  // const [isAuthenticated, setIsAuthenticated] = useState(false); // 미들웨어 사용으로 주석 처리 또는 삭제
-  // const [isAuthLoading, setIsAuthLoading] = useState(true); // 미들웨어 사용으로 주석 처리 또는 삭제
-  // const [isLoading, setIsLoading] = useState(true); // useQuery의 isLoading으로 대체
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
@@ -239,15 +239,18 @@ export default function TeacherPage() {
   return (
     <div className="min-h-screen bg-gray-100 p-4 lg:p-8">
       <div className="max-w-6xl mx-auto px-6 py-10">
-        <header className="flex justify-between items-center mb-10 bg-white p-5 rounded-lg shadow-md">
+        <header className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-gray-800">내 학급 목록</h1>
+        </header>
+
+        <div className="mb-8 flex space-x-4">
           <Link
             href="/class/create/school"
             className="inline-block bg-indigo-600 text-white px-6 py-3 text-lg font-medium rounded-md hover:bg-indigo-700 transition-colors duration-200 shadow-md"
           >
             + 새 학급 만들기
           </Link>
-        </header>
+        </div>
 
         {!isClassesLoading && !isError && (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-6">

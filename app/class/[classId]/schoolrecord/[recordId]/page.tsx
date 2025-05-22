@@ -10,7 +10,9 @@ import {
   CalendarIcon,
   UserIcon,
   ChevronDownIcon,
-  ChevronUpIcon
+  ChevronUpIcon,
+  ClipboardIcon,
+  ClipboardDocumentCheckIcon
 } from '@heroicons/react/24/outline';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -84,6 +86,9 @@ export default function SchoolRecordDetailPage() {
   
   // 학생별 표시 상태 관리
   const [expandedStudents, setExpandedStudents] = useState<{[key: string]: boolean}>({});
+  
+  // 복사된 학생 상태 관리
+  const [copiedStudent, setCopiedStudent] = useState<string | null>(null);
   
   // 학급 정보 조회
   const { data: classDetails, isLoading: isClassLoading } = useQuery({
@@ -159,6 +164,35 @@ export default function SchoolRecordDetailPage() {
     setExpandedStudents(newState);
   };
   
+  // 학생별 문구 복사 함수
+  const copyStudentRecord = (studentName: string, content: string) => {
+    navigator.clipboard.writeText(content)
+      .then(() => {
+        setCopiedStudent(studentName);
+        toast.success(`${studentName}의 생활기록부 문구가 복사되었습니다.`);
+        // 2초 후 복사 상태 초기화
+        setTimeout(() => setCopiedStudent(null), 2000);
+      })
+      .catch((error) => {
+        console.error('클립보드 복사 오류:', error);
+        toast.error('복사에 실패했습니다.');
+      });
+  };
+  
+  // 전체 생활기록부 복사 함수
+  const copyAllRecords = () => {
+    if (!schoolRecord) return;
+    
+    navigator.clipboard.writeText(schoolRecord.result_data)
+      .then(() => {
+        toast.success('전체 생활기록부 내용이 복사되었습니다.');
+      })
+      .catch((error) => {
+        console.error('클립보드 복사 오류:', error);
+        toast.error('복사에 실패했습니다.');
+      });
+  };
+  
   if (isClassLoading || isRecordLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-gray-100">
@@ -187,7 +221,7 @@ export default function SchoolRecordDetailPage() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <div className="max-w-screen-2xl mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto px-4 py-8">
         {/* 헤더 */}
         <header className="mb-8 bg-white p-4 rounded-lg shadow-md">
           <div className="flex items-center justify-between mb-4">
@@ -211,6 +245,13 @@ export default function SchoolRecordDetailPage() {
           <p className="text-gray-600">{schoolRecord.summary || '학생별 생활기록부 문구입니다.'}</p>
           
           <div className="mt-4 flex justify-end space-x-2">
+            <button
+              onClick={copyAllRecords}
+              className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 flex items-center"
+            >
+              <ClipboardIcon className="w-4 h-4 mr-1" />
+              전체 복사
+            </button>
             <button
               onClick={() => toggleAllStudents(true)}
               className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 flex items-center"
@@ -244,16 +285,50 @@ export default function SchoolRecordDetailPage() {
                       <UserIcon className="w-5 h-5 text-amber-500 mr-2" />
                       <span className="font-medium text-gray-800">{studentName}</span>
                     </div>
-                    {expandedStudents[studentName] ? (
-                      <ChevronUpIcon className="w-5 h-5 text-gray-500" />
-                    ) : (
-                      <ChevronDownIcon className="w-5 h-5 text-gray-500" />
-                    )}
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation(); // 토글 이벤트 전파 방지
+                          copyStudentRecord(studentName, studentRecords[studentName]);
+                        }}
+                        className="p-1.5 rounded-full bg-gray-50 hover:bg-amber-100 text-gray-500 hover:text-amber-600 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-300"
+                        title={`${studentName} 문구 복사`}
+                      >
+                        {copiedStudent === studentName ? (
+                          <ClipboardDocumentCheckIcon className="w-4 h-4" />
+                        ) : (
+                          <ClipboardIcon className="w-4 h-4" />
+                        )}
+                      </button>
+                      {expandedStudents[studentName] ? (
+                        <ChevronUpIcon className="w-5 h-5 text-gray-500" />
+                      ) : (
+                        <ChevronDownIcon className="w-5 h-5 text-gray-500" />
+                      )}
+                    </div>
                   </div>
                   
                   {expandedStudents[studentName] && (
                     <div className="p-4 bg-white">
                       <div className="prose max-w-none">
+                        <div className="flex justify-end mb-2">
+                          <button
+                            onClick={() => copyStudentRecord(studentName, studentRecords[studentName])}
+                            className="px-3 py-1 text-xs bg-amber-50 text-amber-600 rounded hover:bg-amber-100 flex items-center"
+                          >
+                            {copiedStudent === studentName ? (
+                              <>
+                                <ClipboardDocumentCheckIcon className="w-3 h-3 mr-1" />
+                                복사됨
+                              </>
+                            ) : (
+                              <>
+                                <ClipboardIcon className="w-3 h-3 mr-1" />
+                                문구 복사
+                              </>
+                            )}
+                          </button>
+                        </div>
                         <ReactMarkdown
                           rehypePlugins={[rehypeRaw]}
                           components={{

@@ -215,7 +215,7 @@ export default function SurveyListPage() {
 
   return (
     <div className="flex flex-col h-screen bg-gray-100">
-      <div className="max-w-screen-2xl mx-auto w-full flex flex-col flex-1 overflow-hidden p-4 lg:p-6 gap-4 lg:gap-6">
+      <div className="max-w-6xl mx-auto w-full flex flex-col flex-1 overflow-hidden p-4 lg:p-6 gap-4 lg:gap-6">
         <div className="flex-shrink-0 bg-white rounded-lg shadow-md border border-gray-200 p-4 lg:p-6">
           <header className="flex items-center justify-between">
             <button

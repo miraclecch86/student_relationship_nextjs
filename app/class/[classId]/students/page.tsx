@@ -346,9 +346,9 @@ export default function ClassStudentsPage() {
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 3,
-        delay: 100,
-        tolerance: 1,
+        distance: 8,        // 드래그를 위한 최소 이동 거리 (3에서 8로 증가)
+        delay: 250,         // 드래그 활성화 전 지연 시간 (100에서 250ms로 증가)
+        tolerance: 5,       // 허용 오차 범위 (1에서 5로 증가)
       },
     }),
     useSensor(KeyboardSensor, {

@@ -100,7 +100,7 @@ export default function ClassDashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <div className="max-w-screen-2xl mx-auto px-6 py-10">
+      <div className="max-w-6xl mx-auto px-6 py-10">
         {/* 헤더 */}
         <header className="mb-10 flex justify-between items-center bg-white p-5 rounded-lg shadow-md">
           <div className="flex items-center gap-4">

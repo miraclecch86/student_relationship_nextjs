@@ -821,7 +821,7 @@ export default function ClassAnalysisPage() {
         </div>
       )}
       
-      <div className="max-w-screen-xl mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto px-4 py-8">
         {/* 헤더 */}
         <header className="mb-8 bg-white p-4 rounded-lg shadow-md">
           <div className="flex items-center gap-4">

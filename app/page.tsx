@@ -155,34 +155,36 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-100 p-8">
-      <header className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-800">내 학급 목록</h1>
-        <div className="flex items-center space-x-4">
-          <Link
-            href="/class/create/school"
-            className="inline-block bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors duration-200 text-sm font-medium shadow-sm"
-          >
-            + 새 학급 만들기
-          </Link>
-          <UserProfile />
-        </div>
-      </header>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mt-8">
-        {classes && classes.length > 0 ? (
-          classes.map((cls) => (
-        <motion.div 
-              key={cls.id}
-              initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
+      <div className="max-w-6xl mx-auto px-6 py-10">
+        <header className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-800">내 학급 목록</h1>
+          <div className="flex items-center space-x-4">
+            <Link
+              href="/class/create/school"
+              className="inline-block bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors duration-200 text-sm font-medium shadow-sm"
             >
-              <div className="bg-white p-4 rounded shadow">{cls.name} (Temp Card)</div>
-        </motion.div>
-            ))
-          ) : (
-          <p className="text-gray-500 italic col-span-full">생성된 학급이 없습니다.</p>
-          )}
+              + 새 학급 만들기
+            </Link>
+            <UserProfile />
+          </div>
+        </header>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mt-8">
+          {classes && classes.length > 0 ? (
+            classes.map((cls) => (
+          <motion.div 
+                key={cls.id}
+                initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <div className="bg-white p-4 rounded shadow">{cls.name} (Temp Card)</div>
+          </motion.div>
+              ))
+            ) : (
+            <p className="text-gray-500 italic col-span-full">생성된 학급이 없습니다.</p>
+            )}
+        </div>
       </div>
     </div>
   );
