@@ -214,53 +214,47 @@ export default function SurveyListPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gray-100">
-      <div className="max-w-6xl mx-auto w-full flex flex-col flex-1 overflow-hidden p-4 lg:p-6 gap-4 lg:gap-6">
-        <div className="flex-shrink-0 bg-white rounded-lg shadow-md border border-gray-200 p-4 lg:p-6">
-          <header className="flex items-center justify-between">
+    <div className="min-h-screen bg-gray-100">
+      <div className="max-w-6xl mx-auto px-6 py-10">
+        <header className="mb-10 flex justify-between items-center bg-white p-5 rounded-lg shadow-md">
+          <div className="flex items-center gap-4">
             <button
               onClick={() => router.push(`/class/${classId}/dashboard`)}
-              className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              className="flex items-center px-4 py-2 text-sm bg-indigo-500 text-white rounded-md hover:bg-indigo-600 shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:ring-offset-1 transition-all duration-200"
             >
-              <ArrowLeftIcon className="w-5 h-5 mr-2" />
+              <ArrowLeftIcon className="w-4 h-4 mr-2" />
               대시보드
             </button>
-            <h1 className="text-xl font-semibold text-gray-800">
-              {classDetails?.name ?? '학급 정보 로딩 중...'} - 설문 목록
+            <h1 className="text-2xl font-bold text-black">
+              {classDetails?.name ?? ''} - 설문 목록
             </h1>
-            <div className="w-32"></div>
-          </header>
-        </div>
+          </div>
+          <button
+            onClick={() => setShowCreateSurveyModal(true)}
+            className="flex items-center px-4 py-2 text-sm bg-indigo-500 text-white rounded-md hover:bg-indigo-600 shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:ring-offset-1 transition-all duration-200"
+          >
+            <PlusIcon className="w-4 h-4 mr-2" />
+            새 설문 만들기
+          </button>
+        </header>
 
-        <div className="flex flex-1 overflow-hidden">
-          <main className="flex-1 bg-white rounded-lg shadow-md border border-gray-200 p-6 lg:p-8 overflow-y-auto">
-            <div className="mb-6 flex justify-end">
-              <button
-                onClick={() => setShowCreateSurveyModal(true)}
-                className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                <PlusIcon className="w-5 h-5 mr-2" />
-                새 설문 만들기
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {surveys && surveys.length > 0 ? (
-                surveys.map((survey) => (
-                  <SurveyCard 
-                    key={survey.id} 
-                    survey={survey} 
-                    onClick={() => handleSurveyClick(survey.id)}
-                    onEdit={handleEditSurvey}
-                    onDelete={handleDeleteSurveyClick}
-                  />
-                ))
-              ) : (
-                <p className="text-gray-500 italic col-span-full text-center mt-8">생성된 설문이 없습니다. '새 설문 만들기' 버튼을 클릭하여 설문을 추가하세요.</p>
-              )}
-            </div>
-          </main>
-        </div>
+        <main className="bg-white rounded-lg shadow-md border border-gray-200 p-6 lg:p-8 overflow-y-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {surveys && surveys.length > 0 ? (
+              surveys.map((survey) => (
+                <SurveyCard 
+                  key={survey.id} 
+                  survey={survey} 
+                  onClick={() => handleSurveyClick(survey.id)}
+                  onEdit={handleEditSurvey}
+                  onDelete={handleDeleteSurveyClick}
+                />
+              ))
+            ) : (
+              <p className="text-gray-500 italic col-span-full text-center mt-8">생성된 설문이 없습니다. '새 설문 만들기' 버튼을 클릭하여 설문을 추가하세요.</p>
+            )}
+          </div>
+        </main>
       </div>
 
       {showCreateSurveyModal && (

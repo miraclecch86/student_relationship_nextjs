@@ -532,22 +532,39 @@ export default function SchoolRecordPage() {
         </div>
       )}
       
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto px-6 py-10">
         {/* 헤더 */}
-        <header className="mb-8 bg-white p-4 rounded-lg shadow-md">
+        <header className="mb-10 flex justify-between items-center bg-white p-5 rounded-lg shadow-md">
           <div className="flex items-center gap-4">
             <button
               onClick={() => router.push(`/class/${classId}/dashboard`)}
-              className="px-4 py-2 text-sm bg-amber-500 text-white rounded-md hover:bg-amber-600 shadow focus:outline-none focus:ring-2 focus:ring-amber-300 focus:ring-offset-1 transition-all duration-200 flex items-center"
+              className="px-4 py-2 text-sm bg-indigo-500 text-white rounded-md hover:bg-indigo-600 shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:ring-offset-1 transition-all duration-200 flex items-center"
             >
               <ArrowLeftIcon className="w-4 h-4 mr-2" />
               대시보드
             </button>
             <h1 className="text-2xl font-bold text-black">{classDetails.name} 생활기록부</h1>
           </div>
+          <button
+            onClick={generateSchoolRecordWithProgress}
+            disabled={generateMutation.isPending || isGenerating}
+            className="px-4 py-2 text-sm bg-amber-500 text-white rounded-md hover:bg-amber-600 shadow focus:outline-none focus:ring-2 focus:ring-amber-300 focus:ring-offset-1 transition-all duration-200 flex items-center disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {generateMutation.isPending || isGenerating ? (
+              <>
+                <ArrowPathIcon className="w-4 h-4 animate-spin mr-2" />
+                생성 중...
+              </>
+            ) : (
+              <>
+                <SparklesIcon className="w-4 h-4 mr-2" />
+                새 생활기록부 생성
+              </>
+            )}
+          </button>
         </header>
         
-        {/* 생활기록부 생성 버튼 */}
+        {/* 생활기록부 생성 설명 부분은 현재 위치 유지 */}
         <div className="bg-white rounded-lg shadow-md p-4 mb-8">
           <div className="flex items-center justify-between">
             <div>
@@ -561,25 +578,6 @@ export default function SchoolRecordPage() {
               <p className="text-xs text-gray-500 mt-1">
                 각 학생의 특성을 반영한 구체적이고 개성 있는 생활기록부 문구를 제공합니다.
               </p>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={generateSchoolRecordWithProgress}
-                disabled={generateMutation.isPending || isGenerating}
-                className="px-4 py-2 bg-amber-500 text-white rounded-md hover:bg-amber-600 shadow focus:outline-none focus:ring-2 focus:ring-amber-300 flex items-center disabled:opacity-70 disabled:cursor-not-allowed"
-              >
-                {generateMutation.isPending || isGenerating ? (
-                  <>
-                    <ArrowPathIcon className="w-5 h-5 animate-spin mr-2" />
-                    생성 중...
-                  </>
-                ) : (
-                  <>
-                    <SparklesIcon className="w-5 h-5 mr-2" />
-                    새 생활기록부 생성
-                  </>
-                )}
-              </button>
             </div>
           </div>
         </div>

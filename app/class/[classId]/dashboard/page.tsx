@@ -10,9 +10,11 @@ import {
   ChartBarIcon,
   ArrowLeftIcon,
   DocumentTextIcon,
+  InformationCircleIcon,
 } from '@heroicons/react/24/outline';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
+import CarouselBanner from '@/components/CarouselBanner';
 
 // 학급 정보 조회 함수
 async function fetchClassDetails(classId: string): Promise<Class | null> {
@@ -66,6 +68,23 @@ export default function ClassDashboardPage() {
   const router = useRouter();
   const classId = params.classId as string;
 
+  // CarouselBanner를 위한 슬라이드 데이터 예시
+  const dashboardBannerSlides = [
+    {
+      id: 1,
+      title: '📢 대시보드 주요 업데이트 안내',
+      description: '새로운 위젯과 통계 기능이 추가되었습니다. 지금 바로 확인해보세요!',
+      link: '#',
+      titleIcon: <InformationCircleIcon className="w-6 h-6 text-sky-300" />
+    },
+    {
+      id: 2,
+      title: '✨ 사용자 편의성 개선',
+      description: '더욱 빨라진 로딩 속도와 직관적인 UI를 경험해보세요.',
+      link: '#',
+    }
+  ];
+
   // 학급 정보 조회
   const { data: classDetails, isLoading, isError, error } = useQuery({
     queryKey: ['classDetails', classId],
@@ -100,9 +119,10 @@ export default function ClassDashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <div className="max-w-6xl mx-auto px-6 py-10">
+      <div className="max-w-6xl mx-auto px-6 pb-10 pt-5">
+        <CarouselBanner slides={dashboardBannerSlides} autoPlayInterval={6000} />
         {/* 헤더 */}
-        <header className="mb-10 flex justify-between items-center bg-white p-5 rounded-lg shadow-md">
+        <header className="mt-5 mb-5 flex justify-between items-center bg-white p-5 rounded-lg shadow-md">
           <div className="flex items-center gap-4">
             <button
               onClick={() => router.push('/teacher')}
@@ -126,15 +146,6 @@ export default function ClassDashboardPage() {
             color="bg-indigo-500"
           />
           
-          {/* 학생 목록 카드 */}
-          <DashboardCard
-            title="학생 목록"
-            description="학급의 학생들을 관리합니다. 학생을 추가, 수정, 삭제할 수 있습니다."
-            icon={<UserGroupIcon className="w-7 h-7 text-white" />}
-            href={`/class/${classId}/students`}
-            color="bg-emerald-500"
-          />
-          
           {/* 분석 카드 */}
           <DashboardCard
             title="학급 분석"
@@ -151,6 +162,15 @@ export default function ClassDashboardPage() {
             icon={<DocumentTextIcon className="w-7 h-7 text-white" />}
             href={`/class/${classId}/schoolrecord`}
             color="bg-amber-500"
+          />
+
+          {/* 학생 목록 카드 - 마지막으로 이동 */}
+          <DashboardCard
+            title="학생 목록"
+            description="학급의 학생들을 관리합니다. 학생을 추가, 수정, 삭제할 수 있습니다."
+            icon={<UserGroupIcon className="w-7 h-7 text-white" />}
+            href={`/class/${classId}/students`}
+            color="bg-emerald-500"
           />
         </div>
       </div>

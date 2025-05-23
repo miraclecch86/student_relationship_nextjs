@@ -549,9 +549,9 @@ export default function ClassStudentsPage() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <div className="max-w-screen-lg mx-auto px-4 py-8">
+      <div className="max-w-screen-lg mx-auto px-6 py-10">
         {/* 헤더 */}
-        <header className="mb-8 flex justify-between items-center bg-white p-4 rounded-lg shadow-md">
+        <header className="mb-10 flex justify-between items-center bg-white p-5 rounded-lg shadow-md">
           <div className="flex items-center gap-4">
             <button
               onClick={() => router.push(`/class/${classId}/dashboard`)}
@@ -562,9 +562,26 @@ export default function ClassStudentsPage() {
             </button>
             <h1 className="text-2xl font-bold text-black">{classDetails.name} 학생 목록</h1>
           </div>
+          <button
+            onClick={handleAddStudent}
+            disabled={addStudentMutation.isPending}
+            className="px-4 py-2 text-sm bg-indigo-500 text-white rounded-md hover:bg-indigo-600 shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 flex items-center disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {addStudentMutation.isPending ? (
+              <>
+                <ArrowPathIcon className="w-4 h-4 animate-spin mr-2" />
+                추가 중...
+              </>
+            ) : (
+              <>
+                <UserPlusIcon className="w-4 h-4 mr-2" />
+                학생 추가
+              </>
+            )}
+          </button>
         </header>
 
-        {/* 학생 추가 폼 */}
+        {/* 학생 추가 입력 필드는 현재 위치 유지 */}
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">
           <div className="flex gap-4">
             <input
@@ -572,26 +589,9 @@ export default function ClassStudentsPage() {
               value={newStudentName}
               onChange={(e) => setNewStudentName(e.target.value)}
               onKeyPress={handleAddStudentKeyPress}
-              placeholder="학생 이름 입력"
+              placeholder="학생 이름 입력 후, 헤더의 '학생 추가' 버튼 클릭"
               className="flex-grow px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-300 text-black placeholder:text-gray-500"
             />
-            <button
-              onClick={handleAddStudent}
-              disabled={addStudentMutation.isPending}
-              className="px-4 py-2 bg-indigo-500 text-white rounded-md hover:bg-indigo-600 shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 flex items-center disabled:opacity-70 disabled:cursor-not-allowed"
-            >
-              {addStudentMutation.isPending ? (
-                <>
-                  <ArrowPathIcon className="w-5 h-5 animate-spin mr-2" />
-                  추가 중...
-                </>
-              ) : (
-                <>
-                  <UserPlusIcon className="w-5 h-5 mr-2" />
-                  학생 추가
-                </>
-              )}
-            </button>
           </div>
         </div>
 

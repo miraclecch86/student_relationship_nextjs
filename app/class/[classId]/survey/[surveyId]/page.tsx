@@ -282,17 +282,17 @@ export default function SurveyRelationshipPage() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <div className="max-w-screen-2xl mx-auto px-4 py-8 flex flex-col">
+      <div className="max-w-6xl mx-auto px-6 py-10 flex flex-col">
 
-        <header className="mb-4 flex justify-between items-center bg-white p-3 rounded-lg shadow-md flex-shrink-0">
+        <header className="mb-10 flex justify-between items-center bg-white p-5 rounded-lg shadow-md flex-shrink-0">
           <div className="flex items-center gap-4">
             <button
               onClick={() => router.push(`/class/${classId}/survey`)}
-              className="px-4 py-2 text-sm bg-[#6366f1] text-white rounded-md hover:bg-[#4f46e5] shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:ring-offset-1 transition-all duration-200 cursor-pointer font-semibold hover:-translate-y-0.5 hover:shadow-md"
+              className="px-4 py-2 text-sm bg-indigo-500 text-white rounded-md hover:bg-indigo-600 shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:ring-offset-1 transition-all duration-200 flex items-center"
             >
               설문 목록
             </button>
-            <h1 className="text-xl font-bold text-black">{classDetails.name} - {surveyDetails.name}</h1>
+            <h1 className="text-2xl font-bold text-black">{classDetails.name} - {surveyDetails.name}</h1>
           </div>
         </header>
 

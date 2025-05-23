@@ -821,9 +821,9 @@ export default function ClassAnalysisPage() {
         </div>
       )}
       
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto px-6 py-10">
         {/* 헤더 */}
-        <header className="mb-8 bg-white p-4 rounded-lg shadow-md">
+        <header className="mb-10 flex justify-between items-center bg-white p-5 rounded-lg shadow-md">
           <div className="flex items-center gap-4">
             <button
               onClick={() => router.push(`/class/${classId}/dashboard`)}
@@ -834,9 +834,26 @@ export default function ClassAnalysisPage() {
             </button>
             <h1 className="text-2xl font-bold text-black">{classDetails.name} 학급 분석</h1>
           </div>
+          <button
+            onClick={runFullAnalysisSequentially}
+            disabled={isAnyRunning || isAnalyzing}
+            className="px-4 py-2 text-sm bg-indigo-500 text-white rounded-md hover:bg-indigo-600 shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 flex items-center disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {isAnyRunning || isAnalyzing ? (
+              <>
+                <ArrowPathIcon className="w-4 h-4 animate-spin mr-2" />
+                분석 중...
+              </>
+            ) : (
+              <>
+                <SparklesIcon className="w-4 h-4 mr-2" />
+                새 분석 실행
+              </>
+            )}
+          </button>
         </header>
         
-        {/* 분석 실행 버튼 */}
+        {/* 분석 실행 설명 부분은 현재 위치 유지 */}
         <div className="bg-white rounded-lg shadow-md p-4 mb-8">
           <div className="flex items-center justify-between">
             <div>
@@ -850,25 +867,6 @@ export default function ClassAnalysisPage() {
               <p className="text-xs text-gray-500 mt-1">
                 분석은 종합분석 및 학생그룹별 분석으로 나누어 진행됩니다.
               </p>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={runFullAnalysisSequentially}
-                disabled={isAnyRunning || isAnalyzing}
-                className="px-4 py-2 bg-indigo-500 text-white rounded-md hover:bg-indigo-600 shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 flex items-center disabled:opacity-70 disabled:cursor-not-allowed"
-              >
-                {isAnyRunning || isAnalyzing ? (
-                  <>
-                    <ArrowPathIcon className="w-5 h-5 animate-spin mr-2" />
-                    분석 중...
-                  </>
-                ) : (
-                  <>
-                    <SparklesIcon className="w-5 h-5 mr-2" />
-                    새 분석 실행
-                  </>
-                )}
-              </button>
             </div>
           </div>
         </div>

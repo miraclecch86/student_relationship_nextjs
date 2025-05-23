@@ -8,6 +8,9 @@ import ClassCard from '@/components/ClassCard';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+// import Banner from '@/components/Banner'; // 기존 Banner 주석 처리 또는 삭제
+import CarouselBanner from '@/components/CarouselBanner'; // CarouselBanner import
+import { SparklesIcon } from '@heroicons/react/24/outline'; // 예시 아이콘
 
 // 주관식 질문 개수를 포함하는 새로운 인터페이스 정의
 interface ClassWithCount extends BaseClass {
@@ -125,9 +128,31 @@ export default function TeacherPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [newClassName, setNewClassName] = useState('');
-  // const [isAuthenticated, setIsAuthenticated] = useState(false); // 미들웨어 사용으로 주석 처리 또는 삭제
-  // const [isAuthLoading, setIsAuthLoading] = useState(true); // 미들웨어 사용으로 주석 처리 또는 삭제
-  // const [isLoading, setIsLoading] = useState(true); // useQuery의 isLoading으로 대체
+  // const [showBanner, setShowBanner] = useState(true); // 기존 Banner 상태 주석 처리
+
+  // CarouselBanner를 위한 슬라이드 데이터 예시
+  const bannerSlides = [
+    {
+      id: 1,
+      title: '🚀 NEW! 문항 자동 생성앱 - OX 퀴즈 항목 추가(5/17)',
+      description: '교과서 텍스트를 OX퀴즈로 만들고 자동으로 구글 슬라이드를 생성합니다.',
+      link: '#',
+      // titleIcon: <SparklesIcon className="w-6 h-6 text-yellow-300" /> // 아이콘 사용 예시
+    },
+    {
+      id: 2,
+      title: '💡 학습 분석 기능 업데이트 안내',
+      description: '더욱 정확해진 AI 분석으로 학생들의 학습 패턴을 파악해보세요.',
+      link: '#',
+    },
+    {
+      id: 3,
+      title: '🎉 여름방학 맞이 특별 이벤트!',
+      description: '지금 바로 참여하고 다양한 혜택을 받아가세요.',
+      link: '#',
+      imageUrl: 'https://images.unsplash.com/photo-1506748686214-e9df14d4d9d0?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80' // 예시 이미지
+    }
+  ];
 
   useEffect(() => {
     let isMounted = true;
@@ -237,13 +262,15 @@ export default function TeacherPage() {
   if (isError) return <div className="text-red-500 text-center mt-10">데이터 로딩 중 오류 발생: {(error as any)?.message ?? '알 수 없는 오류'}</div>;
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 lg:p-8">
-      <div className="max-w-6xl mx-auto px-6 py-10">
-        <header className="flex justify-between items-center mb-10 bg-white p-5 rounded-lg shadow-md">
-          <h1 className="text-3xl font-bold text-gray-800">내 학급 목록</h1>
+    <div className="min-h-screen bg-gray-100">
+      {/* CarouselBanner와 하단 콘텐츠를 모두 감싸는 단일 div */}
+      <div className="max-w-6xl mx-auto px-6 pb-10 pt-5"> 
+        <CarouselBanner slides={bannerSlides} autoPlayInterval={5000} />
+        <header className="flex justify-between items-center mt-5 mb-5 bg-white p-5 rounded-lg shadow-md">
+          <h1 className="text-2xl font-bold text-black">내 학급 목록</h1>
           <Link
             href="/class/create/school"
-            className="inline-block bg-indigo-600 text-white px-6 py-3 text-lg font-medium rounded-md hover:bg-indigo-700 transition-colors duration-200 shadow-md"
+            className="inline-block bg-indigo-500 text-white px-4 py-2 text-sm font-medium rounded-md hover:bg-indigo-600 shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:ring-offset-1 transition-all duration-200"
           >
             + 새 학급 만들기
           </Link>
