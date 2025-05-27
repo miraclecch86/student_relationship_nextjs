@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { analyzeStudentGroup } from '@/lib/openai';
+import { analyzeStudentGroupWithGemini } from '@/lib/gemini';
 import { Database } from '@/lib/database.types';
 import { Student, Relationship, Answer, Question, Survey } from '@/lib/supabase';
+import { isDemoClass } from '@/utils/demo-permissions';
 
 // UUID 생성 함수
 function generateUUID() {
@@ -174,6 +176,11 @@ export async function POST(
     // 세션 ID 가져오기 (있는 경우)
     const sessionId = searchParams.get('sessionId') || generateUUID();
     
+    // 요청 본문에서 model 추출
+    const requestData = await request.json().catch(() => ({}));
+    const model = requestData.model || 'gpt'; // 기본값은 gpt
+    console.log('[학생 그룹 분석 API] 선택된 모델:', model);
+    
     // 학급 존재 확인
     console.log('[학생 그룹 분석 API] 학급 정보 조회 시작:', classId);
     const { data: classData, error: classError } = await supabase
@@ -210,6 +217,16 @@ export async function POST(
         { status: 404 }
       );
     }
+
+    // 🌟 데모 학급이 아닌 경우에만 소유권 확인
+    if (!isDemoClass(classData) && classData.user_id !== session.user.id) {
+      console.log('[학생 그룹 분석 API] 권한 없음. 학급 소유자:', classData.user_id, '요청자:', session.user.id);
+      return NextResponse.json(
+        { error: '학급에 대한 권한이 없습니다.' },
+        { status: 403 }
+      );
+    }
+    console.log('[학생 그룹 분석 API] 학급 권한 확인 완료 (데모 학급:', isDemoClass(classData), ')');
     
     // 학생 목록 가져오기
     let allStudents;
@@ -297,20 +314,57 @@ export async function POST(
     // 추가 데이터 수집
     const additionalData = await collectAdditionalData(classId, studentIds, supabase);
     
-    // OpenAI API를 사용하여 분석 실행
+    // AI 분석 실행 (선택된 모델에 따라)
     try {
-      const analysisResult = await analyzeStudentGroup(
-        groupStudents, // 현재 그룹에 속한 학생들만 전달
-        relationships || [],
-        groupIndex,
-        (additionalData?.surveyData || []).map((data: any) => data.answers || []).flat() || [],
-        (additionalData?.surveyData || []).map((data: any) => data.questions || []).flat() || [],
-        {
-          classDetails: classData,
-          allStudents: allStudents, // 전체 학생 목록 전달
-          ...additionalData
-        }
-      );
+      console.log('[학생 그룹 분석 API] AI 분석 시작, 선택된 모델:', model);
+      
+      // 환경 변수 확인
+      if (model === 'gpt' && !process.env.OPENAI_API_KEY) {
+        console.error('[학생 그룹 분석 API] OPENAI_API_KEY 환경 변수가 설정되지 않았습니다.');
+        return NextResponse.json(
+          { error: 'OpenAI API 키가 설정되지 않았습니다. 환경 변수를 확인해주세요.' },
+          { status: 500 }
+        );
+      }
+      
+      if (model === 'gemini-flash' && !process.env.GEMINI_API_KEY) {
+        console.error('[학생 그룹 분석 API] GEMINI_API_KEY 환경 변수가 설정되지 않았습니다.');
+        return NextResponse.json(
+          { error: 'Gemini API 키가 설정되지 않았습니다. 환경 변수를 확인해주세요.' },
+          { status: 500 }
+        );
+      }
+      
+      console.log('[학생 그룹 분석 API] 환경 변수 확인 완료');
+      
+      let analysisResult;
+      if (model === 'gemini-flash') {
+        analysisResult = await analyzeStudentGroupWithGemini(
+          groupStudents, // 현재 그룹에 속한 학생들만 전달
+          relationships || [],
+          groupIndex,
+          (additionalData?.surveyData || []).map((data: any) => data.answers || []).flat() || [],
+          (additionalData?.surveyData || []).map((data: any) => data.questions || []).flat() || [],
+          {
+            classDetails: classData,
+            allStudents: allStudents, // 전체 학생 목록 전달
+            ...additionalData
+          }
+        );
+      } else {
+        analysisResult = await analyzeStudentGroup(
+          groupStudents, // 현재 그룹에 속한 학생들만 전달
+          relationships || [],
+          groupIndex,
+          (additionalData?.surveyData || []).map((data: any) => data.answers || []).flat() || [],
+          (additionalData?.surveyData || []).map((data: any) => data.questions || []).flat() || [],
+          {
+            classDetails: classData,
+            allStudents: allStudents, // 전체 학생 목록 전달
+            ...additionalData
+          }
+        );
+      }
       
       // 요약 필드를 빈 문자열로 설정하여 사용자가 직접 입력하도록 유도
       let summary = '';
@@ -338,9 +392,9 @@ export async function POST(
       
       return NextResponse.json(newAnalysis);
     } catch (error) {
-      console.error(`[학생 그룹 분석 API] OpenAI 분석 오류:`, error);
+      console.error(`[학생 그룹 분석 API] AI 분석 오류 (모델: ${model}):`, error);
       return NextResponse.json(
-        { error: 'AI 분석 중 오류가 발생했습니다.' }, 
+        { error: `AI 분석 중 오류가 발생했습니다 (모델: ${model})` }, 
         { status: 500 }
       );
     }

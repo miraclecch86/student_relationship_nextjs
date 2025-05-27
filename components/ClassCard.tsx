@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Class as BaseClass } from '@/lib/supabase'; // Supabase 타입
 import EditClassNameModal from './EditClassNameModal';
@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query'; // 뮤테이션 훅
 import { supabase } from '@/lib/supabase'; // supabase 클라이언트
 import { useRouter } from 'next/navigation'; // 라우터 임포트
+import { isDemoClass as checkIsDemoClass } from '@/utils/demo-permissions';
 
 // 학급 수정 함수
 async function updateClass(id: string, newName: string): Promise<BaseClass | null> {
@@ -27,6 +28,8 @@ interface ClassWithCount extends BaseClass {
   subjectiveQuestionCount?: number; // optional로 처리하여 에러 방지
   studentCount?: number; // 학생 수 필드 추가
   surveyCount?: number; // 설문지 수 필드 추가
+  is_demo?: boolean; // 데모 학급 여부
+  is_public?: boolean; // 공개 학급 여부
 }
 
 interface ClassCardProps {
@@ -39,8 +42,10 @@ interface ClassCardProps {
 export default function ClassCard({ classData, onEdit, onDelete }: ClassCardProps) {
   const queryClient = useQueryClient();
   const router = useRouter(); // 라우터 초기화
+  const cardRef = useRef<HTMLDivElement>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isCopying, setIsCopying] = useState(false);
 
   // 수정 뮤테이션 (반환 타입 BaseClass | null)
   const updateMutation = useMutation<BaseClass | null, Error, { id: string; newName: string }>({
@@ -70,6 +75,60 @@ export default function ClassCard({ classData, onEdit, onDelete }: ClassCardProp
       },
   });
 
+  // 🌟 데모 학급 여부 확인
+  const isDemoClass = checkIsDemoClass(classData);
+
+  // 카드 클릭 핸들러
+  const handleCardClick = () => {
+    router.push(`/class/${classData.id}/dashboard`);
+  };
+
+  // 데모 학급 복사 핸들러
+  const handleCopyDemoClass = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (isCopying) return;
+    
+    try {
+      setIsCopying(true);
+      toast.loading('데모 학급을 복사하는 중...', { id: 'copy-demo' });
+      
+      const response = await fetch(`/api/classes/${classData.id}/copy`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: `${classData.name} (복사본)`
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || '복사에 실패했습니다.');
+      }
+      
+      toast.success('데모 학급이 성공적으로 복사되었습니다!', { id: 'copy-demo' });
+      
+      // 학급 목록 새로고침
+      queryClient.invalidateQueries({ queryKey: ['classes'] });
+      
+      // 새 학급으로 이동
+      toast.loading('새 학급으로 이동 중...', { id: 'navigate' });
+      setTimeout(() => {
+        router.push(`/class/${result.data.newClass.id}/dashboard`);
+        toast.dismiss('navigate');
+      }, 1000);
+      
+    } catch (error) {
+      console.error('데모 학급 복사 오류:', error);
+      toast.error(error instanceof Error ? error.message : '복사 중 오류가 발생했습니다.', { id: 'copy-demo' });
+    } finally {
+      setIsCopying(false);
+    }
+  };
+
   // --- 이벤트 핸들러들 ---
   // 수정 버튼 클릭 핸들러 (모달 열기)
   const handleEditClick = (e: React.MouseEvent) => {
@@ -87,11 +146,6 @@ export default function ClassCard({ classData, onEdit, onDelete }: ClassCardProp
   const handleDeleteClick = (e: React.MouseEvent) => { e.stopPropagation(); setIsDeleteDialogOpen(true); };
   const confirmDelete = async () => { try { await onDelete(classData.id); } catch (error) {} };
 
-  // 카드 클릭 핸들러
-  const handleCardClick = () => {
-    // 설문 목록 페이지로 이동하도록 경로 수정
-    router.push(`/class/${classData.id}/dashboard`); 
-  };
   // --- 이벤트 핸들러들 끝 ---
 
   return (
@@ -107,7 +161,14 @@ export default function ClassCard({ classData, onEdit, onDelete }: ClassCardProp
       >
         {/* 상단: 학급 이름 */}
         <div className="bg-indigo-500 px-4 py-3">
-          <h3 className="text-white font-semibold truncate text-sm">{classData.name}</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-white font-semibold truncate text-sm flex-1">{classData.name}</h3>
+            {isDemoClass && (
+              <span className="ml-2 px-2 py-1 bg-yellow-400 text-yellow-900 text-xs font-medium rounded-full whitespace-nowrap">
+                🌟 체험용
+              </span>
+            )}
+          </div>
         </div>
 
         {/* 하단: 정보 및 버튼 섹션 */}        
@@ -126,22 +187,45 @@ export default function ClassCard({ classData, onEdit, onDelete }: ClassCardProp
 
           {/* 액션 버튼 */}          
           <div className="grid grid-cols-2 gap-3">
-            {/* 수정 버튼 */}            
-            <motion.button
-              onClick={handleEditClick}
-              // 변경: 색상(light indigo), hover 효과(translate + shadow), 기본 스타일(rounded-md 등) 확인, active 스타일 변경
-              className="w-full px-4 py-2 bg-indigo-50 text-indigo-500 text-sm font-medium rounded-md hover:bg-indigo-100 active:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:ring-offset-1 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
-            >
-              수정
-            </motion.button>
-            {/* 삭제 버튼 */}            
-            <motion.button
-              onClick={handleDeleteClick}
-              // 변경: 색상(light red), hover 효과(translate + shadow), 기본 스타일 확인, active 스타일 변경
-              className="w-full px-4 py-2 bg-red-50 text-red-600 text-sm font-medium rounded-md hover:bg-red-100 active:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-200 focus:ring-offset-1 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
-            >
-              삭제
-            </motion.button>
+            {isDemoClass ? (
+              <>
+                {/* 데모 학급: 복사 버튼 */}
+                <motion.button
+                  onClick={handleCopyDemoClass}
+                  disabled={isCopying}
+                  className={`w-full px-4 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-green-200 focus:ring-offset-1 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg ${
+                    isCopying 
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                      : 'bg-green-50 text-green-600 hover:bg-green-100 active:bg-green-100 cursor-pointer'
+                  }`}
+                >
+                  {isCopying ? '⏳ 복사 중...' : '📋 복사'}
+                </motion.button>
+                {/* 데모 학급: 체험하기 버튼 */}
+                <motion.button
+                  onClick={handleCardClick}
+                  className="w-full px-4 py-2 bg-blue-50 text-blue-600 text-sm font-medium rounded-md hover:bg-blue-100 active:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:ring-offset-1 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
+                >
+                  🚀 체험하기
+                </motion.button>
+              </>
+            ) : (
+              <>
+                {/* 일반 학급: 수정/삭제 버튼 */}
+                <motion.button
+                  onClick={handleEditClick}
+                  className="w-full px-4 py-2 bg-indigo-50 text-indigo-500 text-sm font-medium rounded-md hover:bg-indigo-100 active:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:ring-offset-1 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
+                >
+                  수정
+                </motion.button>
+                <motion.button
+                  onClick={handleDeleteClick}
+                  className="w-full px-4 py-2 bg-red-50 text-red-600 text-sm font-medium rounded-md hover:bg-red-100 active:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-200 focus:ring-offset-1 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
+                >
+                  삭제
+                </motion.button>
+              </>
+            )}
           </div>
         </div>
       </motion.div>

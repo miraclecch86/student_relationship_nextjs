@@ -11,10 +11,13 @@ import Link from 'next/link';
 // import Banner from '@/components/Banner'; // 기존 Banner 주석 처리 또는 삭제
 import CarouselBanner from '@/components/CarouselBanner'; // CarouselBanner import
 import { SparklesIcon } from '@heroicons/react/24/outline'; // 예시 아이콘
+import { handleDemoSaveAttempt, isDemoClass } from '@/utils/demo-permissions';
 
 // 주관식 질문 개수를 포함하는 새로운 인터페이스 정의
 interface ClassWithCount extends BaseClass {
   user_id: string;
+  is_demo?: boolean;
+  is_public?: boolean;
   subjectiveQuestionCount?: number;
   studentCount: number;
   surveyCount: number;
@@ -30,11 +33,11 @@ async function fetchClasses(): Promise<ClassWithCount[]> {
     throw new Error('인증 세션을 확인할 수 없습니다.');
   }
 
-  // 클래스 데이터 조회
+  // 🎯 사용자 학급 + 공개 데모 학급 모두 조회
   const { data: classesData, error: classesError } = await supabase
     .from('classes')
-    .select('id, name, created_at, user_id')
-    .eq('user_id', session.user.id)
+    .select('id, name, created_at, user_id, is_demo, is_public')
+    .or(`user_id.eq.${session.user.id},and(is_demo.eq.true,is_public.eq.true)`)
     .order('created_at');
 
   if (classesError) {
@@ -75,7 +78,19 @@ async function fetchClasses(): Promise<ClassWithCount[]> {
     })
   );
 
-  return classesWithCounts;
+  // 🌟 데모 학급을 맨 위로 정렬
+  const sortedClasses = classesWithCounts.sort((a, b) => {
+    const aIsDemo = a.is_demo && a.is_public;
+    const bIsDemo = b.is_demo && b.is_public;
+    
+    if (aIsDemo && !bIsDemo) return -1;
+    if (!aIsDemo && bIsDemo) return 1;
+    
+    // 같은 타입이면 생성일 기준 정렬
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+
+  return sortedClasses;
   // --- 임시 주석 처리 제거 끝 ---
 
   // 임시 반환: 카운트 없이 클래스 데이터만 반환 (타입 맞추기 위해 임시 카운트 추가)
@@ -207,25 +222,77 @@ export default function TeacherPage() {
   });
 
   // 학급 수정 Mutation
-  const updateClassMutation = useMutation<BaseClass | null, Error, { id: string; newName: string }>({
-    mutationFn: ({ id, newName }) => updateClass(id, newName),
+  const updateClassMutation = useMutation<BaseClass | null, Error, { id: string; newName: string; classData: ClassWithCount }>({
+    mutationFn: async ({ id, newName, classData }) => {
+      // 🌟 데모 학급 권한 체크
+      if (isDemoClass(classData)) {
+        const saveAttempt = handleDemoSaveAttempt(classData, "학급 이름 수정");
+        if (!saveAttempt.canSave) {
+          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
+            duration: 4000,
+            style: {
+              background: '#3B82F6',
+              color: 'white',
+              padding: '16px',
+              fontSize: '14px',
+              lineHeight: '1.5',
+              whiteSpace: 'pre-line'
+            }
+          });
+          throw new Error("DEMO_BLOCKED");
+        }
+      }
+      return updateClass(id, newName);
+    },
     onSuccess: (updatedClass, variables) => {
       queryClient.invalidateQueries({ queryKey: ['classes'] });
-      toast.success(`'${variables.newName}'으로 학급 이름이 수정되었습니다.`);
+      // 🌟 데모 학급이 아닌 경우만 성공 메시지 표시
+      if (!isDemoClass(variables.classData)) {
+        toast.success(`'${variables.newName}'으로 학급 이름이 수정되었습니다.`);
+      }
     },
     onError: (error) => {
+      if (error instanceof Error && error.message === "DEMO_BLOCKED") {
+        return;
+      }
       toast.error(`학급 수정 실패: ${error.message}`);
     },
   });
 
   // 학급 삭제 Mutation
-  const deleteClassMutation = useMutation<void, Error, string>({
-    mutationFn: deleteClass,
-    onSuccess: (_, id) => {
+  const deleteClassMutation = useMutation<void, Error, { id: string; classData: ClassWithCount }>({
+    mutationFn: async ({ id, classData }) => {
+      // 🌟 데모 학급 권한 체크
+      if (isDemoClass(classData)) {
+        const saveAttempt = handleDemoSaveAttempt(classData, "학급 삭제");
+        if (!saveAttempt.canSave) {
+          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
+            duration: 4000,
+            style: {
+              background: '#3B82F6',
+              color: 'white',
+              padding: '16px',
+              fontSize: '14px',
+              lineHeight: '1.5',
+              whiteSpace: 'pre-line'
+            }
+          });
+          throw new Error("DEMO_BLOCKED");
+        }
+      }
+      return deleteClass(id);
+    },
+    onSuccess: (_, { classData }) => {
       queryClient.invalidateQueries({ queryKey: ['classes'] });
-      toast.success('학급이 삭제되었습니다.');
+      // 🌟 데모 학급이 아닌 경우만 성공 메시지 표시
+      if (!isDemoClass(classData)) {
+        toast.success('학급이 삭제되었습니다.');
+      }
     },
     onError: (error) => {
+      if (error instanceof Error && error.message === "DEMO_BLOCKED") {
+        return;
+      }
       toast.error(`학급 삭제 실패: ${error.message}`);
     },
   });
@@ -246,12 +313,18 @@ export default function TeacherPage() {
 
   // ClassCard에 전달할 수정 함수
   const handleEditClass = async (id: string, newName: string) => {
-    await updateClassMutation.mutateAsync({ id, newName });
+    const classData = classes?.find(cls => cls.id === id);
+    if (classData) {
+      await updateClassMutation.mutateAsync({ id, newName, classData });
+    }
   };
 
   // ClassCard에 전달할 삭제 함수
   const handleDeleteClass = async (id: string) => {
-    await deleteClassMutation.mutateAsync(id);
+    const classData = classes?.find(cls => cls.id === id);
+    if (classData) {
+      await deleteClassMutation.mutateAsync({ id, classData });
+    }
   };
 
   // 로딩 및 에러 처리 (useQuery 상태 사용)

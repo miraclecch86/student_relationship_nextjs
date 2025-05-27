@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { analyzeClassOverview } from '@/lib/openai';
+import { analyzeClassOverviewWithGemini } from '@/lib/gemini';
 import { Database } from '@/lib/database.types';
+import { isDemoClass } from '@/utils/demo-permissions';
 
 export const dynamic = 'force-dynamic'; // 라우트를 동적으로 설정
 
@@ -14,18 +16,17 @@ export async function POST(
   console.log('[종합분석 API] 호출됨, context.params:', context.params);
   
   try {
-    const { classId } = context.params;
+    const params = await context.params;
+    const { classId } = params;
     
-    // 요청 본문에서 session_id 추출
+    // 요청 본문에서 session_id와 model 추출
     const requestData = await request.json().catch(() => ({}));
     const sessionId = requestData.session_id || null;
-    console.log('[종합분석 API] 세션 ID:', sessionId);
+    const model = requestData.model || 'gpt'; // 기본값은 gpt
+    console.log('[종합분석 API] 세션 ID:', sessionId, ', 모델:', model);
     
     // Supabase 클라이언트 생성
-    const cookieStore = cookies();
-    console.log('[종합분석 API] 쿠키 스토어 생성됨');
-    
-    const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
+    const supabase = createRouteHandlerClient<Database>({ cookies });
     console.log('[종합분석 API] Supabase 클라이언트 생성됨');
 
     // 인증 확인
@@ -51,7 +52,7 @@ export async function POST(
     // 학급 소유권 확인
     const { data: classData, error: classError } = await supabase
       .from('classes')
-      .select('user_id')
+      .select('id, name, created_at, user_id, is_demo, is_public')
       .eq('id', classId)
       .single();
 
@@ -71,14 +72,15 @@ export async function POST(
       );
     }
 
-    if (classData.user_id !== session.user.id) {
+    // 🌟 데모 학급이 아닌 경우에만 소유권 확인
+    if (!isDemoClass(classData) && classData.user_id !== session.user.id) {
       console.log('[종합분석 API] 권한 없음. 학급 소유자:', classData.user_id, '요청자:', session.user.id);
       return NextResponse.json(
         { error: '학급에 대한 권한이 없습니다.' },
         { status: 403 }
       );
     }
-    console.log('[종합분석 API] 학급 권한 확인 완료');
+    console.log('[종합분석 API] 학급 권한 확인 완료 (데모 학급:', isDemoClass(classData), ')');
 
     // 학생 목록 조회
     const { data: students, error: studentsError } = await supabase
@@ -136,12 +138,12 @@ export async function POST(
     }
     console.log('[종합분석 API] 관계 데이터 조회 완료, 관계 수:', relationships ? relationships.length : 0);
 
-    // OpenAI API를 통해 분석 수행
+    // AI 분석 수행 (선택된 모델에 따라)
     try {
-      console.log('[종합분석 API] AI 분석 시작');
+      console.log('[종합분석 API] AI 분석 시작, 선택된 모델:', model);
       
       // 환경 변수 확인
-      if (!process.env.OPENAI_API_KEY) {
+      if (model === 'gpt' && !process.env.OPENAI_API_KEY) {
         console.error('[종합분석 API] OPENAI_API_KEY 환경 변수가 설정되지 않았습니다.');
         return NextResponse.json(
           { error: 'OpenAI API 키가 설정되지 않았습니다. 환경 변수를 확인해주세요.' },
@@ -149,7 +151,15 @@ export async function POST(
         );
       }
       
-      console.log('[종합분석 API] 환경 변수 확인 완료, API 키 길이:', process.env.OPENAI_API_KEY.length);
+      if (model === 'gemini-flash' && !process.env.GEMINI_API_KEY) {
+        console.error('[종합분석 API] GEMINI_API_KEY 환경 변수가 설정되지 않았습니다.');
+        return NextResponse.json(
+          { error: 'Gemini API 키가 설정되지 않았습니다. 환경 변수를 확인해주세요.' },
+          { status: 500 }
+        );
+      }
+      
+      console.log('[종합분석 API] 환경 변수 확인 완료');
       
       // 학급에 속한 모든 설문지 조회
       console.log('[종합분석 API] 설문지 정보 조회 시작');
@@ -244,19 +254,34 @@ export async function POST(
       }
       console.log('[종합분석 API] 학급 상세 정보 조회 완료');
       
-      // AI 분석을 위해 모든 데이터를 전달
-      const analysisResult = await analyzeClassOverview(
-        students,
-        relationships || [],
-        allAnswers || [],
-        allQuestions || [],
-        {
-          classDetails: classDetails || { id: classId },
-          surveys: surveys || [],
-          surveyData: surveyData,
-        }
-      );
-      console.log('[종합분석 API] AI 분석 완료, 결과 타입:', typeof analysisResult);
+      // AI 분석을 위해 모든 데이터를 전달 (선택된 모델에 따라)
+      let analysisResult;
+      if (model === 'gemini-flash') {
+        analysisResult = await analyzeClassOverviewWithGemini(
+          students,
+          relationships || [],
+          allAnswers || [],
+          allQuestions || [],
+          {
+            classDetails: classDetails || { id: classId },
+            surveys: surveys || [],
+            surveyData: surveyData,
+          }
+        );
+      } else {
+        analysisResult = await analyzeClassOverview(
+          students,
+          relationships || [],
+          allAnswers || [],
+          allQuestions || [],
+          {
+            classDetails: classDetails || { id: classId },
+            surveys: surveys || [],
+            surveyData: surveyData,
+          }
+        );
+      }
+      console.log('[종합분석 API] AI 분석 완료, 모델:', model, ', 결과 타입:', typeof analysisResult);
       
       // 분석 결과 저장
       console.log('[종합분석 API] 분석 결과 저장 시작');

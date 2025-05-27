@@ -22,6 +22,7 @@ import { ko } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import ConfirmModal from '@/components/ConfirmModal';
+import { handleDemoSaveAttempt, isDemoClass } from '@/utils/demo-permissions';
 
 // 생활기록부 결과 타입 정의
 interface SchoolRecord {
@@ -72,8 +73,8 @@ async function fetchSchoolRecords(classId: string): Promise<SchoolRecord[]> {
 }
 
 // 생활기록부 생성 함수
-async function generateSchoolRecord(classId: string): Promise<SchoolRecord> {
-  console.log(`생활기록부 생성 요청: classId=${classId}`);
+async function generateSchoolRecord(classId: string, model: 'gpt' | 'gemini-flash' = 'gpt'): Promise<SchoolRecord> {
+  console.log(`생활기록부 생성 요청: classId=${classId}, model=${model}`);
   
   try {
     const response = await fetch(`/api/class/${classId}/schoolrecord`, {
@@ -81,6 +82,7 @@ async function generateSchoolRecord(classId: string): Promise<SchoolRecord> {
       headers: {
         'Content-Type': 'application/json',
       },
+      body: JSON.stringify({ model }),
     });
     
     if (!response.ok) {
@@ -222,9 +224,10 @@ async function updateSchoolRecordDescription(
 // 생활기록부 카드 컴포넌트
 interface SchoolRecordCardProps {
   record: SchoolRecord;
+  classDetails?: Class | null;
 }
 
-function SchoolRecordCard({ record }: SchoolRecordCardProps) {
+function SchoolRecordCard({ record, classDetails }: SchoolRecordCardProps) {
   const router = useRouter();
   const params = useParams();
   const classId = params.classId as string;
@@ -249,27 +252,82 @@ function SchoolRecordCard({ record }: SchoolRecordCardProps) {
   
   // 삭제 Mutation
   const deleteMutation = useMutation({
-    mutationFn: () => deleteSchoolRecord(classId, record.id),
+    mutationFn: async () => {
+      // 🌟 데모 학급 권한 체크 - 먼저 체크하고 차단
+      if (classDetails && isDemoClass(classDetails)) {
+        const saveAttempt = handleDemoSaveAttempt(classDetails, "생활기록부 삭제");
+        if (!saveAttempt.canSave) {
+          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
+            duration: 4000,
+            style: {
+              background: '#3B82F6',
+              color: 'white',
+              padding: '16px',
+              fontSize: '14px',
+              lineHeight: '1.5',
+              whiteSpace: 'pre-line'
+            }
+          });
+          // 실제 API 호출 없이 바로 리턴
+          return Promise.resolve();
+        }
+      }
+      return deleteSchoolRecord(classId, record.id);
+    },
     onSuccess: () => {
+      // 🌟 데모 학급인 경우에는 쿼리 무효화나 상태 업데이트 안함
+      if (classDetails && isDemoClass(classDetails)) {
+        setIsDeleteDialogOpen(false);
+        return;
+      }
       toast.success('생활기록부가 삭제되었습니다.');
       queryClient.invalidateQueries({ queryKey: ['schoolRecords', classId] });
       setIsDeleteDialogOpen(false);
     },
     onError: (error) => {
+      console.error('삭제 mutation 에러:', error);
       toast.error(error instanceof Error ? error.message : '삭제 중 오류가 발생했습니다.');
     },
   });
   
   // 설명 업데이트 Mutation
   const updateDescriptionMutation = useMutation({
-    mutationFn: () => updateSchoolRecordDescription(classId, record.id, description),
+    mutationFn: async () => {
+      // 🌟 데모 학급 권한 체크 - 먼저 체크하고 차단
+      if (classDetails && isDemoClass(classDetails)) {
+        const saveAttempt = handleDemoSaveAttempt(classDetails, "생활기록부 설명 수정");
+        if (!saveAttempt.canSave) {
+          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
+            duration: 4000,
+            style: {
+              background: '#3B82F6',
+              color: 'white',
+              padding: '16px',
+              fontSize: '14px',
+              lineHeight: '1.5',
+              whiteSpace: 'pre-line'
+            }
+          });
+          // 실제 API 호출 없이 바로 리턴
+          return Promise.resolve();
+        }
+      }
+      return updateSchoolRecordDescription(classId, record.id, description);
+    },
     onSuccess: () => {
+      // 🌟 데모 학급인 경우에는 쿼리 무효화나 상태 업데이트 안함
+      if (classDetails && isDemoClass(classDetails)) {
+        setIsEditing(false);
+        setIsSaving(false);
+        return;
+      }
       toast.success('설명이 업데이트되었습니다.');
       queryClient.invalidateQueries({ queryKey: ['schoolRecords', classId] });
       setIsEditing(false);
       setIsSaving(false);
     },
     onError: (error) => {
+      console.error('설명 업데이트 mutation 에러:', error);
       toast.error(error instanceof Error ? error.message : '설명 업데이트 중 오류가 발생했습니다.');
       setIsSaving(false);
     },
@@ -414,6 +472,7 @@ export default function SchoolRecordPage() {
   const [isDeleteAllModalOpen, setIsDeleteAllModalOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState('');
+  const [selectedModel, setSelectedModel] = useState<'gpt' | 'gemini-flash'>('gpt');
   
   // 학급 정보 조회
   const { 
@@ -441,13 +500,40 @@ export default function SchoolRecordPage() {
   
   // 생활기록부 생성 mutation
   const generateMutation = useMutation({
-    mutationFn: () => generateSchoolRecord(classId),
-    onSuccess: () => {
+    mutationFn: async () => {
+      // 🌟 데모 학급 권한 체크 - 먼저 체크하고 차단
+      if (classDetails && isDemoClass(classDetails)) {
+        const saveAttempt = handleDemoSaveAttempt(classDetails, "AI 생활기록부 생성");
+        if (!saveAttempt.canSave) {
+          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
+            duration: 4000,
+            style: {
+              background: '#3B82F6',
+              color: 'white',
+              padding: '16px',
+              fontSize: '14px',
+              lineHeight: '1.5',
+              whiteSpace: 'pre-line'
+            }
+          });
+          // 실제 API 호출 없이 바로 리턴
+          return Promise.resolve({} as SchoolRecord);
+        }
+      }
+      return generateSchoolRecord(classId, selectedModel);
+    },
+    onSuccess: (data) => {
+      // 🌟 데모 학급인 경우에는 쿼리 무효화나 상태 업데이트 안함
+      if (classDetails && isDemoClass(classDetails)) {
+        setIsGenerating(false);
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: ['schoolRecords', classId] });
       toast.success('생활기록부가 생성되었습니다.');
       setIsGenerating(false);
     },
     onError: (error: any) => {
+      console.error('생성 mutation 에러:', error);
       toast.error(`생성 실패: ${error.message}`);
       setIsGenerating(false);
     },
@@ -455,12 +541,38 @@ export default function SchoolRecordPage() {
   
   // 모든 생활기록부 삭제 mutation
   const deleteAllMutation = useMutation({
-    mutationFn: () => deleteAllSchoolRecords(classId),
+    mutationFn: async () => {
+      // 🌟 데모 학급 권한 체크 - 먼저 체크하고 차단
+      if (classDetails && isDemoClass(classDetails)) {
+        const saveAttempt = handleDemoSaveAttempt(classDetails, "모든 생활기록부 삭제");
+        if (!saveAttempt.canSave) {
+          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
+            duration: 4000,
+            style: {
+              background: '#3B82F6',
+              color: 'white',
+              padding: '16px',
+              fontSize: '14px',
+              lineHeight: '1.5',
+              whiteSpace: 'pre-line'
+            }
+          });
+          // 실제 API 호출 없이 바로 리턴
+          return Promise.resolve();
+        }
+      }
+      return deleteAllSchoolRecords(classId);
+    },
     onSuccess: () => {
+      // 🌟 데모 학급인 경우에는 쿼리 무효화나 상태 업데이트 안함
+      if (classDetails && isDemoClass(classDetails)) {
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: ['schoolRecords', classId] });
       toast.success('모든 생활기록부가 삭제되었습니다.');
     },
     onError: (error: any) => {
+      console.error('삭제 mutation 에러:', error);
       toast.error(`삭제 실패: ${error.message}`);
     },
   });
@@ -545,23 +657,48 @@ export default function SchoolRecordPage() {
             </button>
             <h1 className="text-2xl font-bold text-black">{classDetails.name} 생활기록부</h1>
           </div>
-          <button
-            onClick={generateSchoolRecordWithProgress}
-            disabled={generateMutation.isPending || isGenerating}
-            className="px-4 py-2 text-sm bg-amber-500 text-white rounded-md hover:bg-amber-600 shadow focus:outline-none focus:ring-2 focus:ring-amber-300 focus:ring-offset-1 transition-all duration-200 flex items-center disabled:opacity-70 disabled:cursor-not-allowed"
-          >
-            {generateMutation.isPending || isGenerating ? (
-              <>
-                <ArrowPathIcon className="w-4 h-4 animate-spin mr-2" />
-                생성 중...
-              </>
-            ) : (
-              <>
-                <SparklesIcon className="w-4 h-4 mr-2" />
-                새 생활기록부 생성
-              </>
-            )}
-          </button>
+          <div className="flex items-center gap-3">
+            {/* AI 모델 선택 버튼 */}
+            <div className="flex bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setSelectedModel('gpt')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
+                  selectedModel === 'gpt'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                GPT-4
+              </button>
+              <button
+                onClick={() => setSelectedModel('gemini-flash')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
+                  selectedModel === 'gemini-flash'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Gemini 2.5
+              </button>
+            </div>
+            <button
+              onClick={generateSchoolRecordWithProgress}
+              disabled={generateMutation.isPending || isGenerating}
+              className="px-4 py-2 text-sm bg-amber-500 text-white rounded-md hover:bg-amber-600 shadow focus:outline-none focus:ring-2 focus:ring-amber-300 focus:ring-offset-1 transition-all duration-200 flex items-center disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              {generateMutation.isPending || isGenerating ? (
+                <>
+                  <ArrowPathIcon className="w-4 h-4 animate-spin mr-2" />
+                  생성 중...
+                </>
+              ) : (
+                <>
+                  <SparklesIcon className="w-4 h-4 mr-2" />
+                  새 생활기록부 생성
+                </>
+              )}
+            </button>
+          </div>
         </header>
         
         {/* 생활기록부 생성 설명 부분은 현재 위치 유지 */}
@@ -640,6 +777,7 @@ export default function SchoolRecordPage() {
                   <SchoolRecordCard
                     key={record.id}
                     record={record}
+                    classDetails={classDetails}
                   />
                 ))}
               </AnimatePresence>

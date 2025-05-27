@@ -22,6 +22,7 @@ import { ko } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import ConfirmModal from '@/components/ConfirmModal';
+import { handleDemoSaveAttempt, isDemoClass } from '@/utils/demo-permissions';
 
 // 분석 결과 타입 정의
 interface AnalysisResult {
@@ -75,7 +76,7 @@ async function fetchAnalysisResults(classId: string): Promise<AnalysisResult[]> 
   console.log(`분석 목록 요청: classId=${classId}`);
   
   try {
-    // API 엔드포인트에 직접 요청 (group_by_session=true 추가)
+    // API 엔드포인트에 group_by_session=true 파라미터 추가
     const response = await fetch(`/api/class/${classId}/analysis?group_by_session=true`);
     
     if (!response.ok) {
@@ -83,7 +84,24 @@ async function fetchAnalysisResults(classId: string): Promise<AnalysisResult[]> 
     }
     
     const data = await response.json();
-    console.log(`분석 목록 수신 성공, ${data ? data.length : 0}개의 결과`);
+    console.log(`분석 목록 수신 성공, ${data ? data.length : 0}개의 결과 (세션별 그룹화됨)`);
+    
+    // 🔍 데이터 구조 상세 로그
+    if (data && data.length > 0) {
+      console.log('🔍 첫 번째 분석 결과 상세:', data[0]);
+      console.log('🔍 result_data 타입:', typeof data[0].result_data);
+      console.log('🔍 result_data 내용:', data[0].result_data);
+      
+      if (typeof data[0].result_data === 'string') {
+        try {
+          const parsed = JSON.parse(data[0].result_data);
+          console.log('🔍 파싱된 result_data:', parsed);
+        } catch (e) {
+          console.log('🔍 result_data JSON 파싱 실패:', e);
+        }
+      }
+    }
+    
     return data || [];
   } catch (error) {
     console.error('분석 목록 요청 오류:', error);
@@ -130,8 +148,8 @@ async function runAnalysis(classId: string): Promise<AnalysisResult> {
 }
 
 // 종합 분석 실행 함수 수정
-async function runOverviewAnalysis(classId: string, sessionId: string): Promise<AnalysisResult> {
-  console.log(`종합 분석 실행 요청: classId=${classId}, sessionId=${sessionId}`);
+async function runOverviewAnalysis(classId: string, sessionId: string, model: 'gpt' | 'gemini-flash' = 'gpt'): Promise<AnalysisResult> {
+  console.log(`종합 분석 실행 요청: classId=${classId}, sessionId=${sessionId}, model=${model}`);
   
   try {
     const response = await fetch(`/api/class/${encodeURIComponent(classId)}/analysis/overview?sessionId=${encodeURIComponent(sessionId)}`, {
@@ -139,7 +157,10 @@ async function runOverviewAnalysis(classId: string, sessionId: string): Promise<
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ session_id: sessionId }), // session_id 전달
+      body: JSON.stringify({ 
+        session_id: sessionId,
+        model: model 
+      }), // session_id와 model 전달
     });
     
     if (!response.ok) {
@@ -169,8 +190,8 @@ async function runOverviewAnalysis(classId: string, sessionId: string): Promise<
 }
 
 // 학생 그룹별 분석 실행 함수 수정
-async function runStudentGroupAnalysis(classId: string, groupIndex: number, sessionId: string): Promise<AnalysisResult> {
-  console.log(`학생 그룹${groupIndex} 분석 실행 요청: classId=${classId}, sessionId=${sessionId}`);
+async function runStudentGroupAnalysis(classId: string, groupIndex: number, sessionId: string, model: 'gpt' | 'gemini-flash' = 'gpt'): Promise<AnalysisResult> {
+  console.log(`학생 그룹${groupIndex} 분석 실행 요청: classId=${classId}, sessionId=${sessionId}, model=${model}`);
   
   try {
     const response = await fetch(`/api/class/${encodeURIComponent(classId)}/analysis/students?group=${groupIndex}&sessionId=${encodeURIComponent(sessionId)}`, {
@@ -178,7 +199,10 @@ async function runStudentGroupAnalysis(classId: string, groupIndex: number, sess
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ session_id: sessionId }), // session_id 전달
+      body: JSON.stringify({ 
+        session_id: sessionId,
+        model: model 
+      }), // session_id와 model 전달
     });
     
     if (!response.ok) {
@@ -259,16 +283,23 @@ const getAnalysisBadge = (type: string) => {
 // 분석 카드 컴포넌트
 interface AnalysisCardProps {
   analysis: AnalysisResult;
+  classDetails?: Class | null;
 }
 
-function AnalysisCard({ analysis }: AnalysisCardProps) {
+function AnalysisCard({ analysis, classDetails }: AnalysisCardProps) {
   const router = useRouter();
   const params = useParams();
   const queryClient = useQueryClient();
   const classId = params.classId as string;
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [description, setDescription] = useState(analysis.summary || '편집 버튼을 눌러 설명을 입력하세요.');
+  
+  // 의미 있는 설명이 있는지 확인하고 없으면 기본 텍스트 사용
+  const hasValidSummary = analysis.summary && analysis.summary.trim().length > 0 && 
+                         !analysis.summary.includes("학급 관계 분석") && 
+                         !analysis.summary.includes("분석 결과");
+  
+  const [description, setDescription] = useState(hasValidSummary ? analysis.summary : '편집 버튼을 눌러 설명을 입력하세요.');
   const [isSaving, setIsSaving] = useState(false);
   
   // 설명이 기본 텍스트인지 확인
@@ -282,28 +313,83 @@ function AnalysisCard({ analysis }: AnalysisCardProps) {
   const badge = getAnalysisBadge(analysis.type);
   
   // 삭제 Mutation
-  const deleteAnalysisMutation = useMutation({
-    mutationFn: () => deleteAnalysis(classId, analysis.id),
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      // 🌟 데모 학급 권한 체크
+      if (classDetails && isDemoClass(classDetails)) {
+        const saveAttempt = handleDemoSaveAttempt(classDetails, "분석 결과 삭제");
+        if (!saveAttempt.canSave) {
+          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
+            duration: 4000,
+            style: {
+              background: '#3B82F6',
+              color: 'white',
+              padding: '16px',
+              fontSize: '14px',
+              lineHeight: '1.5',
+              whiteSpace: 'pre-line'
+            }
+          });
+          throw new Error("DEMO_BLOCKED");
+        }
+      }
+      return deleteAnalysis(classId, analysis.id);
+    },
     onSuccess: () => {
-      toast.success('분석 결과가 삭제되었습니다.');
+      // 🌟 데모 학급이 아닌 경우만 성공 메시지 표시
+      if (classDetails && !isDemoClass(classDetails)) {
+        toast.success('분석 결과가 삭제되었습니다.');
+      }
       queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
       setIsDeleteDialogOpen(false);
     },
     onError: (error) => {
+      if (error instanceof Error && error.message === "DEMO_BLOCKED") {
+        setIsDeleteDialogOpen(false);
+        return;
+      }
       toast.error(error instanceof Error ? error.message : '삭제 중 오류가 발생했습니다.');
     },
   });
   
   // 설명 업데이트 Mutation
   const updateDescriptionMutation = useMutation({
-    mutationFn: () => updateAnalysisDescription(classId, analysis.id, description),
+    mutationFn: async () => {
+      // 🌟 데모 학급 권한 체크
+      if (classDetails && isDemoClass(classDetails)) {
+        const saveAttempt = handleDemoSaveAttempt(classDetails, "분석 결과 설명 수정");
+        if (!saveAttempt.canSave) {
+          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
+            duration: 4000,
+            style: {
+              background: '#3B82F6',
+              color: 'white',
+              padding: '16px',
+              fontSize: '14px',
+              lineHeight: '1.5',
+              whiteSpace: 'pre-line'
+            }
+          });
+          throw new Error("DEMO_BLOCKED");
+        }
+      }
+      return updateAnalysisDescription(classId, analysis.id, description);
+    },
     onSuccess: () => {
-      toast.success('설명이 업데이트되었습니다.');
+      // 🌟 데모 학급이 아닌 경우만 성공 메시지 표시
+      if (classDetails && !isDemoClass(classDetails)) {
+        toast.success('설명이 업데이트되었습니다.');
+      }
       queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
       setIsEditing(false);
       setIsSaving(false);
     },
     onError: (error) => {
+      if (error instanceof Error && error.message === "DEMO_BLOCKED") {
+        setIsEditing(false);
+        setIsSaving(false);
+        return;
+      }
       toast.error(error instanceof Error ? error.message : '설명 업데이트 중 오류가 발생했습니다.');
       setIsSaving(false);
     },
@@ -315,7 +401,7 @@ function AnalysisCard({ analysis }: AnalysisCardProps) {
   };
   
   const confirmDelete = () => {
-    deleteAnalysisMutation.mutate();
+    deleteMutation.mutate();
   };
   
   const handleEditClick = (e: React.MouseEvent) => {
@@ -412,11 +498,11 @@ function AnalysisCard({ analysis }: AnalysisCardProps) {
               </button>
               <button
                 onClick={handleDeleteClick}
-                disabled={deleteAnalysisMutation.isPending}
+                disabled={deleteMutation.isPending}
                 className="p-1.5 rounded-full bg-gray-50 hover:bg-red-50 text-gray-500 hover:text-red-600 transition-colors focus:outline-none focus:ring-2 focus:ring-red-300"
                 title="삭제"
               >
-                {deleteAnalysisMutation.isPending ? (
+                {deleteMutation.isPending ? (
                   <ArrowPathIcon className="w-4 h-4 animate-spin" />
                 ) : (
                   <TrashIcon className="w-4 h-4" />
@@ -434,7 +520,7 @@ function AnalysisCard({ analysis }: AnalysisCardProps) {
         title="분석 결과 삭제 확인"
         message={`${formattedDate} ${formattedTime}에 생성된 분석 결과를 정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`}
         confirmText="삭제"
-        isLoading={deleteAnalysisMutation.isPending}
+        isLoading={deleteMutation.isPending}
       />
     </>
   );
@@ -525,6 +611,7 @@ export default function ClassAnalysisPage() {
   const [isDeleteAllDialogOpen, setIsDeleteAllDialogOpen] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState('');
+  const [selectedModel, setSelectedModel] = useState<'gpt' | 'gemini-flash'>('gpt');
   
   // 학급 정보 조회
   const { data: classDetails, isLoading: isClassLoading } = useQuery({
@@ -547,12 +634,38 @@ export default function ClassAnalysisPage() {
   
   // 종합 분석 실행 Mutation
   const runOverviewMutation = useMutation({
-    mutationFn: (sessionId: string) => runOverviewAnalysis(classId, sessionId),
+    mutationFn: async (sessionId: string) => {
+      // 🌟 데모 학급 권한 체크 - 먼저 체크하고 차단
+      if (classDetails && isDemoClass(classDetails)) {
+        const saveAttempt = handleDemoSaveAttempt(classDetails, "AI 학급 관계 분석");
+        if (!saveAttempt.canSave) {
+          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
+            duration: 4000,
+            style: {
+              background: '#3B82F6',
+              color: 'white',
+              padding: '16px',
+              fontSize: '14px',
+              lineHeight: '1.5',
+              whiteSpace: 'pre-line'
+            }
+          });
+          // 실제 API 호출 없이 바로 리턴
+          return Promise.resolve({} as AnalysisResult);
+        }
+      }
+      return runOverviewAnalysis(classId, sessionId, selectedModel);
+    },
     onSuccess: (newAnalysis) => {
+      // 🌟 데모 학급인 경우에는 쿼리 무효화나 상태 업데이트 안함
+      if (classDetails && isDemoClass(classDetails)) {
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
       toast.success('종합 분석이 완료되었습니다.');
     },
     onError: (error) => {
+      console.error('종합 분석 mutation 에러:', error);
       toast.error(error instanceof Error ? error.message : '종합 분석 실행 중 오류가 발생했습니다.');
       setIsAnalyzing(false);
     },
@@ -560,96 +673,304 @@ export default function ClassAnalysisPage() {
   
   // 학생 그룹1 분석 실행 Mutation
   const runStudents1Mutation = useMutation({
-    mutationFn: (sessionId: string) => runStudentGroupAnalysis(classId, 1, sessionId),
+    mutationFn: async (sessionId: string) => {
+      // 🌟 데모 학급 권한 체크
+      if (classDetails && isDemoClass(classDetails)) {
+        const saveAttempt = handleDemoSaveAttempt(classDetails, "학생 그룹 분석");
+        if (!saveAttempt.canSave) {
+          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
+            duration: 4000,
+            style: {
+              background: '#3B82F6',
+              color: 'white',
+              padding: '16px',
+              fontSize: '14px',
+              lineHeight: '1.5',
+              whiteSpace: 'pre-line'
+            }
+          });
+          throw new Error("DEMO_BLOCKED");
+        }
+      }
+      return runStudentGroupAnalysis(classId, 1, sessionId, selectedModel);
+    },
     onSuccess: (newAnalysis) => {
       queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
-      toast.success('첫 번째 학생 그룹 분석이 완료되었습니다.');
+      // 🌟 데모 학급이 아닌 경우만 성공 메시지 표시
+      if (classDetails && !isDemoClass(classDetails)) {
+        toast.success('첫 번째 학생 그룹 분석이 완료되었습니다.');
+      }
     },
     onError: (error) => {
+      if (error instanceof Error && error.message === "DEMO_BLOCKED") {
+        return;
+      }
       toast.error(error instanceof Error ? error.message : '학생 그룹1 분석 실행 중 오류가 발생했습니다.');
     },
   });
   
   // 학생 그룹2 분석 실행 Mutation
   const runStudents2Mutation = useMutation({
-    mutationFn: (sessionId: string) => runStudentGroupAnalysis(classId, 2, sessionId),
+    mutationFn: async (sessionId: string) => {
+      // 🌟 데모 학급 권한 체크
+      if (classDetails && isDemoClass(classDetails)) {
+        const saveAttempt = handleDemoSaveAttempt(classDetails, "학생 그룹 분석");
+        if (!saveAttempt.canSave) {
+          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
+            duration: 4000,
+            style: {
+              background: '#3B82F6',
+              color: 'white',
+              padding: '16px',
+              fontSize: '14px',
+              lineHeight: '1.5',
+              whiteSpace: 'pre-line'
+            }
+          });
+          throw new Error("DEMO_BLOCKED");
+        }
+      }
+      return runStudentGroupAnalysis(classId, 2, sessionId, selectedModel);
+    },
     onSuccess: (newAnalysis) => {
       queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
-      toast.success('두 번째 학생 그룹 분석이 완료되었습니다.');
+      // 🌟 데모 학급이 아닌 경우만 성공 메시지 표시
+      if (classDetails && !isDemoClass(classDetails)) {
+        toast.success('두 번째 학생 그룹 분석이 완료되었습니다.');
+      }
     },
     onError: (error) => {
+      if (error instanceof Error && error.message === "DEMO_BLOCKED") {
+        return;
+      }
       toast.error(error instanceof Error ? error.message : '학생 그룹2 분석 실행 중 오류가 발생했습니다.');
     },
   });
   
   // 학생 그룹3 분석 실행 Mutation
   const runStudents3Mutation = useMutation({
-    mutationFn: (sessionId: string) => runStudentGroupAnalysis(classId, 3, sessionId),
+    mutationFn: async (sessionId: string) => {
+      // 🌟 데모 학급 권한 체크
+      if (classDetails && isDemoClass(classDetails)) {
+        const saveAttempt = handleDemoSaveAttempt(classDetails, "학생 그룹 분석");
+        if (!saveAttempt.canSave) {
+          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
+            duration: 4000,
+            style: {
+              background: '#3B82F6',
+              color: 'white',
+              padding: '16px',
+              fontSize: '14px',
+              lineHeight: '1.5',
+              whiteSpace: 'pre-line'
+            }
+          });
+          throw new Error("DEMO_BLOCKED");
+        }
+      }
+      return runStudentGroupAnalysis(classId, 3, sessionId, selectedModel);
+    },
     onSuccess: (newAnalysis) => {
       queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
-      toast.success('세 번째 학생 그룹 분석이 완료되었습니다.');
+      // 🌟 데모 학급이 아닌 경우만 성공 메시지 표시
+      if (classDetails && !isDemoClass(classDetails)) {
+        toast.success('세 번째 학생 그룹 분석이 완료되었습니다.');
+      }
     },
     onError: (error) => {
+      if (error instanceof Error && error.message === "DEMO_BLOCKED") {
+        return;
+      }
       toast.error(error instanceof Error ? error.message : '학생 그룹3 분석 실행 중 오류가 발생했습니다.');
     },
   });
   
   // 학생 그룹4 분석 실행 Mutation
   const runStudents4Mutation = useMutation({
-    mutationFn: (sessionId: string) => runStudentGroupAnalysis(classId, 4, sessionId),
+    mutationFn: async (sessionId: string) => {
+      // 🌟 데모 학급 권한 체크
+      if (classDetails && isDemoClass(classDetails)) {
+        const saveAttempt = handleDemoSaveAttempt(classDetails, "학생 그룹 분석");
+        if (!saveAttempt.canSave) {
+          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
+            duration: 4000,
+            style: {
+              background: '#3B82F6',
+              color: 'white',
+              padding: '16px',
+              fontSize: '14px',
+              lineHeight: '1.5',
+              whiteSpace: 'pre-line'
+            }
+          });
+          throw new Error("DEMO_BLOCKED");
+        }
+      }
+      return runStudentGroupAnalysis(classId, 4, sessionId, selectedModel);
+    },
     onSuccess: (newAnalysis) => {
       queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
-      toast.success('네 번째 학생 그룹 분석이 완료되었습니다.');
+      // 🌟 데모 학급이 아닌 경우만 성공 메시지 표시
+      if (classDetails && !isDemoClass(classDetails)) {
+        toast.success('네 번째 학생 그룹 분석이 완료되었습니다.');
+      }
     },
     onError: (error) => {
+      if (error instanceof Error && error.message === "DEMO_BLOCKED") {
+        return;
+      }
       toast.error(error instanceof Error ? error.message : '학생 그룹4 분석 실행 중 오류가 발생했습니다.');
     },
   });
   
   // 학생 그룹5 분석 실행 Mutation
   const runStudents5Mutation = useMutation({
-    mutationFn: (sessionId: string) => runStudentGroupAnalysis(classId, 5, sessionId),
+    mutationFn: async (sessionId: string) => {
+      // 🌟 데모 학급 권한 체크
+      if (classDetails && isDemoClass(classDetails)) {
+        const saveAttempt = handleDemoSaveAttempt(classDetails, "학생 그룹 분석");
+        if (!saveAttempt.canSave) {
+          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
+            duration: 4000,
+            style: {
+              background: '#3B82F6',
+              color: 'white',
+              padding: '16px',
+              fontSize: '14px',
+              lineHeight: '1.5',
+              whiteSpace: 'pre-line'
+            }
+          });
+          throw new Error("DEMO_BLOCKED");
+        }
+      }
+      return runStudentGroupAnalysis(classId, 5, sessionId, selectedModel);
+    },
     onSuccess: (newAnalysis) => {
       queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
-      toast.success('다섯 번째 학생 그룹 분석이 완료되었습니다.');
+      // 🌟 데모 학급이 아닌 경우만 성공 메시지 표시
+      if (classDetails && !isDemoClass(classDetails)) {
+        toast.success('다섯 번째 학생 그룹 분석이 완료되었습니다.');
+      }
     },
     onError: (error) => {
+      if (error instanceof Error && error.message === "DEMO_BLOCKED") {
+        return;
+      }
       toast.error(error instanceof Error ? error.message : '학생 그룹5 분석 실행 중 오류가 발생했습니다.');
     },
   });
   
   // 학생 그룹6 분석 실행 Mutation
   const runStudents6Mutation = useMutation({
-    mutationFn: (sessionId: string) => runStudentGroupAnalysis(classId, 6, sessionId),
+    mutationFn: async (sessionId: string) => {
+      // 🌟 데모 학급 권한 체크
+      if (classDetails && isDemoClass(classDetails)) {
+        const saveAttempt = handleDemoSaveAttempt(classDetails, "학생 그룹 분석");
+        if (!saveAttempt.canSave) {
+          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
+            duration: 4000,
+            style: {
+              background: '#3B82F6',
+              color: 'white',
+              padding: '16px',
+              fontSize: '14px',
+              lineHeight: '1.5',
+              whiteSpace: 'pre-line'
+            }
+          });
+          throw new Error("DEMO_BLOCKED");
+        }
+      }
+      return runStudentGroupAnalysis(classId, 6, sessionId, selectedModel);
+    },
     onSuccess: (newAnalysis) => {
       queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
-      toast.success('여섯 번째 학생 그룹 분석이 완료되었습니다.');
+      // 🌟 데모 학급이 아닌 경우만 성공 메시지 표시
+      if (classDetails && !isDemoClass(classDetails)) {
+        toast.success('여섯 번째 학생 그룹 분석이 완료되었습니다.');
+      }
     },
     onError: (error) => {
+      if (error instanceof Error && error.message === "DEMO_BLOCKED") {
+        return;
+      }
       toast.error(error instanceof Error ? error.message : '학생 그룹6 분석 실행 중 오류가 발생했습니다.');
     },
   });
   
   // 학생 그룹7 분석 실행 Mutation
   const runStudents7Mutation = useMutation({
-    mutationFn: (sessionId: string) => runStudentGroupAnalysis(classId, 7, sessionId),
+    mutationFn: async (sessionId: string) => {
+      // 🌟 데모 학급 권한 체크
+      if (classDetails && isDemoClass(classDetails)) {
+        const saveAttempt = handleDemoSaveAttempt(classDetails, "학생 그룹 분석");
+        if (!saveAttempt.canSave) {
+          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
+            duration: 4000,
+            style: {
+              background: '#3B82F6',
+              color: 'white',
+              padding: '16px',
+              fontSize: '14px',
+              lineHeight: '1.5',
+              whiteSpace: 'pre-line'
+            }
+          });
+          throw new Error("DEMO_BLOCKED");
+        }
+      }
+      return runStudentGroupAnalysis(classId, 7, sessionId, selectedModel);
+    },
     onSuccess: (newAnalysis) => {
       queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
-      toast.success('일곱 번째 학생 그룹 분석이 완료되었습니다.');
+      // 🌟 데모 학급이 아닌 경우만 성공 메시지 표시
+      if (classDetails && !isDemoClass(classDetails)) {
+        toast.success('일곱 번째 학생 그룹 분석이 완료되었습니다.');
+      }
     },
     onError: (error) => {
+      if (error instanceof Error && error.message === "DEMO_BLOCKED") {
+        return;
+      }
       toast.error(error instanceof Error ? error.message : '학생 그룹7 분석 실행 중 오류가 발생했습니다.');
     },
   });
   
   // 학생 그룹8 분석 실행 Mutation
   const runStudents8Mutation = useMutation({
-    mutationFn: (sessionId: string) => runStudentGroupAnalysis(classId, 8, sessionId),
+    mutationFn: async (sessionId: string) => {
+      // 🌟 데모 학급 권한 체크
+      if (classDetails && isDemoClass(classDetails)) {
+        const saveAttempt = handleDemoSaveAttempt(classDetails, "학생 그룹 분석");
+        if (!saveAttempt.canSave) {
+          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
+            duration: 4000,
+            style: {
+              background: '#3B82F6',
+              color: 'white',
+              padding: '16px',
+              fontSize: '14px',
+              lineHeight: '1.5',
+              whiteSpace: 'pre-line'
+            }
+          });
+          throw new Error("DEMO_BLOCKED");
+        }
+      }
+      return runStudentGroupAnalysis(classId, 8, sessionId, selectedModel);
+    },
     onSuccess: (newAnalysis) => {
       queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
-      toast.success('여덟 번째 학생 그룹 분석이 완료되었습니다.');
+      // 🌟 데모 학급이 아닌 경우만 성공 메시지 표시
+      if (classDetails && !isDemoClass(classDetails)) {
+        toast.success('여덟 번째 학생 그룹 분석이 완료되었습니다.');
+      }
     },
     onError: (error) => {
+      if (error instanceof Error && error.message === "DEMO_BLOCKED") {
+        return;
+      }
       toast.error(error instanceof Error ? error.message : '학생 그룹8 분석 실행 중 오류가 발생했습니다.');
     },
   });
@@ -723,13 +1044,40 @@ export default function ClassAnalysisPage() {
   
   // 모든 분석 결과 삭제 Mutation
   const deleteAllAnalysisMutation = useMutation({
-    mutationFn: () => deleteAllAnalysis(classId),
+    mutationFn: async () => {
+      // 🌟 데모 학급 권한 체크
+      if (classDetails && isDemoClass(classDetails)) {
+        const saveAttempt = handleDemoSaveAttempt(classDetails, "모든 분석 결과 삭제");
+        if (!saveAttempt.canSave) {
+          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
+            duration: 4000,
+            style: {
+              background: '#3B82F6',
+              color: 'white',
+              padding: '16px',
+              fontSize: '14px',
+              lineHeight: '1.5',
+              whiteSpace: 'pre-line'
+            }
+          });
+          throw new Error("DEMO_BLOCKED");
+        }
+      }
+      return deleteAllAnalysis(classId);
+    },
     onSuccess: () => {
-      toast.success('모든 분석 결과가 삭제되었습니다.');
+      // 🌟 데모 학급이 아닌 경우만 성공 메시지 표시
+      if (classDetails && !isDemoClass(classDetails)) {
+        toast.success('모든 분석 결과가 삭제되었습니다.');
+      }
       queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
       setIsDeleteAllDialogOpen(false);
     },
     onError: (error) => {
+      if (error instanceof Error && error.message === "DEMO_BLOCKED") {
+        setIsDeleteAllDialogOpen(false);
+        return;
+      }
       toast.error(error instanceof Error ? error.message : '삭제 중 오류가 발생했습니다.');
     },
   });
@@ -834,23 +1182,48 @@ export default function ClassAnalysisPage() {
             </button>
             <h1 className="text-2xl font-bold text-black">{classDetails.name} 학급 분석</h1>
           </div>
-          <button
-            onClick={runFullAnalysisSequentially}
-            disabled={isAnyRunning || isAnalyzing}
-            className="px-4 py-2 text-sm bg-indigo-500 text-white rounded-md hover:bg-indigo-600 shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 flex items-center disabled:opacity-70 disabled:cursor-not-allowed"
-          >
-            {isAnyRunning || isAnalyzing ? (
-              <>
-                <ArrowPathIcon className="w-4 h-4 animate-spin mr-2" />
-                분석 중...
-              </>
-            ) : (
-              <>
-                <SparklesIcon className="w-4 h-4 mr-2" />
-                새 분석 실행
-              </>
-            )}
-          </button>
+          <div className="flex items-center gap-3">
+            {/* AI 모델 선택 버튼 */}
+            <div className="flex bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setSelectedModel('gpt')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
+                  selectedModel === 'gpt'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                GPT-4
+              </button>
+              <button
+                onClick={() => setSelectedModel('gemini-flash')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
+                  selectedModel === 'gemini-flash'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Gemini 2.5
+              </button>
+            </div>
+            <button
+              onClick={runFullAnalysisSequentially}
+              disabled={isAnyRunning || isAnalyzing}
+              className="px-4 py-2 text-sm bg-indigo-500 text-white rounded-md hover:bg-indigo-600 shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 flex items-center disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              {isAnyRunning || isAnalyzing ? (
+                <>
+                  <ArrowPathIcon className="w-4 h-4 animate-spin mr-2" />
+                  분석 중...
+                </>
+              ) : (
+                <>
+                  <SparklesIcon className="w-4 h-4 mr-2" />
+                  새 분석 실행
+                </>
+              )}
+            </button>
+          </div>
         </header>
         
         {/* 분석 실행 설명 부분은 현재 위치 유지 */}
@@ -910,6 +1283,7 @@ export default function ClassAnalysisPage() {
                   <AnalysisCard
                     key={analysis.id}
                     analysis={analysis}
+                    classDetails={classDetails}
                   />
                 ))}
               </AnimatePresence>

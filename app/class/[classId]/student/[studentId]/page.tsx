@@ -8,6 +8,7 @@ import { RELATIONSHIP_TYPES, RELATIONSHIP_COLORS } from '@/lib/constants';
 import ConfirmModal from '@/components/ConfirmModal';
 import { ArrowUturnLeftIcon, PlusIcon, TrashIcon, ExclamationCircleIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import { handleDemoSaveAttempt, isDemoClass } from '@/utils/demo-permissions';
 
 // 학생 데이터 타입 (간단 버전)
 type TargetStudent = Pick<Student, 'id' | 'name'>; // 성별 등 추가 정보 필요 시 확장
@@ -27,6 +28,18 @@ type AnswerSetting = {
 type CurrentStudentData = Student & { gender?: 'male' | 'female' | null };
 
 // --- 데이터 Fetching 함수 ---
+
+// 🆕 학급 정보 조회 함수 추가
+async function fetchClassDetails(classId: string) {
+    const { data, error } = await supabase
+        .from('classes')
+        .select('*')
+        .eq('id', classId)
+        .single();
+    if (error) { console.error('Error fetching class:', error); return null; }
+    return data;
+}
+
 async function fetchCurrentStudent(studentId: string): Promise<CurrentStudentData | null> {
     const { data, error } = await supabase
         .from('students')
@@ -89,8 +102,29 @@ async function saveAllSettings(
     classId: string, // classId 추가
     relationships: RelationshipSetting,
     answers: AnswerSetting,
-    initialRelationships: RelationshipSetting // 초기 관계 데이터 추가
+    initialRelationships: RelationshipSetting, // 초기 관계 데이터 추가
+    classData?: any // 🆕 학급 데이터 추가
 ): Promise<void> {
+    // 🌟 데모 학급 권한 체크
+    if (classData && isDemoClass(classData)) {
+        const saveAttempt = handleDemoSaveAttempt(classData, "관계 설정 변경사항");
+        if (!saveAttempt.canSave) {
+            // 데모 학급에서는 저장하지 않고 메시지만 표시
+            toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
+                duration: 4000,
+                style: {
+                    background: '#3B82F6',
+                    color: 'white',
+                    padding: '16px',
+                    fontSize: '14px',
+                    lineHeight: '1.5',
+                    whiteSpace: 'pre-line'
+                }
+            });
+            return; // 실제 저장하지 않고 종료
+        }
+    }
+
     // const queryClient = useQueryClient(); // 캐시 무효화는 onSuccess에서 처리
 
     // 1. 관계 저장/삭제
@@ -191,6 +225,14 @@ export default function StudentRelationshipEditorPage() {
     const [initialGender, setInitialGender] = useState<'male' | 'female' | null>(null); // 초기 성별 저장용
 
     // --- 데이터 조회 Queries ---
+    
+    // 🆕 학급 정보 조회
+    const { data: classDetails } = useQuery({
+        queryKey: ['classDetails', classId],
+        queryFn: () => fetchClassDetails(classId),
+        enabled: !!classId,
+    });
+
     const { data: currentStudent, isLoading: isLoadingStudent } = useQuery<CurrentStudentData | null, Error>({
         queryKey: ['student', studentId],
         queryFn: () => fetchCurrentStudent(studentId),
@@ -265,10 +307,12 @@ export default function StudentRelationshipEditorPage() {
 
     // --- 데이터 변경 Mutations ---
     const saveSettingsMutation = useMutation<void, Error, void>({
-        mutationFn: () => saveAllSettings(studentId, classId, relationshipSettings, answerSettings, initialRelationshipsData),
+        mutationFn: () => saveAllSettings(studentId, classId, relationshipSettings, answerSettings, initialRelationshipsData, classDetails),
         onSuccess: () => {
-            // 캐시 무효화는 saveAllSettings 내부에서 처리
-            toast.success('설정이 저장되었습니다.');
+            // 🌟 데모 학급인 경우 "저장되었습니다" 메시지 표시하지 않음
+            if (classDetails && !isDemoClass(classDetails)) {
+                toast.success('설정이 저장되었습니다.');
+            }
             router.push(`/class/${classId}`); // 관계도 페이지로 이동
         },
         onError: (error) => {

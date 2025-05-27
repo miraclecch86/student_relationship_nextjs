@@ -9,6 +9,7 @@ import { ArrowPathIcon, ExclamationCircleIcon, PlusIcon, ArrowLeftIcon } from '@
 import toast from 'react-hot-toast';
 import ConfirmModal from '@/components/ConfirmModal';
 import EditSurveyModal from '@/components/EditSurveyModal';
+import { handleDemoSaveAttempt, isDemoClass } from '@/utils/demo-permissions';
 
 // --- 데이터 Fetching 함수 --- 
 
@@ -27,11 +28,11 @@ async function fetchSurveys(classId: string): Promise<Survey[]> {
   return data || [];
 }
 
-// 학급 정보 조회 함수 추가 (헤더용)
-async function fetchClassDetails(classId: string): Promise<{ name: string } | null> {
+// 학급 정보 조회 함수 수정 (전체 정보 필요)
+async function fetchClassDetails(classId: string): Promise<any | null> {
     const { data, error } = await supabase
         .from('classes')
-        .select('name')
+        .select('*')
         .eq('id', classId)
         .single();
     if (error) {
@@ -117,28 +118,81 @@ export default function SurveyListPage() {
 
   // 설문 생성 Mutation
   const createSurveyMutation = useMutation<Survey, Error, { name: string; description?: string }>({ 
-    mutationFn: ({ name, description }) => createSurvey(classId, name, description),
+    mutationFn: async ({ name, description }) => {
+      // 🌟 데모 학급 권한 체크
+      if (classDetails && isDemoClass(classDetails)) {
+        const saveAttempt = handleDemoSaveAttempt(classDetails, "설문 생성");
+        if (!saveAttempt.canSave) {
+          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
+            duration: 4000,
+            style: {
+              background: '#3B82F6',
+              color: 'white',
+              padding: '16px',
+              fontSize: '14px',
+              lineHeight: '1.5',
+              whiteSpace: 'pre-line'
+            }
+          });
+          throw new Error("DEMO_BLOCKED");
+        }
+      }
+      return createSurvey(classId, name, description);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['surveys', classId] });
       setShowCreateSurveyModal(false);
       setNewSurveyName('');
       setNewSurveyDesc('');
-      toast.success('새로운 설문이 생성되었습니다.');
+      // 🌟 데모 학급이 아닌 경우만 성공 메시지 표시
+      if (classDetails && !isDemoClass(classDetails)) {
+        toast.success('새로운 설문이 생성되었습니다.');
+      }
     },
     onError: (error) => {
+      if (error instanceof Error && error.message === "DEMO_BLOCKED") {
+        return;
+      }
       toast.error(error.message);
     },
   });
 
   // 설문 삭제 Mutation
   const deleteSurveyMutation = useMutation<void, Error, string>({
-    mutationFn: deleteSurvey,
+    mutationFn: async (surveyId: string) => {
+      // 🌟 데모 학급 권한 체크
+      if (classDetails && isDemoClass(classDetails)) {
+        const saveAttempt = handleDemoSaveAttempt(classDetails, "설문 삭제");
+        if (!saveAttempt.canSave) {
+          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
+            duration: 4000,
+            style: {
+              background: '#3B82F6',
+              color: 'white',
+              padding: '16px',
+              fontSize: '14px',
+              lineHeight: '1.5',
+              whiteSpace: 'pre-line'
+            }
+          });
+          throw new Error("DEMO_BLOCKED");
+        }
+      }
+      return deleteSurvey(surveyId);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['surveys', classId] });
-      toast.success('설문이 삭제되었습니다.');
       setSurveyToDelete(null);
+      // 🌟 데모 학급이 아닌 경우만 성공 메시지 표시
+      if (classDetails && !isDemoClass(classDetails)) {
+        toast.success('설문이 삭제되었습니다.');
+      }
     },
     onError: (error) => {
+      if (error instanceof Error && error.message === "DEMO_BLOCKED") {
+        setSurveyToDelete(null);
+        return;
+      }
       toast.error(error.message);
       setSurveyToDelete(null);
     }
@@ -146,18 +200,47 @@ export default function SurveyListPage() {
 
   // 설문 수정 Mutation 추가
   const updateSurveyMutation = useMutation<Survey | null, Error, Partial<Survey>>({
-    mutationFn: updateSurvey,
+    mutationFn: async (surveyData: Partial<Survey>) => {
+      // 🌟 데모 학급 권한 체크
+      if (classDetails && isDemoClass(classDetails)) {
+        const saveAttempt = handleDemoSaveAttempt(classDetails, "설문 수정");
+        if (!saveAttempt.canSave) {
+          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
+            duration: 4000,
+            style: {
+              background: '#3B82F6',
+              color: 'white',
+              padding: '16px',
+              fontSize: '14px',
+              lineHeight: '1.5',
+              whiteSpace: 'pre-line'
+            }
+          });
+          throw new Error("DEMO_BLOCKED");
+        }
+      }
+      return updateSurvey(surveyData);
+    },
     onSuccess: (updatedSurvey) => {
       if (updatedSurvey) {
         queryClient.invalidateQueries({ queryKey: ['surveys', classId] });
-        toast.success('설문 정보가 수정되었습니다.');
+        // 🌟 데모 학급이 아닌 경우만 성공 메시지 표시
+        if (classDetails && !isDemoClass(classDetails)) {
+          toast.success('설문 정보가 수정되었습니다.');
+        }
       } else {
         // 변경 사항이 없었을 경우 (toast.info 대신 기본 toast 사용)
-        toast('변경된 내용이 없습니다.'); 
+        if (classDetails && !isDemoClass(classDetails)) {
+          toast('변경된 내용이 없습니다.');
+        }
       }
       setSurveyToEdit(null); // 모달 닫기
     },
     onError: (error) => {
+      if (error instanceof Error && error.message === "DEMO_BLOCKED") {
+        setSurveyToEdit(null);
+        return;
+      }
       toast.error(error.message);
       // 모달을 닫지 않고 에러를 표시할 수도 있음
       // setSurveyToEdit(null);

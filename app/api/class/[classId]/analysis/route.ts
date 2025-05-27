@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { analyzeStudentRelationships } from '@/lib/openai';
 import { Database } from '@/lib/database.types';
+import { isDemoClass } from '@/utils/demo-permissions';
 
 // 분석 결과 저장 API
 export async function POST(
@@ -44,7 +45,7 @@ export async function POST(
     // 학급 소유권 확인
     const { data: classData, error: classError } = await supabase
       .from('classes')
-      .select('user_id')
+      .select('id, name, created_at, user_id, is_demo, is_public')
       .eq('id', classId)
       .single();
 
@@ -64,14 +65,15 @@ export async function POST(
       );
     }
 
-    if (classData.user_id !== session.user.id) {
+    // 🌟 데모 학급이 아닌 경우에만 소유권 확인
+    if (!isDemoClass(classData) && classData.user_id !== session.user.id) {
       console.log('[POST API] 권한 없음. 학급 소유자:', classData.user_id, '요청자:', session.user.id);
       return NextResponse.json(
         { error: '학급에 대한 권한이 없습니다.' },
         { status: 403 }
       );
     }
-    console.log('[POST API] 학급 권한 확인 완료');
+    console.log('[POST API] 학급 권한 확인 완료 (데모 학급:', isDemoClass(classData), ')');
 
     // 학생 목록 조회
     const { data: students, error: studentsError } = await supabase
@@ -353,30 +355,11 @@ export async function GET(
     const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
     console.log('[GET API] Supabase 클라이언트 생성됨');
 
-    // 인증 확인
-    console.log('[GET API] 인증 세션 확인 시작');
-    const { data: { session }, error: authError } = await supabase.auth.getSession();
-    if (authError) {
-      console.error('[GET API] 인증 오류:', authError);
-      return NextResponse.json(
-        { error: '인증되지 않은 사용자입니다.' },
-        { status: 401 }
-      );
-    }
-    
-    if (!session) {
-      console.error('[GET API] 세션이 존재하지 않음');
-      return NextResponse.json(
-        { error: '인증되지 않은 사용자입니다.' },
-        { status: 401 }
-      );
-    }
-    console.log('[GET API] 인증 확인 완료, 사용자 ID:', session.user.id);
-
-    // 학급 소유권 확인
+    // 학급 정보를 먼저 조회해서 데모 학급인지 확인
+    console.log('[GET API] 학급 정보 조회 중...');
     const { data: classData, error: classError } = await supabase
       .from('classes')
-      .select('user_id')
+      .select('id, name, created_at, user_id, is_demo, is_public')
       .eq('id', classId)
       .single();
 
@@ -396,14 +379,39 @@ export async function GET(
       );
     }
 
-    if (classData.user_id !== session.user.id) {
-      console.log('[GET API] 권한 없음. 학급 소유자:', classData.user_id, '요청자:', session.user.id);
-      return NextResponse.json(
-        { error: '학급에 대한 권한이 없습니다.' },
-        { status: 403 }
-      );
+    // 🌟 데모 학급이 아닌 경우에만 인증 확인
+    if (!isDemoClass(classData)) {
+      // 인증 확인
+      console.log('[GET API] 인증 세션 확인 시작 (일반 학급)');
+      const { data: { session }, error: authError } = await supabase.auth.getSession();
+      if (authError) {
+        console.error('[GET API] 인증 오류:', authError);
+        return NextResponse.json(
+          { error: '인증되지 않은 사용자입니다.' },
+          { status: 401 }
+        );
+      }
+      
+      if (!session) {
+        console.error('[GET API] 세션이 존재하지 않음');
+        return NextResponse.json(
+          { error: '인증되지 않은 사용자입니다.' },
+          { status: 401 }
+        );
+      }
+      
+      // 소유권 확인
+      if (classData.user_id !== session.user.id) {
+        console.log('[GET API] 권한 없음. 학급 소유자:', classData.user_id, '요청자:', session.user.id);
+        return NextResponse.json(
+          { error: '학급에 대한 권한이 없습니다.' },
+          { status: 403 }
+        );
+      }
+      console.log('[GET API] 인증 확인 완료, 사용자 ID:', session.user.id);
+    } else {
+      console.log('[GET API] 데모 학급이므로 인증 생략');
     }
-    console.log('[GET API] 학급 권한 확인 완료');
 
     // 분석 결과 목록 조회
     console.log('[GET API] 분석 결과 목록 조회 시작');
@@ -532,7 +540,7 @@ export async function DELETE(
     // 학급 소유권 확인
     const { data: classData, error: classError } = await supabase
       .from('classes')
-      .select('user_id')
+      .select('id, name, created_at, user_id, is_demo, is_public')
       .eq('id', classId)
       .single();
 
@@ -552,14 +560,15 @@ export async function DELETE(
       );
     }
 
-    if (classData.user_id !== session.user.id) {
+    // 🌟 데모 학급이 아닌 경우에만 소유권 확인
+    if (!isDemoClass(classData) && classData.user_id !== session.user.id) {
       console.log('[DELETE API] 권한 없음. 학급 소유자:', classData.user_id, '요청자:', session.user.id);
       return NextResponse.json(
         { error: '학급에 대한 권한이 없습니다.' },
         { status: 403 }
       );
     }
-    console.log('[DELETE API] 학급 권한 확인 완료');
+    console.log('[DELETE API] 학급 권한 확인 완료 (데모 학급:', isDemoClass(classData), ')');
 
     // 전체 삭제 요청인 경우
     if (deleteAll) {

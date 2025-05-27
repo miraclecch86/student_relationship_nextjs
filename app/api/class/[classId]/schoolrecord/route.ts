@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { generateSchoolRecord } from '@/lib/openai';
+import { generateSchoolRecordWithGemini } from '@/lib/gemini';
 import { Database } from '@/lib/database.types';
+import { isDemoClass } from '@/utils/demo-permissions';
 
 // 생활기록부 생성 API
 export async function POST(
@@ -13,6 +15,11 @@ export async function POST(
   
   try {
     const { classId } = context.params;
+    
+    // 요청 본문에서 model 추출
+    const requestData = await request.json().catch(() => ({}));
+    const model = requestData.model || 'gpt'; // 기본값은 gpt
+    console.log('[POST API] 선택된 모델:', model);
     
     // Supabase 클라이언트 생성
     const cookieStore = cookies();
@@ -44,7 +51,7 @@ export async function POST(
     // 학급 소유권 확인
     const { data: classData, error: classError } = await supabase
       .from('classes')
-      .select('user_id')
+      .select('id, name, created_at, user_id, is_demo, is_public')
       .eq('id', classId)
       .single();
 
@@ -64,14 +71,15 @@ export async function POST(
       );
     }
 
-    if (classData.user_id !== session.user.id) {
+    // 🌟 데모 학급이 아닌 경우에만 소유권 확인
+    if (!isDemoClass(classData) && classData.user_id !== session.user.id) {
       console.log('[POST API] 권한 없음. 학급 소유자:', classData.user_id, '요청자:', session.user.id);
       return NextResponse.json(
         { error: '학급에 대한 권한이 없습니다.' },
         { status: 403 }
       );
     }
-    console.log('[POST API] 학급 권한 확인 완료');
+    console.log('[POST API] 학급 권한 확인 완료 (데모 학급:', isDemoClass(classData), ')');
 
     // 학생 목록 조회
     const { data: students, error: studentsError } = await supabase
@@ -129,12 +137,12 @@ export async function POST(
     }
     console.log('[POST API] 관계 데이터 조회 완료, 관계 수:', relationships ? relationships.length : 0);
 
-    // OpenAI API를 통해 생활기록부 생성 수행
+    // AI를 통해 생활기록부 생성 수행 (선택된 모델에 따라)
     try {
-      console.log('[POST API] 생활기록부 생성 시작');
+      console.log('[POST API] 생활기록부 생성 시작, 선택된 모델:', model);
       
       // 환경 변수 확인
-      if (!process.env.OPENAI_API_KEY) {
+      if (model === 'gpt' && !process.env.OPENAI_API_KEY) {
         console.error('[POST API] OPENAI_API_KEY 환경 변수가 설정되지 않았습니다.');
         return NextResponse.json(
           { error: 'OpenAI API 키가 설정되지 않았습니다. 환경 변수를 확인해주세요.' },
@@ -142,7 +150,15 @@ export async function POST(
         );
       }
       
-      console.log('[POST API] 환경 변수 확인 완료, API 키 길이:', process.env.OPENAI_API_KEY.length);
+      if (model === 'gemini-flash' && !process.env.GEMINI_API_KEY) {
+        console.error('[POST API] GEMINI_API_KEY 환경 변수가 설정되지 않았습니다.');
+        return NextResponse.json(
+          { error: 'Gemini API 키가 설정되지 않았습니다. 환경 변수를 확인해주세요.' },
+          { status: 500 }
+        );
+      }
+      
+      console.log('[POST API] 환경 변수 확인 완료');
       
       // 학급에 속한 모든 설문지 조회
       console.log('[POST API] 설문지 정보 조회 시작');
@@ -235,18 +251,33 @@ export async function POST(
       }
       console.log('[POST API] 학급 상세 정보 조회 완료');
       
-      // OpenAI 생활기록부 생성 함수 호출
-      const schoolRecordContent = await generateSchoolRecord(
-        students,
-        relationships || [],
-        allAnswers || [],
-        allQuestions || [],
-        {
-          classDetails: classDetails || { id: classId },
-          surveys: surveys || [],
-          surveyData: surveyData,
-        }
-      );
+      // AI 생활기록부 생성 함수 호출 (선택된 모델에 따라)
+      let schoolRecordContent;
+      if (model === 'gemini-flash') {
+        schoolRecordContent = await generateSchoolRecordWithGemini(
+          students,
+          relationships || [],
+          allAnswers || [],
+          allQuestions || [],
+          {
+            classDetails: classDetails || { id: classId },
+            surveys: surveys || [],
+            surveyData: surveyData,
+          }
+        );
+      } else {
+        schoolRecordContent = await generateSchoolRecord(
+          students,
+          relationships || [],
+          allAnswers || [],
+          allQuestions || [],
+          {
+            classDetails: classDetails || { id: classId },
+            surveys: surveys || [],
+            surveyData: surveyData,
+          }
+        );
+      }
       
       console.log('[POST API] 생활기록부 생성 완료');
       
@@ -284,10 +315,10 @@ export async function POST(
       // 성공 응답 반환
       return NextResponse.json(savedRecord);
       
-    } catch (openaiError: any) {
-      console.error('[POST API] OpenAI 생활기록부 생성 오류:', openaiError);
+    } catch (aiError: any) {
+      console.error(`[POST API] AI 생활기록부 생성 오류 (모델: ${model}):`, aiError);
       return NextResponse.json(
-        { error: `생활기록부 생성에 실패했습니다: ${openaiError.message}` },
+        { error: `생활기록부 생성에 실패했습니다 (모델: ${model}): ${aiError.message}` },
         { status: 500 }
       );
     }
@@ -314,58 +345,76 @@ export async function GET(
     const cookieStore = cookies();
     const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
 
-    // 인증 확인
-    const { data: { session }, error: authError } = await supabase.auth.getSession();
-    if (authError || !session) {
-      console.error('[GET API] 인증 오류:', authError);
-      return NextResponse.json(
-        { error: '인증되지 않은 사용자입니다.' },
-        { status: 401 }
-      );
-    }
-
-    // 학급 소유권 확인
+    // 학급 정보를 먼저 조회해서 데모 학급인지 확인
+    console.log('[GET API] 학급 정보 조회 중...');
     const { data: classData, error: classError } = await supabase
       .from('classes')
-      .select('user_id')
+      .select('id, name, created_at, user_id, is_demo, is_public')
       .eq('id', classId)
       .single();
 
-    if (classError || !classData) {
+    if (classError) {
       console.error('[GET API] 학급 조회 오류:', classError);
       return NextResponse.json(
         { error: '학급을 찾을 수 없습니다.' },
         { status: 404 }
       );
     }
-
-    if (classData.user_id !== session.user.id) {
-      console.log('[GET API] 권한 없음');
+    
+    if (!classData) {
+      console.error('[GET API] 학급 데이터가 null임');
       return NextResponse.json(
-        { error: '학급에 대한 권한이 없습니다.' },
-        { status: 403 }
+        { error: '학급을 찾을 수 없습니다.' },
+        { status: 404 }
       );
     }
 
+    // 🌟 데모 학급이 아닌 경우에만 인증 확인
+    if (!isDemoClass(classData)) {
+      // 인증 확인
+      console.log('[GET API] 인증 세션 확인 시작 (일반 학급)');
+      const { data: { session }, error: authError } = await supabase.auth.getSession();
+      if (authError || !session) {
+        console.error('[GET API] 인증 오류:', authError);
+        return NextResponse.json(
+          { error: '인증되지 않은 사용자입니다.' },
+          { status: 401 }
+        );
+      }
+      
+      // 소유권 확인
+      if (classData.user_id !== session.user.id) {
+        console.log('[GET API] 권한 없음. 학급 소유자:', classData.user_id, '요청자:', session.user.id);
+        return NextResponse.json(
+          { error: '학급에 대한 권한이 없습니다.' },
+          { status: 403 }
+        );
+      }
+      console.log('[GET API] 인증 확인 완료, 사용자 ID:', session.user.id);
+    } else {
+      console.log('[GET API] 데모 학급이므로 인증 생략');
+    }
+
     // 생활기록부 목록 조회
-    const { data: schoolRecords, error: recordsError } = await supabase
+    console.log('[GET API] 생활기록부 목록 조회 시작');
+    const { data: records, error: recordsError } = await supabase
       .from('school_records')
       .select('*')
       .eq('class_id', classId)
       .order('created_at', { ascending: false });
-      
+
     if (recordsError) {
-      console.error('[GET API] 생활기록부 목록 조회 오류:', recordsError);
+      console.error('[GET API] 생활기록부 조회 오류:', recordsError);
       return NextResponse.json(
-        { error: '생활기록부 목록을 불러오는 중 오류가 발생했습니다.' },
+        { error: '생활기록부를 불러오는 중 오류가 발생했습니다.' },
         { status: 500 }
       );
     }
-    
-    return NextResponse.json(schoolRecords || []);
-    
+
+    console.log('[GET API] 생활기록부 조회 완료, 결과 수:', records ? records.length : 0);
+    return NextResponse.json(records || []);
   } catch (error: any) {
-    console.error('[GET API] 최상위 오류 발생:', error);
+    console.error('[GET API] 예외 발생:', error);
     return NextResponse.json(
       { error: `서버 오류: ${error.message}` },
       { status: 500 }

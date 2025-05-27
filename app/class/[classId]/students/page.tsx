@@ -17,6 +17,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import ConfirmModal from '@/components/ConfirmModal';
+import { handleDemoSaveAttempt, isDemoClass } from '@/utils/demo-permissions';
 import {
   DndContext,
   closestCenter,
@@ -393,40 +394,118 @@ export default function ClassStudentsPage() {
 
   // 학생 추가 Mutation
   const addStudentMutation = useMutation({
-    mutationFn: (name: string) => addStudent(classId, name),
+    mutationFn: async (name: string) => {
+      // 🌟 데모 학급 권한 체크
+      if (classDetails && isDemoClass(classDetails)) {
+        const saveAttempt = handleDemoSaveAttempt(classDetails, "학생 추가");
+        if (!saveAttempt.canSave) {
+          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
+            duration: 4000,
+            style: {
+              background: '#3B82F6',
+              color: 'white',
+              padding: '16px',
+              fontSize: '14px',
+              lineHeight: '1.5',
+              whiteSpace: 'pre-line'
+            }
+          });
+          throw new Error("DEMO_BLOCKED"); // 특별한 에러로 표시
+        }
+      }
+      return addStudent(classId, name);
+    },
     onSuccess: (newStudent) => {
       queryClient.invalidateQueries({ queryKey: ['students', classId] });
       setNewStudentName('');
-      toast.success(`'${newStudent.name}' 학생이 추가되었습니다.`);
+      // 🌟 데모 학급이 아닌 경우만 성공 메시지 표시
+      if (classDetails && !isDemoClass(classDetails)) {
+        toast.success(`'${newStudent.name}' 학생이 추가되었습니다.`);
+      }
     },
     onError: (error) => {
+      // 데모 블록 에러는 무시 (이미 메시지 표시됨)
+      if (error instanceof Error && error.message === "DEMO_BLOCKED") {
+        return;
+      }
       toast.error(error instanceof Error ? error.message : '학생 추가 실패');
     },
   });
 
   // 학생 이름 수정 Mutation
   const updateStudentMutation = useMutation({
-    mutationFn: ({ studentId, newName }: { studentId: string; newName: string }) => 
-      updateStudentName(studentId, newName),
+    mutationFn: async ({ studentId, newName }: { studentId: string; newName: string }) => {
+      // 🌟 데모 학급 권한 체크
+      if (classDetails && isDemoClass(classDetails)) {
+        const saveAttempt = handleDemoSaveAttempt(classDetails, "학생 이름 수정");
+        if (!saveAttempt.canSave) {
+          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
+            duration: 4000,
+            style: {
+              background: '#3B82F6',
+              color: 'white',
+              padding: '16px',
+              fontSize: '14px',
+              lineHeight: '1.5',
+              whiteSpace: 'pre-line'
+            }
+          });
+          throw new Error("DEMO_BLOCKED");
+        }
+      }
+      return updateStudentName(studentId, newName);
+    },
     onSuccess: (updatedStudent) => {
       if (updatedStudent) {
         queryClient.invalidateQueries({ queryKey: ['students', classId] });
-        toast.success(`'${updatedStudent.name}' 학생 이름이 수정되었습니다.`);
+        // 🌟 데모 학급이 아닌 경우만 성공 메시지 표시
+        if (classDetails && !isDemoClass(classDetails)) {
+          toast.success(`'${updatedStudent.name}' 학생 이름이 수정되었습니다.`);
+        }
       }
     },
     onError: (error) => {
+      if (error instanceof Error && error.message === "DEMO_BLOCKED") {
+        return;
+      }
       toast.error(error instanceof Error ? error.message : '학생 이름 수정 실패');
     },
   });
 
   // 학생 삭제 Mutation
   const deleteStudentMutation = useMutation({
-    mutationFn: deleteStudent,
+    mutationFn: async (studentId: string) => {
+      // 🌟 데모 학급 권한 체크
+      if (classDetails && isDemoClass(classDetails)) {
+        const saveAttempt = handleDemoSaveAttempt(classDetails, "학생 삭제");
+        if (!saveAttempt.canSave) {
+          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
+            duration: 4000,
+            style: {
+              background: '#3B82F6',
+              color: 'white',
+              padding: '16px',
+              fontSize: '14px',
+              lineHeight: '1.5',
+              whiteSpace: 'pre-line'
+            }
+          });
+          throw new Error("DEMO_BLOCKED");
+        }
+      }
+      return deleteStudent(studentId);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['students', classId] });
-      toast.success('학생이 삭제되었습니다.');
+      // 🌟 데모 학급이 아닌 경우만 성공 메시지 표시
+      if (classDetails && !isDemoClass(classDetails)) {
+        toast.success('학생이 삭제되었습니다.');
+      }
     },
     onError: (error) => {
+      if (error instanceof Error && error.message === "DEMO_BLOCKED") {
+        return;
+      }
       toast.error(error instanceof Error ? error.message : '학생 삭제 실패');
     },
   });
