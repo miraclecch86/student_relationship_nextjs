@@ -497,3 +497,268 @@ COMMENT ON COLUMN public.school_records.class_id IS '관련 학급 ID';
 COMMENT ON COLUMN public.school_records.result_data IS 'AI가 생성한 생활기록부 내용 (마크다운 형식)';
 COMMENT ON COLUMN public.school_records.summary IS '사용자 정의 생활기록부 설명';
 COMMENT ON COLUMN public.school_records.created_at IS '생성 시간';
+
+-- ✅ 12. 학급 일지 관련 테이블들 (스마트 학급 일지 기능)
+
+-- 12.1. 학급 일지 마스터 테이블
+CREATE TABLE IF NOT EXISTS public.class_journals (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    class_id uuid REFERENCES public.classes(id) ON DELETE CASCADE NOT NULL,
+    journal_date date NOT NULL,
+    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+    CONSTRAINT unique_class_journal_date UNIQUE (class_id, journal_date)
+);
+
+-- 인덱스 생성
+CREATE INDEX IF NOT EXISTS idx_class_journals_class_id ON public.class_journals(class_id);
+CREATE INDEX IF NOT EXISTS idx_class_journals_date ON public.class_journals(journal_date);
+
+-- RLS 활성화
+ALTER TABLE public.class_journals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.class_journals FORCE ROW LEVEL SECURITY;
+
+-- RLS 정책 설정
+CREATE POLICY "Users can view their own class journals"
+ON public.class_journals FOR SELECT
+USING (
+    EXISTS (
+        SELECT 1 FROM public.classes
+        WHERE classes.id = class_journals.class_id
+        AND classes.user_id = auth.uid()
+    )
+);
+
+CREATE POLICY "Users can insert their own class journals"
+ON public.class_journals FOR INSERT
+WITH CHECK (
+    EXISTS (
+        SELECT 1 FROM public.classes
+        WHERE classes.id = class_id
+        AND classes.user_id = auth.uid()
+    )
+);
+
+CREATE POLICY "Users can update their own class journals"
+ON public.class_journals FOR UPDATE
+USING (
+    EXISTS (
+        SELECT 1 FROM public.classes
+        WHERE classes.id = class_journals.class_id
+        AND classes.user_id = auth.uid()
+    )
+);
+
+CREATE POLICY "Users can delete their own class journals"
+ON public.class_journals FOR DELETE
+USING (
+    EXISTS (
+        SELECT 1 FROM public.classes
+        WHERE classes.id = class_journals.class_id
+        AND classes.user_id = auth.uid()
+    )
+);
+
+-- 12.2. 알림장 테이블
+CREATE TABLE IF NOT EXISTS public.journal_announcements (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    journal_id uuid REFERENCES public.class_journals(id) ON DELETE CASCADE NOT NULL,
+    keywords text[],
+    teacher_input_content text,
+    ai_generated_content text,
+    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 인덱스 생성
+CREATE INDEX IF NOT EXISTS idx_journal_announcements_journal_id ON public.journal_announcements(journal_id);
+
+-- RLS 활성화
+ALTER TABLE public.journal_announcements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.journal_announcements FORCE ROW LEVEL SECURITY;
+
+-- RLS 정책 설정
+CREATE POLICY "Users can view their own journal announcements"
+ON public.journal_announcements FOR SELECT
+USING (
+    EXISTS (
+        SELECT 1 FROM public.class_journals cj
+        JOIN public.classes c ON c.id = cj.class_id
+        WHERE cj.id = journal_announcements.journal_id
+        AND c.user_id = auth.uid()
+    )
+);
+
+CREATE POLICY "Users can insert their own journal announcements"
+ON public.journal_announcements FOR INSERT
+WITH CHECK (
+    EXISTS (
+        SELECT 1 FROM public.class_journals cj
+        JOIN public.classes c ON c.id = cj.class_id
+        WHERE cj.id = journal_id
+        AND c.user_id = auth.uid()
+    )
+);
+
+CREATE POLICY "Users can update their own journal announcements"
+ON public.journal_announcements FOR UPDATE
+USING (
+    EXISTS (
+        SELECT 1 FROM public.class_journals cj
+        JOIN public.classes c ON c.id = cj.class_id
+        WHERE cj.id = journal_announcements.journal_id
+        AND c.user_id = auth.uid()
+    )
+);
+
+CREATE POLICY "Users can delete their own journal announcements"
+ON public.journal_announcements FOR DELETE
+USING (
+    EXISTS (
+        SELECT 1 FROM public.class_journals cj
+        JOIN public.classes c ON c.id = cj.class_id
+        WHERE cj.id = journal_announcements.journal_id
+        AND c.user_id = auth.uid()
+    )
+);
+
+-- 12.3. 학생 출결 및 상태 테이블 (오늘의 아이들)
+CREATE TABLE IF NOT EXISTS public.journal_student_status (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    journal_id uuid REFERENCES public.class_journals(id) ON DELETE CASCADE NOT NULL,
+    student_id uuid REFERENCES public.students(id) ON DELETE CASCADE NOT NULL,
+    attendance_status text CHECK (attendance_status IN ('출석', '조퇴', '결석', '체험학습')) DEFAULT '출석' NOT NULL,
+    memo text,
+    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+    CONSTRAINT unique_journal_student UNIQUE (journal_id, student_id)
+);
+
+-- 인덱스 생성
+CREATE INDEX IF NOT EXISTS idx_journal_student_status_journal_id ON public.journal_student_status(journal_id);
+CREATE INDEX IF NOT EXISTS idx_journal_student_status_student_id ON public.journal_student_status(student_id);
+
+-- RLS 활성화
+ALTER TABLE public.journal_student_status ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.journal_student_status FORCE ROW LEVEL SECURITY;
+
+-- RLS 정책 설정
+CREATE POLICY "Users can view their own journal student status"
+ON public.journal_student_status FOR SELECT
+USING (
+    EXISTS (
+        SELECT 1 FROM public.class_journals cj
+        JOIN public.classes c ON c.id = cj.class_id
+        WHERE cj.id = journal_student_status.journal_id
+        AND c.user_id = auth.uid()
+    )
+);
+
+CREATE POLICY "Users can insert their own journal student status"
+ON public.journal_student_status FOR INSERT
+WITH CHECK (
+    EXISTS (
+        SELECT 1 FROM public.class_journals cj
+        JOIN public.classes c ON c.id = cj.class_id
+        WHERE cj.id = journal_id
+        AND c.user_id = auth.uid()
+    )
+);
+
+CREATE POLICY "Users can update their own journal student status"
+ON public.journal_student_status FOR UPDATE
+USING (
+    EXISTS (
+        SELECT 1 FROM public.class_journals cj
+        JOIN public.classes c ON c.id = cj.class_id
+        WHERE cj.id = journal_student_status.journal_id
+        AND c.user_id = auth.uid()
+    )
+);
+
+CREATE POLICY "Users can delete their own journal student status"
+ON public.journal_student_status FOR DELETE
+USING (
+    EXISTS (
+        SELECT 1 FROM public.class_journals cj
+        JOIN public.classes c ON c.id = cj.class_id
+        WHERE cj.id = journal_student_status.journal_id
+        AND c.user_id = auth.uid()
+    )
+);
+
+-- 12.4. 학급 메모 테이블 (오늘의 우리 반)
+CREATE TABLE IF NOT EXISTS public.journal_class_memos (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    journal_id uuid REFERENCES public.class_journals(id) ON DELETE CASCADE NOT NULL,
+    content text,
+    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 인덱스 생성
+CREATE INDEX IF NOT EXISTS idx_journal_class_memos_journal_id ON public.journal_class_memos(journal_id);
+
+-- RLS 활성화
+ALTER TABLE public.journal_class_memos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.journal_class_memos FORCE ROW LEVEL SECURITY;
+
+-- RLS 정책 설정
+CREATE POLICY "Users can view their own journal class memos"
+ON public.journal_class_memos FOR SELECT
+USING (
+    EXISTS (
+        SELECT 1 FROM public.class_journals cj
+        JOIN public.classes c ON c.id = cj.class_id
+        WHERE cj.id = journal_class_memos.journal_id
+        AND c.user_id = auth.uid()
+    )
+);
+
+CREATE POLICY "Users can insert their own journal class memos"
+ON public.journal_class_memos FOR INSERT
+WITH CHECK (
+    EXISTS (
+        SELECT 1 FROM public.class_journals cj
+        JOIN public.classes c ON c.id = cj.class_id
+        WHERE cj.id = journal_id
+        AND c.user_id = auth.uid()
+    )
+);
+
+CREATE POLICY "Users can update their own journal class memos"
+ON public.journal_class_memos FOR UPDATE
+USING (
+    EXISTS (
+        SELECT 1 FROM public.class_journals cj
+        JOIN public.classes c ON c.id = cj.class_id
+        WHERE cj.id = journal_class_memos.journal_id
+        AND c.user_id = auth.uid()
+    )
+);
+
+CREATE POLICY "Users can delete their own journal class memos"
+ON public.journal_class_memos FOR DELETE
+USING (
+    EXISTS (
+        SELECT 1 FROM public.class_journals cj
+        JOIN public.classes c ON c.id = cj.class_id
+        WHERE cj.id = journal_class_memos.journal_id
+        AND c.user_id = auth.uid()
+    )
+);
+
+-- 테이블 주석 추가
+COMMENT ON TABLE public.class_journals IS '학급 일지 마스터 테이블 - 날짜별 학급 일지 기본 정보';
+COMMENT ON TABLE public.journal_announcements IS '알림장 테이블 - AI 생성 알림장 내용 저장';
+COMMENT ON TABLE public.journal_student_status IS '학생 출결 및 상태 테이블 - 오늘의 아이들 기능';
+COMMENT ON TABLE public.journal_class_memos IS '학급 메모 테이블 - 오늘의 우리 반 기능';
+
+-- 컬럼 주석 추가
+COMMENT ON COLUMN public.class_journals.journal_date IS '일지 작성 날짜';
+COMMENT ON COLUMN public.journal_announcements.keywords IS '알림장 생성을 위한 키워드 배열';
+COMMENT ON COLUMN public.journal_announcements.teacher_input_content IS '교사가 입력한 상세 내용';
+COMMENT ON COLUMN public.journal_announcements.ai_generated_content IS 'AI가 생성한 최종 알림장 내용';
+COMMENT ON COLUMN public.journal_student_status.attendance_status IS '출결 상태: 출석, 조퇴, 결석, 체험학습';
+COMMENT ON COLUMN public.journal_student_status.memo IS '학생별 특이사항 메모';
+COMMENT ON COLUMN public.journal_class_memos.content IS '학급 전체 특이사항 및 메모';

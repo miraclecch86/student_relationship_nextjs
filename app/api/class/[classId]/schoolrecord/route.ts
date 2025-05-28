@@ -11,15 +11,24 @@ export async function POST(
   request: NextRequest,
   context: any
 ) {
-  console.log('[POST API] 생활기록부 생성 호출됨, params:', context.params);
+  const params = await context.params;
+  console.log('[POST API] 생활기록부 생성 호출됨, params:', params);
   
   try {
-    const { classId } = context.params;
+    const { classId } = params;
     
     // 요청 본문에서 model 추출
     const requestData = await request.json().catch(() => ({}));
-    const model = requestData.model || 'gpt'; // 기본값은 gpt
-    console.log('[POST API] 선택된 모델:', model);
+    let model = requestData.model || 'gpt'; // 기본값은 gpt
+    
+    // 모델 이름 정규화
+    if (model.includes('gemini')) {
+      model = 'gemini';
+    } else if (model.includes('openai') || model.includes('gpt')) {
+      model = 'openai';
+    }
+    
+    console.log('[POST API] 선택된 모델:', requestData.model, '-> 정규화된 모델:', model);
     
     // Supabase 클라이언트 생성
     const cookieStore = cookies();
@@ -137,191 +146,205 @@ export async function POST(
     }
     console.log('[POST API] 관계 데이터 조회 완료, 관계 수:', relationships ? relationships.length : 0);
 
-    // AI를 통해 생활기록부 생성 수행 (선택된 모델에 따라)
-    try {
-      console.log('[POST API] 생활기록부 생성 시작, 선택된 모델:', model);
-      
-      // 환경 변수 확인
-      if (model === 'gpt' && !process.env.OPENAI_API_KEY) {
-        console.error('[POST API] OPENAI_API_KEY 환경 변수가 설정되지 않았습니다.');
-        return NextResponse.json(
-          { error: 'OpenAI API 키가 설정되지 않았습니다. 환경 변수를 확인해주세요.' },
-          { status: 500 }
-        );
-      }
-      
-      if (model === 'gemini-flash' && !process.env.GEMINI_API_KEY) {
-        console.error('[POST API] GEMINI_API_KEY 환경 변수가 설정되지 않았습니다.');
-        return NextResponse.json(
-          { error: 'Gemini API 키가 설정되지 않았습니다. 환경 변수를 확인해주세요.' },
-          { status: 500 }
-        );
-      }
-      
-      console.log('[POST API] 환경 변수 확인 완료');
-      
-      // 학급에 속한 모든 설문지 조회
-      console.log('[POST API] 설문지 정보 조회 시작');
-      const { data: surveys, error: surveysError } = await supabase
-        .from('surveys')
-        .select('*')
-        .eq('class_id', classId)
-        .order('created_at');
+    // 학급에 속한 모든 설문지 조회
+    console.log('[POST API] 설문지 정보 조회 시작');
+    const { data: surveys, error: surveysError } = await supabase
+      .from('surveys')
+      .select('*')
+      .eq('class_id', classId)
+      .order('created_at');
 
-      if (surveysError) {
-        console.error('[POST API] 설문지 목록 조회 오류:', surveysError);
-        // 설문지 오류는 치명적이지 않으므로 계속 진행
-        console.log('[POST API] 설문지 정보 없이 계속 진행');
+    if (surveysError) {
+      console.error('[POST API] 설문지 목록 조회 오류:', surveysError);
+      // 설문지 오류는 치명적이지 않으므로 계속 진행
+      console.log('[POST API] 설문지 정보 없이 계속 진행');
+    }
+    
+    console.log('[POST API] 설문지 조회 완료, 설문지 수:', surveys ? surveys.length : 0);
+    
+    // 설문지별 관계 데이터 및 질문/응답 데이터 조회
+    const surveyData = [];
+    
+    if (surveys && surveys.length > 0) {
+      console.log('[POST API] 설문지별 데이터 조회 시작');
+      
+      for (const survey of surveys) {
+        // 설문지별 관계 데이터 조회
+        const { data: surveyRelationships, error: surveyRelError } = await supabase
+          .from('relations')
+          .select('*')
+          .in('from_student_id', ids)
+          .in('to_student_id', ids)
+          .eq('survey_id', survey.id);
+          
+        // 설문지별 질문 조회 - 모든 질문 가져오기
+        const { data: questions, error: questionsError } = await supabase
+          .from('questions')
+          .select('*')
+          .eq('class_id', classId);
+          
+        // 설문지의 모든 응답 조회
+        const { data: answers, error: answersError } = await supabase
+          .from('answers')
+          .select('*')
+          .in('student_id', ids);
+          
+        surveyData.push({
+          survey: survey,
+          relationships: surveyRelationships || [],
+          questions: questions || [],
+          answers: answers || []
+        });
       }
       
-      console.log('[POST API] 설문지 조회 완료, 설문지 수:', surveys ? surveys.length : 0);
+      console.log('[POST API] 설문지별 데이터 조회 완료');
+    }
+    
+    // 모든 질문 데이터 조회
+    console.log('[POST API] 전체 질문 데이터 조회 시작');
+    const { data: allQuestions, error: allQuestionsError } = await supabase
+      .from('questions')
+      .select('*')
+      .eq('class_id', classId);
       
-      // 설문지별 관계 데이터 및 질문/응답 데이터 조회
-      const surveyData = [];
+    if (allQuestionsError) {
+      console.error('[POST API] 전체 질문 데이터 조회 오류:', allQuestionsError);
+    }
+    console.log('[POST API] 전체 질문 데이터 조회 완료, 질문 수:', allQuestions ? allQuestions.length : 0);
+    
+    // 모든 응답 데이터 조회
+    console.log('[POST API] 전체 응답 데이터 조회 시작');
+    const { data: allAnswers, error: allAnswersError } = await supabase
+      .from('answers')
+      .select('*')
+      .in('student_id', ids);
       
-      if (surveys && surveys.length > 0) {
-        console.log('[POST API] 설문지별 데이터 조회 시작');
-        
-        for (const survey of surveys) {
-          // 설문지별 관계 데이터 조회
-          const { data: surveyRelationships, error: surveyRelError } = await supabase
-            .from('relations')
-            .select('*')
-            .in('from_student_id', ids)
-            .in('to_student_id', ids)
-            .eq('survey_id', survey.id);
-            
-          // 설문지별 질문 조회 - 모든 질문 가져오기 (survey_id 필터 제거)
-          const { data: questions, error: questionsError } = await supabase
-            .from('questions')
-            .select('*')
-            .eq('class_id', classId);
-            
-          // 설문지의 모든 응답 조회 - survey_id 필터 제거
-          const { data: answers, error: answersError } = await supabase
-            .from('answers')
-            .select('*')
-            .in('student_id', ids);
-            
-          surveyData.push({
-            survey: survey,
-            relationships: surveyRelationships || [],
-            questions: questions || [],
-            answers: answers || []
-          });
-        }
-        
-        console.log('[POST API] 설문지별 데이터 조회 완료');
-      }
-      
-      // 모든 질문 데이터 조회
-      console.log('[POST API] 전체 질문 데이터 조회 시작');
-      const { data: allQuestions, error: allQuestionsError } = await supabase
-        .from('questions')
-        .select('*')
-        .eq('class_id', classId);
-        
-      if (allQuestionsError) {
-        console.error('[POST API] 전체 질문 데이터 조회 오류:', allQuestionsError);
-      }
-      console.log('[POST API] 전체 질문 데이터 조회 완료, 질문 수:', allQuestions ? allQuestions.length : 0);
-      
-      // 모든 응답 데이터 조회
-      console.log('[POST API] 전체 응답 데이터 조회 시작');
-      const { data: allAnswers, error: allAnswersError } = await supabase
-        .from('answers')
-        .select('*')
-        .in('student_id', ids);
-        
-      if (allAnswersError) {
-        console.error('[POST API] 전체 응답 데이터 조회 오류:', allAnswersError);
-      }
-      console.log('[POST API] 전체 응답 데이터 조회 완료, 응답 수:', allAnswers ? allAnswers.length : 0);
-      
-      // 학급 정보 상세 조회
-      console.log('[POST API] 학급 상세 정보 조회 시작');
-      const { data: classDetails, error: classDetailsError } = await supabase
-        .from('classes')
-        .select('*')
-        .eq('id', classId)
-        .single();
-        
-      if (classDetailsError) {
-        console.error('[POST API] 학급 상세 정보 조회 오류:', classDetailsError);
-      }
-      console.log('[POST API] 학급 상세 정보 조회 완료');
-      
-      // AI 생활기록부 생성 함수 호출 (선택된 모델에 따라)
-      let schoolRecordContent;
-      if (model === 'gemini-flash') {
-        schoolRecordContent = await generateSchoolRecordWithGemini(
-          students,
-          relationships || [],
-          allAnswers || [],
-          allQuestions || [],
-          {
-            classDetails: classDetails || { id: classId },
-            surveys: surveys || [],
-            surveyData: surveyData,
-          }
-        );
-      } else {
-        schoolRecordContent = await generateSchoolRecord(
-          students,
-          relationships || [],
-          allAnswers || [],
-          allQuestions || [],
-          {
-            classDetails: classDetails || { id: classId },
-            surveys: surveys || [],
-            surveyData: surveyData,
-          }
-        );
-      }
-      
-      console.log('[POST API] 생활기록부 생성 완료');
-      
-      // Supabase에 결과 저장
-      console.log('[POST API] 생활기록부 결과 저장 시작');
-      
-      const { data: savedRecord, error: saveError } = await supabase
-        .from('school_records')
-        .insert({
-          class_id: classId,
-          result_data: schoolRecordContent,
-          summary: ''
-        })
-        .select()
-        .single();
-        
-      if (saveError) {
-        console.error('[POST API] 생활기록부 저장 오류:', saveError);
-        return NextResponse.json(
-          { error: '생활기록부 저장 중 오류가 발생했습니다.' },
-          { status: 500 }
-        );
-      }
-      
-      if (!savedRecord) {
-        console.error('[POST API] 생활기록부 저장 실패: 결과가 null입니다.');
-        return NextResponse.json(
-          { error: '생활기록부 저장에 실패했습니다.' },
-          { status: 500 }
-        );
-      }
-      
-      console.log('[POST API] 생활기록부 저장 완료, ID:', savedRecord.id);
-      
-      // 성공 응답 반환
-      return NextResponse.json(savedRecord);
-      
-    } catch (aiError: any) {
-      console.error(`[POST API] AI 생활기록부 생성 오류 (모델: ${model}):`, aiError);
+    if (allAnswersError) {
+      console.error('[POST API] 전체 응답 데이터 조회 오류:', allAnswersError);
+    }
+    console.log('[POST API] 전체 응답 데이터 조회 완료, 응답 수:', allAnswers ? allAnswers.length : 0);
+
+    // AI를 사용한 학생별 생활기록부 생성
+    console.log('[POST API] 생활기록부 생성 시작, 선택된 모델:', model);
+    
+    // 환경 변수 확인
+    if (model === 'openai' && !process.env.OPENAI_API_KEY) {
+      console.error('[POST API] OPENAI_API_KEY 환경 변수가 설정되지 않았습니다.');
       return NextResponse.json(
-        { error: `생활기록부 생성에 실패했습니다 (모델: ${model}): ${aiError.message}` },
+        { error: 'OpenAI API 키가 설정되지 않았습니다. 환경 변수를 확인해주세요.' },
         { status: 500 }
       );
     }
+    
+    if (model === 'gemini' && !process.env.GEMINI_API_KEY) {
+      console.error('[POST API] GEMINI_API_KEY 환경 변수가 설정되지 않았습니다.');
+      return NextResponse.json(
+        { error: 'Gemini API 키가 설정되지 않았습니다. 환경 변수를 확인해주세요.' },
+        { status: 500 }
+      );
+    }
+    
+    console.log('[POST API] 환경 변수 확인 완료');
+
+    // 분석 데이터 준비
+    const additionalAnalysisData = {
+      classDetails: classData,
+      surveys: surveys || [],
+      surveyData: surveyData
+    };
+
+    let analysis = '';
+    try {
+      console.log('[POST API] AI 분석 시작, 모델:', model);
+      console.log('[POST API] 분석 데이터 준비 완료:', {
+        studentCount: students.length,
+        relationshipCount: relationships ? relationships.length : 0,
+        answersCount: allAnswers ? allAnswers.length : 0,
+        questionsCount: allQuestions ? allQuestions.length : 0,
+        surveysCount: surveys ? surveys.length : 0
+      });
+      
+      if (model === 'openai') {
+        console.log('[POST API] OpenAI 모델로 생활기록부 생성 시작');
+        analysis = await generateSchoolRecord(
+          students,
+          relationships || [],
+          allAnswers || [],
+          allQuestions || [],
+          additionalAnalysisData
+        );
+        console.log('[POST API] OpenAI 생성 완료, 결과 길이:', analysis.length);
+      } else if (model === 'gemini') {
+        console.log('[POST API] Gemini 모델로 생활기록부 생성 시작');
+        analysis = await generateSchoolRecordWithGemini(
+          students,
+          relationships || [],
+          allAnswers || [],
+          allQuestions || [],
+          additionalAnalysisData,
+          'flash'
+        );
+        console.log('[POST API] Gemini 생성 완료, 결과 길이:', analysis.length);
+      } else {
+        console.error('[POST API] 지원하지 않는 모델:', model);
+        return NextResponse.json(
+          { error: '지원하지 않는 AI 모델입니다.' },
+          { status: 400 }
+        );
+      }
+      
+      if (!analysis || analysis.trim().length === 0) {
+        console.error('[POST API] AI에서 빈 결과 반환됨');
+        return NextResponse.json(
+          { error: 'AI에서 생활기록부 내용을 생성하지 못했습니다.' },
+          { status: 500 }
+        );
+      }
+      
+    } catch (aiError: any) {
+      console.error('[POST API] AI 생성 중 오류 발생:', aiError);
+      return NextResponse.json(
+        { error: `생활기록부 생성 중 오류가 발생했습니다: ${aiError.message}` },
+        { status: 500 }
+      );
+    }
+
+    console.log('[POST API] 생활기록부 생성 완료');
+    
+    // Supabase에 결과 저장
+    console.log('[POST API] 생활기록부 결과 저장 시작');
+    
+    const { data: savedRecord, error: saveError } = await supabase
+      .from('school_records')
+      .insert({
+        class_id: classId,
+        result_data: analysis,
+        summary: ''
+      })
+      .select()
+      .single();
+      
+    if (saveError) {
+      console.error('[POST API] 생활기록부 저장 오류:', saveError);
+      return NextResponse.json(
+        { error: '생활기록부 저장 중 오류가 발생했습니다.' },
+        { status: 500 }
+      );
+    }
+    
+    if (!savedRecord) {
+      console.error('[POST API] 생활기록부 저장 실패: 결과가 null입니다.');
+      return NextResponse.json(
+        { error: '생활기록부 저장에 실패했습니다.' },
+        { status: 500 }
+      );
+    }
+    
+    console.log('[POST API] 생활기록부 저장 완료, ID:', savedRecord.id);
+    
+    // 성공 응답 반환
+    return NextResponse.json(savedRecord);
+    
   } catch (error: any) {
     console.error('[POST API] 최상위 오류 발생:', error);
     return NextResponse.json(
@@ -336,10 +359,11 @@ export async function GET(
   request: NextRequest,
   context: any
 ) {
-  console.log('[GET API] 생활기록부 목록 조회 호출됨, params:', context.params);
+  const params = await context.params;
+  console.log('[GET API] 생활기록부 목록 조회 호출됨, params:', params);
   
   try {
-    const { classId } = context.params;
+    const { classId } = params;
     
     // Supabase 클라이언트 생성
     const cookieStore = cookies();
@@ -427,10 +451,11 @@ export async function DELETE(
   request: NextRequest,
   context: any
 ) {
-  console.log('[DELETE API] 생활기록부 삭제 호출됨, params:', context.params);
+  const params = await context.params;
+  console.log('[DELETE API] 생활기록부 삭제 호출됨, params:', params);
   
   try {
-    const { classId } = context.params;
+    const { classId } = params;
     const url = new URL(request.url);
     const allParam = url.searchParams.get('all');
     const isDeleteAll = allParam === 'true';

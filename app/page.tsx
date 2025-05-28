@@ -147,11 +147,47 @@ export default function Home() {
     queryFn: fetchClasses,
   });
 
+  // 학급 수정 뮤테이션
+  const updateClassMutation = useMutation<BaseClass | null, Error, { id: string; newName: string }>({
+    mutationFn: ({ id, newName }) => updateClass(id, newName),
+    onSuccess: (updatedClass) => {
+      if (updatedClass) {
+        queryClient.invalidateQueries({ queryKey: ['classes'] });
+        toast.success(`'${updatedClass.name}'으로 수정되었습니다.`);
+      }
+    },
+    onError: (error) => {
+      toast.error(`수정 중 오류 발생: ${error.message}`);
+    },
+  });
+
+  // 학급 삭제 뮤테이션
+  const deleteClassMutation = useMutation<void, Error, string>({
+    mutationFn: deleteClass,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['classes'] });
+      toast.success('학급이 삭제되었습니다.');
+    },
+    onError: (error) => {
+      toast.error(`삭제 중 오류 발생: ${error.message}`);
+    },
+  });
+
+  // 학급 수정 핸들러
+  const handleEditClass = async (id: string, newName: string) => {
+    updateClassMutation.mutate({ id, newName });
+  };
+
+  // 학급 삭제 핸들러
+  const handleDeleteClass = async (id: string) => {
+    deleteClassMutation.mutate(id);
+  };
+
   if (isClassesLoading) {
-     return <div className="flex justify-center items-center h-screen text-primary">로딩 중... (Home Page - Temporary)</div>;
+     return <div className="flex justify-center items-center h-screen text-primary">로딩 중...</div>;
   }
 
-  if (isError) return <div className="text-red-500 text-center mt-10">데이터 로딩 중 오류 발생 (Home Page): {(error as any)?.message ?? '알 수 없는 오류'}</div>;
+  if (isError) return <div className="text-red-500 text-center mt-10">데이터 로딩 중 오류 발생: {(error as any)?.message ?? '알 수 없는 오류'}</div>;
 
   return (
     <div className="min-h-screen bg-gray-100 p-8">
@@ -169,21 +205,34 @@ export default function Home() {
           </div>
         </header>
 
+        {/* 학급 카드 그리드 */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mt-8">
           {classes && classes.length > 0 ? (
             classes.map((cls) => (
-          <motion.div 
+              <motion.div 
                 key={cls.id}
                 initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
+                animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3 }}
               >
-                <div className="bg-white p-4 rounded shadow">{cls.name} (Temp Card)</div>
-          </motion.div>
-              ))
-            ) : (
-            <p className="text-gray-500 italic col-span-full">생성된 학급이 없습니다.</p>
-            )}
+                <ClassCard
+                  classData={cls}
+                  onEdit={handleEditClass}
+                  onDelete={handleDeleteClass}
+                />
+              </motion.div>
+            ))
+          ) : (
+            <div className="col-span-full text-center py-12">
+              <p className="text-gray-500 text-lg mb-4">생성된 학급이 없습니다.</p>
+              <Link
+                href="/class/create/school"
+                className="inline-block bg-indigo-600 text-white px-6 py-3 rounded-md hover:bg-indigo-700 transition-colors duration-200 font-medium"
+              >
+                첫 번째 학급 만들기
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </div>

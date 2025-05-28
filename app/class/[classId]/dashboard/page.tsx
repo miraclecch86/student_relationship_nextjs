@@ -11,6 +11,7 @@ import {
   ArrowLeftIcon,
   DocumentTextIcon,
   InformationCircleIcon,
+  CalendarDaysIcon,
 } from '@heroicons/react/24/outline';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -144,6 +145,15 @@ export default function ClassDashboardPage() {
             icon={<ClipboardDocumentListIcon className="w-7 h-7 text-white" />}
             href={`/class/${classId}/survey`}
             color="bg-indigo-500"
+          />
+          
+          {/* 학급 일지 카드 */}
+          <DashboardCard
+            title="학급 일지"
+            description="스마트 학급 일지를 작성하고 관리합니다. AI 알림장 생성, 학생 출결 관리, 학급 메모 등을 한 곳에서 관리하세요."
+            icon={<CalendarDaysIcon className="w-7 h-7 text-white" />}
+            href={`/class/${classId}/journal`}
+            color="bg-blue-500"
           />
           
           {/* 분석 카드 */}

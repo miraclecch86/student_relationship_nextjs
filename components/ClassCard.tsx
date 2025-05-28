@@ -186,46 +186,49 @@ export default function ClassCard({ classData, onEdit, onDelete }: ClassCardProp
           </div>
 
           {/* 액션 버튼 */}          
-          <div className="grid grid-cols-2 gap-3">
-            {isDemoClass ? (
-              <>
-                {/* 데모 학급: 복사 버튼 */}
-                <motion.button
-                  onClick={handleCopyDemoClass}
-                  disabled={isCopying}
-                  className={`w-full px-4 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-green-200 focus:ring-offset-1 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg ${
-                    isCopying 
-                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                      : 'bg-green-50 text-green-600 hover:bg-green-100 active:bg-green-100 cursor-pointer'
-                  }`}
-                >
-                  {isCopying ? '⏳ 복사 중...' : '📋 복사'}
-                </motion.button>
-                {/* 데모 학급: 체험하기 버튼 */}
-                <motion.button
-                  onClick={handleCardClick}
-                  className="w-full px-4 py-2 bg-blue-50 text-blue-600 text-sm font-medium rounded-md hover:bg-blue-100 active:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:ring-offset-1 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
-                >
-                  🚀 체험하기
-                </motion.button>
-              </>
-            ) : (
-              <>
-                {/* 일반 학급: 수정/삭제 버튼 */}
-                <motion.button
-                  onClick={handleEditClick}
-                  className="w-full px-4 py-2 bg-indigo-50 text-indigo-500 text-sm font-medium rounded-md hover:bg-indigo-100 active:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:ring-offset-1 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
-                >
-                  수정
-                </motion.button>
-                <motion.button
-                  onClick={handleDeleteClick}
-                  className="w-full px-4 py-2 bg-red-50 text-red-600 text-sm font-medium rounded-md hover:bg-red-100 active:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-200 focus:ring-offset-1 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
-                >
-                  삭제
-                </motion.button>
-              </>
-            )}
+          <div className="space-y-2">
+            {/* 기존 버튼들 */}
+            <div className="grid grid-cols-2 gap-3">
+              {isDemoClass ? (
+                <>
+                  {/* 데모 학급: 복사 버튼 */}
+                  <motion.button
+                    onClick={handleCopyDemoClass}
+                    disabled={isCopying}
+                    className={`w-full px-4 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-green-200 focus:ring-offset-1 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg ${
+                      isCopying 
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                        : 'bg-green-50 text-green-600 hover:bg-green-100 active:bg-green-100 cursor-pointer'
+                    }`}
+                  >
+                    {isCopying ? '⏳ 복사 중...' : '📋 복사'}
+                  </motion.button>
+                  {/* 데모 학급: 체험하기 버튼 */}
+                  <motion.button
+                    onClick={handleCardClick}
+                    className="w-full px-4 py-2 bg-purple-50 text-purple-600 text-sm font-medium rounded-md hover:bg-purple-100 active:bg-purple-100 focus:outline-none focus:ring-2 focus:ring-purple-200 focus:ring-offset-1 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
+                  >
+                    🚀 체험하기
+                  </motion.button>
+                </>
+              ) : (
+                <>
+                  {/* 일반 학급: 수정/삭제 버튼 */}
+                  <motion.button
+                    onClick={handleEditClick}
+                    className="w-full px-4 py-2 bg-indigo-50 text-indigo-500 text-sm font-medium rounded-md hover:bg-indigo-100 active:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:ring-offset-1 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
+                  >
+                    수정
+                  </motion.button>
+                  <motion.button
+                    onClick={handleDeleteClick}
+                    className="w-full px-4 py-2 bg-red-50 text-red-600 text-sm font-medium rounded-md hover:bg-red-100 active:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-200 focus:ring-offset-1 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
+                  >
+                    삭제
+                  </motion.button>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </motion.div>
