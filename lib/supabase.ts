@@ -38,7 +38,7 @@ export interface StudentForClient extends Omit<Student, 'student_password_hashed
 // 학생 정보 업데이트용 타입 (평문 비밀번호 포함)
 export interface StudentUpdateData {
   name?: string;
-  gender?: 'male' | 'female' | null;
+  gender?: 'male' | 'female' | null; // 런타임에서 빈 문자열이 올 수 있으므로 API에서 변환 처리
   student_number?: number | null;
   student_login_id?: string | null;
   student_password?: string; // 평문 비밀번호 (API에서 해싱 처리)

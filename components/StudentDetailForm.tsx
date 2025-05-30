@@ -22,6 +22,7 @@ export default function StudentDetailForm({
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState<StudentUpdateData>({});
+  const [originalData, setOriginalData] = useState<StudentUpdateData>({}); // 원본 데이터 저장
 
   // 학생 정보 로드
   useEffect(() => {
@@ -36,7 +37,7 @@ export default function StudentDetailForm({
 
         setStudent(result.data);
         // 폼 데이터 초기화
-        setFormData({
+        const initialData = {
           name: result.data.name || '',
           gender: result.data.gender || null,
           student_login_id: result.data.student_login_id || '',
@@ -51,7 +52,9 @@ export default function StudentDetailForm({
           allergies: result.data.allergies || '',
           tablet_number: result.data.tablet_number || '',
           previous_school_records: result.data.previous_school_records || '',
-        });
+        };
+        setFormData(initialData);
+        setOriginalData(initialData); // 원본 데이터도 저장
       } catch (error) {
         console.error('학생 정보 로드 오류:', error);
         toast.error(error instanceof Error ? error.message : '학생 정보를 불러오는데 실패했습니다.');
@@ -71,18 +74,44 @@ export default function StudentDetailForm({
     }));
   };
 
+  // 변경된 필드만 추출하는 함수
+  const getChangedFields = () => {
+    const changedFields: StudentUpdateData = {};
+    
+    for (const key in formData) {
+      const typedKey = key as keyof StudentUpdateData;
+      if (formData[typedKey] !== originalData[typedKey]) {
+        (changedFields as any)[typedKey] = formData[typedKey];
+      }
+    }
+    
+    return changedFields;
+  };
+
   // 폼 제출 핸들러
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
 
     try {
+      // 변경된 필드만 전송
+      const changedFields = getChangedFields();
+      
+      // 변경된 필드가 없으면 저장하지 않음
+      if (Object.keys(changedFields).length === 0) {
+        toast.success('변경된 내용이 없습니다.');
+        setIsSaving(false);
+        return;
+      }
+
+      console.log('변경된 필드들:', changedFields); // 디버깅용
+
       const response = await fetch(`/api/class/${classId}/student/${studentId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(changedFields), // 변경된 필드만 전송
       });
 
       const result = await response.json();
@@ -175,7 +204,10 @@ export default function StudentDetailForm({
                   </label>
                   <select
                     value={formData.gender || ''}
-                    onChange={(e) => handleInputChange('gender', e.target.value || null)}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      handleInputChange('gender', value === '' ? null : value);
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
                   >
                     <option value="">선택하세요</option>

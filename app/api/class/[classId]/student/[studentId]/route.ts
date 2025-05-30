@@ -124,17 +124,23 @@ export async function PATCH(
 
     // 기본 정보
     if (updateData.name !== undefined) updateFields.name = updateData.name;
-    if (updateData.gender !== undefined) updateFields.gender = updateData.gender;
+    if (updateData.gender !== undefined) {
+      // 빈 문자열을 null로 변환 (런타임에서 빈 문자열이 올 수 있음)
+      updateFields.gender = (updateData.gender as any) === '' ? null : updateData.gender;
+    }
     if (updateData.student_number !== undefined) updateFields.student_number = updateData.student_number;
 
     // 로그인 정보
     if (updateData.student_login_id !== undefined) {
-      // 로그인 ID 중복 확인 (다른 학생과 중복되지 않도록)
-      if (updateData.student_login_id) {
+      // 빈 문자열을 null로 변환
+      const loginId = updateData.student_login_id === '' ? null : updateData.student_login_id;
+      
+      // 로그인 ID 중복 확인 (다른 학생과 중복되지 않도록, null이 아닌 경우만)
+      if (loginId) {
         const { data: duplicateCheck } = await supabase
           .from('students')
           .select('id')
-          .eq('student_login_id', updateData.student_login_id)
+          .eq('student_login_id', loginId)
           .neq('id', studentId)
           .single();
 
@@ -142,7 +148,7 @@ export async function PATCH(
           return NextResponse.json({ error: '이미 사용 중인 로그인 아이디입니다.' }, { status: 400 });
         }
       }
-      updateFields.student_login_id = updateData.student_login_id;
+      updateFields.student_login_id = loginId;
     }
 
     // 비밀번호 처리 (undefined가 아닌 경우 모두 처리)
