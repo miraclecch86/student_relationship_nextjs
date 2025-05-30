@@ -32,6 +32,13 @@ const AI_EXPERT_IDENTITY = `## 🎯 AI 전문가 정체성 설정
 // 종합 분석 프롬프트 템플릿
 const COMPREHENSIVE_ANALYSIS_PROMPT = `${AI_EXPERT_IDENTITY}
 
+**관계 데이터 해석 중요 사항:**
+- 관계는 **방향성이 있습니다** (A → B와 B → A는 서로 다른 관계)
+- "from": "철수", "to": "영희", "type": "친해" = "철수가 영희를 친해로 선택했다"는 의미
+- "from": "영희", "to": "철수", "type": "불편해" = "영희가 철수를 불편해로 선택했다"는 의미
+- **받은 관계와 준 관계를 반드시 구분하여 분석**하세요
+- 예: A가 받은 불편해 vs A가 준 불편해는 완전히 다른 의미입니다
+
 **중요**: 
 - 설명이나 안내 문구 없이 바로 분석 내용만 작성하세요
 - 제공된 학급 정보에 기반하여 분석하세요
@@ -55,7 +62,7 @@ const COMPREHENSIVE_ANALYSIS_PROMPT = `${AI_EXPERT_IDENTITY}
 
 #### **전략 1: [즉시 개입 필요 영역]**
 - **🎯 목적**: 현재 가장 시급한 교실 이슈 해결
-- **📋 구체적 방법**: 단계별 실행 계획과 준비물, 교사 역할
+- **구체적 방법**: 단계별 실행 계획과 준비물, 교사 역할
 - **🎈 기대효과**: 이 전략이 학급에 가져올 구체적 변화
 - **📊 성공 지표**: 개선 여부를 확인할 수 있는 관찰 포인트
 
@@ -101,6 +108,13 @@ const COMPREHENSIVE_ANALYSIS_PROMPT = `${AI_EXPERT_IDENTITY}
 
 // 학생 분석 프롬프트 템플릿
 const STUDENT_ANALYSIS_PROMPT = `${AI_EXPERT_IDENTITY}
+
+**관계 데이터 해석 중요 사항:**
+- 관계는 **방향성이 있습니다** (A → B와 B → A는 서로 다른 관계)
+- "from": "철수", "to": "영희", "type": "친해" = "철수가 영희를 친해로 선택했다"는 의미
+- "from": "영희", "to": "철수", "type": "불편해" = "영희가 철수를 불편해로 선택했다"는 의미
+- **받은 관계와 준 관계를 반드시 구분하여 분석**하세요
+- 예: A가 받은 불편해 vs A가 준 불편해는 완전히 다른 의미입니다
 
 **중요**: 
 - 설명이나 안내 문구 없이 바로 학생 분석만 작성하세요
@@ -273,6 +287,9 @@ export async function analyzeStudentRelationships(
       
       // 기본 관계 정보 (설문과 연결되지 않은)
       baseRelationships: relationships.map(r => ({
+        선택한학생: students.find(s => s.id === r.from_student_id)?.name || r.from_student_id,
+        선택받은학생: students.find(s => s.id === r.to_student_id)?.name || r.to_student_id,
+        관계유형: r.relation_type,
         from: students.find(s => s.id === r.from_student_id)?.name || r.from_student_id,
         to: students.find(s => s.id === r.to_student_id)?.name || r.to_student_id,
         type: r.relation_type
@@ -312,6 +329,9 @@ export async function analyzeStudentRelationships(
             created_at: sd.survey.created_at
           },
           relationships: sd.relationships.map(r => ({
+            선택한학생: students.find(s => s.id === r.from_student_id)?.name || r.from_student_id,
+            선택받은학생: students.find(s => s.id === r.to_student_id)?.name || r.to_student_id,
+            관계유형: r.relation_type,
             from: students.find(s => s.id === r.from_student_id)?.name || r.from_student_id,
             to: students.find(s => s.id === r.to_student_id)?.name || r.to_student_id,
             type: r.relation_type
@@ -417,6 +437,9 @@ export async function analyzeClassOverview(
       
       // 기본 관계 정보 (설문과 연결되지 않은)
       baseRelationships: relationships.map(r => ({
+        선택한학생: students.find(s => s.id === r.from_student_id)?.name || r.from_student_id,
+        선택받은학생: students.find(s => s.id === r.to_student_id)?.name || r.to_student_id,
+        관계유형: r.relation_type,
         from: students.find(s => s.id === r.from_student_id)?.name || r.from_student_id,
         to: students.find(s => s.id === r.to_student_id)?.name || r.to_student_id,
         type: r.relation_type
@@ -456,6 +479,9 @@ export async function analyzeClassOverview(
             created_at: sd.survey.created_at
           },
           relationships: sd.relationships.map(r => ({
+            선택한학생: students.find(s => s.id === r.from_student_id)?.name || r.from_student_id,
+            선택받은학생: students.find(s => s.id === r.to_student_id)?.name || r.to_student_id,
+            관계유형: r.relation_type,
             from: students.find(s => s.id === r.from_student_id)?.name || r.from_student_id,
             to: students.find(s => s.id === r.to_student_id)?.name || r.to_student_id,
             type: r.relation_type
