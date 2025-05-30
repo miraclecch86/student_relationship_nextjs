@@ -10,12 +10,48 @@ export interface Student {
   name: string;
   class_id: string;
   gender?: 'male' | 'female' | null;
-  // weekly_form_data?: { [key: string]: string }; // 사용 안 함
-  // class_? 는 실제 컬럼이 아니므로 제거하거나 주석 처리 (일단 제거)
   position_x?: number | null; // 노드 위치 저장용
   position_y?: number | null; // 노드 위치 저장용
   created_at?: string; // 스키마에 created_at 이 있으므로 추가 (선택적)
   display_order?: number;
+  
+  // 새로운 상세 정보 필드들
+  student_number?: number | null; // 학생 번호
+  student_login_id?: string | null; // 학생 로그인 아이디
+  student_password_hashed?: string | null; // 해싱된 비밀번호 (클라이언트에서는 사용하지 않음)
+  student_password_plain?: string | null; // 평문 비밀번호 (선생님용)
+  address?: string | null; // 주소
+  mother_phone_number?: string | null; // 전화번호(모)
+  father_phone_number?: string | null; // 전화번호(부)
+  student_phone_number?: string | null; // 학생 전화
+  birthday?: string | null; // 생일 (YYYY-MM-DD 형식)
+  remarks?: string | null; // 특이사항
+  health_status?: string | null; // 건강상태
+  allergies?: string | null; // 알레르기
+  tablet_number?: string | null; // 태블릿 번호
+  previous_school_records?: string | null; // 이전 학적
+}
+
+// 클라이언트에서 사용할 Student 타입 (비밀번호 해시만 제외)
+export interface StudentForClient extends Omit<Student, 'student_password_hashed'> {}
+
+// 학생 정보 업데이트용 타입 (평문 비밀번호 포함)
+export interface StudentUpdateData {
+  name?: string;
+  gender?: 'male' | 'female' | null;
+  student_number?: number | null;
+  student_login_id?: string | null;
+  student_password?: string; // 평문 비밀번호 (API에서 해싱 처리)
+  address?: string | null;
+  mother_phone_number?: string | null;
+  father_phone_number?: string | null;
+  student_phone_number?: string | null;
+  birthday?: string | null;
+  remarks?: string | null;
+  health_status?: string | null;
+  allergies?: string | null;
+  tablet_number?: string | null;
+  previous_school_records?: string | null;
 }
 
 export interface Class {

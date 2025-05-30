@@ -174,10 +174,10 @@ export default function ClassDashboardPage() {
             color="bg-amber-500"
           />
 
-          {/* 학생 목록 카드 - 마지막으로 이동 */}
+          {/* 학생 정보 카드 - 마지막으로 이동 */}
           <DashboardCard
-            title="학생 목록"
-            description="학급의 학생들을 관리합니다. 학생을 추가, 수정, 삭제할 수 있습니다."
+            title="학생 정보"
+            description="학급 학생들의 정보를 관리합니다. 학생 추가, 개인정보 입력, 순서 조정 및 상세 정보를 관리할 수 있습니다."
             icon={<UserGroupIcon className="w-7 h-7 text-white" />}
             href={`/class/${classId}/students`}
             color="bg-emerald-500"

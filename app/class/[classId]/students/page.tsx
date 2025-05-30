@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase, Student, Class } from '@/lib/supabase';
+import { supabase, Student, Class, StudentForClient } from '@/lib/supabase';
 import {
   UserPlusIcon,
   ArrowLeftIcon,
@@ -13,22 +13,24 @@ import {
   XMarkIcon,
   ArrowPathIcon,
   Bars3Icon,
+  InformationCircleIcon,
 } from '@heroicons/react/24/outline';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import ConfirmModal from '@/components/ConfirmModal';
+import StudentDetailForm from '@/components/StudentDetailForm';
 import { handleDemoSaveAttempt, isDemoClass } from '@/utils/demo-permissions';
 import {
   DndContext,
-  closestCenter,
+  rectIntersection,
   KeyboardSensor,
+  MouseSensor,
   PointerSensor,
   useSensor,
   useSensors,
   DragEndEvent,
   DragOverlay,
   DragStartEvent,
-  defaultDropAnimationSideEffects,
 } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -131,23 +133,27 @@ async function deleteStudent(studentId: string): Promise<void> {
   }
 }
 
-// 학생 아이템 컴포넌트
+// StudentItem 컴포넌트 - dragHandleRef 제거
 interface StudentItemProps {
   student: Student;
   onUpdateStudent: (id: string, newName: string) => Promise<void>;
   onDeleteStudent: (id: string) => Promise<void>;
+  onDetailClick: (student: Student) => void;
   listeners?: any;
   isDragging?: boolean;
   disabled?: boolean;
+  activeId?: string | null;
 }
 
 function StudentItem({ 
   student, 
   onUpdateStudent, 
   onDeleteStudent, 
+  onDetailClick,
   listeners, 
   isDragging = false,
-  disabled = false
+  disabled = false,
+  activeId = null
 }: StudentItemProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(student.name);
@@ -186,9 +192,26 @@ function StudentItem({
     setIsEditing(false);
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+    
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSaveClick(e as any);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      handleCancelClick(e as any);
+    }
+  };
+
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsDeleting(true);
+  };
+
+  const handleDetailClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onDetailClick(student);
   };
 
   const handleConfirmDelete = async () => {
@@ -208,63 +231,122 @@ function StudentItem({
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -20 }}
         transition={{ type: "tween", duration: 0.2 }}
-        className={`bg-white rounded-lg shadow-sm p-4 flex items-center justify-between touch-none will-change-transform ${
-          isDragging ? 'opacity-100 scale-100 shadow-lg bg-white' : ''
+        className={`bg-white rounded-lg shadow-sm border border-gray-200 p-3 hover:shadow-md transition-all duration-200 ${
+          isDragging ? 'opacity-30' : ''
         } ${disabled ? 'pointer-events-none' : ''}`}
-        style={{ transformOrigin: '0 0' }}
-        {...listeners}
+        style={{ 
+          transformOrigin: '0 0',
+          touchAction: 'auto' // 카드는 자유로운 터치 허용
+        }}
       >
-        <div className="flex items-center gap-3 flex-grow">
-          <div className={`p-1.5 hover:bg-gray-100 rounded cursor-grab active:cursor-grabbing flex-shrink-0 drag-handle ${disabled ? 'opacity-50' : ''}`}>
-            <Bars3Icon className="w-5 h-5 text-gray-400" />
+        <div className="flex items-center justify-between">
+          {/* 왼쪽: 드래그 핸들 + 학생 정보 */}
+          <div className="flex items-center gap-3 flex-grow">
+            {/* 드래그 핸들 */}
+            <div 
+              className={`p-2 sm:p-3 hover:bg-gray-100 rounded-md cursor-grab active:cursor-grabbing flex-shrink-0 drag-handle transition-colors ${
+                disabled ? 'opacity-50' : ''
+              } ${
+                activeId === student.id ? 'bg-blue-100 border-2 border-blue-300' : ''
+              }`} 
+              title="0.5초 길게 눌러서 드래그하여 순서 변경"
+              {...listeners} // 🎯 드래그 핸들에만 listeners 적용!
+            >
+              <Bars3Icon className={`w-5 h-5 sm:w-6 sm:h-6 transition-colors ${
+                activeId === student.id ? 'text-blue-600' : 'text-gray-400'
+              }`} />
+            </div>
+            
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+              {isEditing ? (
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  className="flex-grow p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-300 text-gray-900 font-medium"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <h3 className="text-base font-medium text-gray-900">{student.name}</h3>
+              )}
+              <div className="flex gap-1 sm:gap-2 flex-wrap">
+                {student.gender && (
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                    student.gender === 'male' 
+                      ? 'bg-blue-50 text-blue-700 border border-blue-200' 
+                      : 'bg-rose-50 text-rose-700 border border-rose-200'
+                  }`}>
+                    {student.gender === 'male' ? '남' : '여'}
+                  </span>
+                )}
+                {student.tablet_number && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-50 text-slate-700 border border-slate-200">
+                    태블릿 #{student.tablet_number}
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
           
-          {isEditing ? (
-            <input
-              ref={inputRef}
-              type="text"
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              className="flex-grow p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-300 text-black"
-              onClick={(e) => e.stopPropagation()}
-            />
-          ) : (
-            <span className="font-semibold text-gray-900">{student.name}</span>
-          )}
-        </div>
-        
-        <div className="flex items-center gap-2">
-          {isEditing ? (
-            <>
-              <button
-                onClick={handleSaveClick}
-                className="p-1.5 bg-emerald-100 text-emerald-600 rounded-full hover:bg-emerald-200"
-              >
-                <CheckIcon className="w-5 h-5" />
-              </button>
-              <button
-                onClick={handleCancelClick}
-                className="p-1.5 bg-red-100 text-red-600 rounded-full hover:bg-red-200"
-              >
-                <XMarkIcon className="w-5 h-5" />
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                onClick={handleUpdateClick}
-                className="p-1.5 bg-indigo-100 text-indigo-600 rounded-full hover:bg-indigo-200"
-              >
-                <PencilIcon className="w-5 h-5" />
-              </button>
-              <button
-                onClick={handleDeleteClick}
-                className="p-1.5 bg-red-100 text-red-600 rounded-full hover:bg-red-200"
-              >
-                <TrashIcon className="w-5 h-5" />
-              </button>
-            </>
-          )}
+          {/* 오른쪽: 액션 버튼들 */}
+          <div className="flex items-center gap-1.5 ml-4 flex-shrink-0">
+            {isEditing ? (
+              <>
+                <button
+                  onClick={handleSaveClick}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 text-white text-sm font-medium rounded-md hover:bg-emerald-600 transition-colors shadow-sm"
+                >
+                  <CheckIcon className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">저장</span>
+                </button>
+                <button
+                  onClick={handleCancelClick}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-400 text-white text-sm font-medium rounded-md hover:bg-slate-500 transition-colors shadow-sm"
+                >
+                  <XMarkIcon className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">취소</span>
+                </button>
+              </>
+            ) : (
+              <>
+                {(!student.student_login_id && !student.tablet_number && !student.student_phone_number && !student.birthday) ? (
+                  <button
+                    onClick={handleDetailClick}
+                    className="inline-flex items-center justify-center w-8 h-8 sm:w-auto sm:h-auto sm:gap-1.5 sm:px-3 sm:py-1.5 bg-indigo-500 text-white text-sm font-medium rounded-md hover:bg-indigo-600 transition-colors shadow-sm"
+                    title="학생 정보 입력"
+                  >
+                    <InformationCircleIcon className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+                    <span className="hidden sm:inline">상세정보입력</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleDetailClick}
+                    className="inline-flex items-center justify-center w-8 h-8 sm:w-auto sm:h-auto sm:gap-1.5 sm:px-3 sm:py-1.5 bg-indigo-500 text-white text-sm font-medium rounded-md hover:bg-indigo-600 transition-colors shadow-sm"
+                    title="상세 정보 입력"
+                  >
+                    <InformationCircleIcon className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+                    <span className="hidden sm:inline">상세정보입력</span>
+                  </button>
+                )}
+                <button
+                  onClick={handleUpdateClick}
+                  className="inline-flex items-center justify-center w-8 h-8 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors shadow-sm"
+                  title="수정"
+                >
+                  <PencilIcon className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={handleDeleteClick}
+                  className="inline-flex items-center justify-center w-8 h-8 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors shadow-sm"
+                  title="삭제"
+                >
+                  <TrashIcon className="w-4 h-4" />
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </motion.div>
 
@@ -280,12 +362,14 @@ function StudentItem({
   );
 }
 
-// SortableStudentItem 컴포넌트
+// SortableStudentItem 컴포넌트 - 드래그 핸들에만 listeners 적용!
 function SortableStudentItem(props: {
   student: Student;
   onUpdateStudent: (id: string, newName: string) => Promise<void>;
   onDeleteStudent: (id: string) => Promise<void>;
+  onDetailClick: (student: Student) => void;
   disabled?: boolean;
+  activeId?: string | null;
 }) {
   const {
     attributes,
@@ -296,36 +380,30 @@ function SortableStudentItem(props: {
     isDragging
   } = useSortable({
     id: props.student.id,
-    transition: {
-      duration: 100,
-      easing: 'cubic-bezier(0, 0, 0.2, 1)',
-    }
+    disabled: props.disabled,
   });
 
-  // 수직 방향으로만 이동하도록 제한
-  const constrainedTransform = transform ? {
-    ...transform,
-    x: 0 // x축 이동을 0으로 고정
-  } : transform;
-
   const style = {
-    transform: CSS.Transform.toString(constrainedTransform),
+    transform: CSS.Transform.toString(transform),
     transition,
-    zIndex: isDragging ? 50 : 'auto',
-    position: 'relative' as const,
-    opacity: isDragging ? 0.7 : 1,
-    willChange: 'transform',
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes}>
+    <div 
+      ref={setNodeRef} 
+      style={style} 
+      {...attributes}
+      // 🔥 전체 카드에서 listeners 제거! 드래그 핸들에만 적용할 예정
+    >
       <StudentItem
         student={props.student}
         onUpdateStudent={props.onUpdateStudent}
         onDeleteStudent={props.onDeleteStudent}
-        listeners={listeners}
+        onDetailClick={props.onDetailClick}
         isDragging={isDragging}
         disabled={props.disabled}
+        activeId={props.activeId}
+        listeners={listeners} // 🎯 listeners를 StudentItem으로 전달
       />
     </div>
   );
@@ -339,17 +417,22 @@ export default function ClassStudentsPage() {
   const [newStudentName, setNewStudentName] = useState('');
   const [studentOrder, setStudentOrder] = useState<string[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [isTouchScrolling, setIsTouchScrolling] = useState(false);
-  const [touchStartY, setTouchStartY] = useState<number | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
-  // 센서 설정
+  // 🔥 센서 설정 (Hooks 규칙 준수) - 안정적인 기본 드래그!
   const sensors = useSensors(
+    useSensor(MouseSensor, {
+      activationConstraint: {
+        distance: 5, // 마우스: 기본값으로 복원
+      },
+    }),
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8,        // 드래그를 위한 최소 이동 거리 (3에서 8로 증가)
-        delay: 250,         // 드래그 활성화 전 지연 시간 (100에서 250ms로 증가)
-        tolerance: 5,       // 허용 오차 범위 (1에서 5로 증가)
+        distance: 10,     // 터치: 적당한 거리
+        delay: 500,       // 터치: 0.5초 길게 누르기
+        tolerance: 200,   // 🎯 tolerance 다시 올림 (안정적인 드래그)
       },
     }),
     useSensor(KeyboardSensor, {
@@ -378,18 +461,30 @@ export default function ClassStudentsPage() {
   // 학생 목록 순서 초기화
   useEffect(() => {
     if (students) {
-      setStudentOrder(students.map(student => student.id));
+      const newOrder = students.map(student => student.id);
+      console.log('🔄 Student order updated:', {
+        studentsCount: students.length,
+        newOrder
+      });
+      setStudentOrder(newOrder);
     }
   }, [students]);
 
   // 정렬된 학생 목록
   const sortedStudents = useMemo(() => {
     if (!students) return [];
-    return [...students].sort((a, b) => {
+    const sorted = [...students].sort((a, b) => {
       const indexA = studentOrder.indexOf(a.id);
       const indexB = studentOrder.indexOf(b.id);
       return indexA - indexB;
     });
+    console.log('📋 Sorted students:', {
+      originalCount: students.length,
+      sortedCount: sorted.length,
+      studentOrder: studentOrder.slice(0, 3), // 처음 3개만 로그
+      sortedIds: sorted.slice(0, 3).map(s => s.id) // 처음 3개만 로그
+    });
+    return sorted;
   }, [students, studentOrder]);
 
   // 학생 추가 Mutation
@@ -532,19 +627,53 @@ export default function ClassStudentsPage() {
     await deleteStudentMutation.mutateAsync(id);
   };
 
+  // 학생 상세 정보 모달 핸들러들
+  const handleDetailClick = (student: Student) => {
+    setSelectedStudent(student);
+  };
+
+  const handleDetailModalClose = () => {
+    setSelectedStudent(null);
+  };
+
+  const handleStudentSave = (updatedStudent: StudentForClient) => {
+    // 학생 목록 새로고침
+    queryClient.invalidateQueries({ queryKey: ['students', classId] });
+  };
+
   // 드래그 시작 핸들러
   const handleDragStart = (event: DragStartEvent) => {
+    console.log('🚀 Drag started:', {
+      activeId: event.active.id,
+      studentOrder,
+      sortedStudentsCount: sortedStudents.length
+    });
     setActiveId(event.active.id as string);
   };
 
   // 드래그 종료 핸들러
   const handleDragEnd = async (event: DragEndEvent) => {
+    console.log('🏁 Drag ended:', {
+      activeId: event.active.id,
+      overId: event.over?.id,
+      hasOver: !!event.over,
+      collisions: event.collisions
+    });
     const { active, over } = event;
-    setActiveId(null);
+    setActiveId(null); // 🎯 항상 activeId 리셋
     
     if (over && active.id !== over.id) {
+      console.log('✅ Drag successful - moving items');
       const oldIndex = studentOrder.indexOf(active.id as string);
       const newIndex = studentOrder.indexOf(over.id as string);
+      
+      console.log('📊 Index details:', { 
+        oldIndex, 
+        newIndex, 
+        activeId: active.id, 
+        overId: over.id,
+        studentOrderLength: studentOrder.length
+      });
       
       const newOrder = arrayMove(studentOrder, oldIndex, newIndex);
       setStudentOrder(newOrder);
@@ -558,47 +687,27 @@ export default function ClassStudentsPage() {
         await Promise.all(updatePromises);
         // 성공적으로 저장되면 학생 목록 다시 불러오기
         queryClient.invalidateQueries({ queryKey: ['students', classId] });
+        console.log('💾 Order saved successfully');
       } catch (error) {
-        console.error('Failed to update student order:', error);
+        console.error('❌ Failed to update student order:', error);
         toast.error('학생 순서 저장에 실패했습니다.');
         // 에러 발생 시 이전 순서로 되돌리기
         setStudentOrder(studentOrder);
       }
+    } else {
+      console.log('⚠️ Drag failed - no valid drop target or same position');
+      if (!over) {
+        console.log('❌ No drop target found');
+      } else if (active.id === over.id) {
+        console.log('⚪ Same position - no change needed');
+      }
     }
   };
 
-  // 터치 이벤트 핸들러
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length === 1) {
-      setTouchStartY(e.touches[0].clientY);
-      setIsTouchScrolling(false);
-    }
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (touchStartY === null || !scrollContainerRef.current || e.touches.length !== 1) return;
-    
-    const touchY = e.touches[0].clientY;
-    const diff = touchStartY - touchY;
-    
-    // 초기 터치 움직임이 작으면 스크롤이 아닌 드래그로 간주
-    if (Math.abs(diff) < 2) return;
-    
-    // 스크롤 의도 감지 - 수직 움직임이 큰 경우
-    if (Math.abs(diff) > 2 && !isTouchScrolling) {
-      setIsTouchScrolling(true);
-    }
-    
-    if (isTouchScrolling) {
-      scrollContainerRef.current.scrollTop += diff;
-      setTouchStartY(touchY);
-    }
-  };
-
-  const handleTouchEnd = () => {
-    setTouchStartY(null);
-    // 터치 종료 후 바로 스크롤 상태 초기화
-    setIsTouchScrolling(false);
+  // 🎯 드래그 취소 핸들러 추가 (중요!)
+  const handleDragCancel = () => {
+    console.log('❌ Drag cancelled - resetting activeId');
+    setActiveId(null); // 드래그 취소 시 activeId 리셋
   };
 
   const isLoading = isClassLoading || isStudentsLoading;
@@ -620,7 +729,7 @@ export default function ClassStudentsPage() {
           onClick={() => router.push('/teacher')}
           className="px-4 py-2 bg-indigo-500 text-white rounded-md hover:bg-indigo-600"
         >
-          학급 목록으로 돌아가기
+          학급 정보로 돌아가기
         </button>
       </div>
     );
@@ -629,55 +738,59 @@ export default function ClassStudentsPage() {
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="max-w-screen-lg mx-auto px-6 py-10">
-        {/* 헤더 */}
-        <header className="mb-10 flex justify-between items-center bg-white p-5 rounded-lg shadow-md">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => router.push(`/class/${classId}/dashboard`)}
-              className="px-4 py-2 text-sm bg-indigo-500 text-white rounded-md hover:bg-indigo-600 shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:ring-offset-1 transition-all duration-200 flex items-center"
-            >
-              <ArrowLeftIcon className="w-4 h-4 mr-2" />
-              대시보드
-            </button>
-            <h1 className="text-2xl font-bold text-black">{classDetails.name} 학생 목록</h1>
+        {/* 헤더 - 모바일 최적화 */}
+        <header className="mb-6 sm:mb-10 bg-white p-4 sm:p-5 rounded-lg shadow-md">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <button
+                onClick={() => router.push(`/class/${classId}/dashboard`)}
+                className="inline-flex items-center px-3 py-2 text-sm bg-indigo-500 text-white rounded-md hover:bg-indigo-600 shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all duration-200"
+              >
+                <ArrowLeftIcon className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">대시보드</span>
+              </button>
+            </div>
+            <div className="flex-1 ml-3">
+              <h1 className="text-lg sm:text-2xl font-bold text-black truncate">{classDetails.name} 학생 정보</h1>
+            </div>
           </div>
-          <button
-            onClick={handleAddStudent}
-            disabled={addStudentMutation.isPending}
-            className="px-4 py-2 text-sm bg-indigo-500 text-white rounded-md hover:bg-indigo-600 shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 flex items-center disabled:opacity-70 disabled:cursor-not-allowed"
-          >
-            {addStudentMutation.isPending ? (
-              <>
-                <ArrowPathIcon className="w-4 h-4 animate-spin mr-2" />
-                추가 중...
-              </>
-            ) : (
-              <>
-                <UserPlusIcon className="w-4 h-4 mr-2" />
-                학생 추가
-              </>
-            )}
-          </button>
         </header>
 
-        {/* 학생 추가 입력 필드는 현재 위치 유지 */}
+        {/* 학생 추가 입력 필드 */}
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-          <div className="flex gap-4">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <input
               type="text"
               value={newStudentName}
               onChange={(e) => setNewStudentName(e.target.value)}
               onKeyPress={handleAddStudentKeyPress}
-              placeholder="학생 이름 입력 후, 헤더의 '학생 추가' 버튼 클릭"
+              placeholder="학생 이름을 입력하세요"
               className="flex-grow px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-300 text-black placeholder:text-gray-500"
             />
+            <button
+              onClick={handleAddStudent}
+              disabled={addStudentMutation.isPending}
+              className="px-4 py-2 text-sm bg-indigo-500 text-white rounded-md hover:bg-indigo-600 shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 flex items-center justify-center disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              {addStudentMutation.isPending ? (
+                <>
+                  <ArrowPathIcon className="w-4 h-4 animate-spin mr-2" />
+                  추가 중...
+                </>
+              ) : (
+                <>
+                  <UserPlusIcon className="w-4 h-4 mr-2" />
+                  학생 추가
+                </>
+              )}
+            </button>
           </div>
         </div>
 
         {/* 학생 목록 */}
         <div className="space-y-4">
           <h2 className="text-xl font-semibold text-gray-700 mb-4">
-            학생 목록 ({students?.length || 0}명)
+            학생 정보 ({students?.length || 0}명)
           </h2>
           
           {isStudentsError ? (
@@ -687,52 +800,64 @@ export default function ClassStudentsPage() {
           ) : students && students.length > 0 ? (
             <div 
               ref={scrollContainerRef}
-              className="space-y-3 overflow-y-auto max-h-[600px] pr-2" 
-              onTouchStart={handleTouchStart}
-              onTouchMove={handleTouchMove}
-              onTouchEnd={handleTouchEnd}
-              style={{ WebkitOverflowScrolling: 'touch' }}
+              className="space-y-2 sm:space-y-3 overflow-y-auto max-h-[70vh] sm:max-h-[600px] pr-2" 
+              style={{ 
+                WebkitOverflowScrolling: 'touch',
+                // 🎯 드래그 중에는 스크롤 비활성화, 평소에는 스크롤 허용
+                touchAction: activeId ? 'none' : 'pan-y',
+                overflowY: 'auto',
+              }}
             >
               <AnimatePresence mode="popLayout">
                 <DndContext
+                  id={`dnd-context-${classId}`} // 🎯 고유 ID로 DndContext 안정화
                   sensors={sensors}
-                  collisionDetection={closestCenter}
+                  collisionDetection={rectIntersection} // 🎯 rectIntersection으로 변경 - 더 관대한 감지
                   onDragStart={handleDragStart}
                   onDragEnd={handleDragEnd}
+                  onDragCancel={handleDragCancel} // 🎯 드래그 취소 핸들러 추가
                   modifiers={[]}
                 >
                   <SortableContext
                     items={studentOrder}
                     strategy={verticalListSortingStrategy}
                   >
-                    <div className="space-y-3">
+                    <div className="space-y-2 sm:space-y-3">
                       {sortedStudents.map((student) => (
                         <SortableStudentItem
                           key={student.id}
                           student={student}
                           onUpdateStudent={handleUpdateStudent}
                           onDeleteStudent={handleDeleteStudent}
-                          disabled={isTouchScrolling}
+                          onDetailClick={handleDetailClick}
+                          disabled={false}
+                          activeId={activeId}
                         />
                       ))}
                     </div>
                   </SortableContext>
                   <DragOverlay 
                     adjustScale={false}
-                    zIndex={100}
+                    zIndex={1000}
                     dropAnimation={{
-                      duration: 100,
-                      easing: 'cubic-bezier(0, 0, 0.2, 1)',
+                      duration: 200,
+                      easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
                     }}
                   >
-                    {activeId && students ? (
-                      <StudentItem
-                        student={students.find(s => s.id === activeId)!}
-                        onUpdateStudent={async () => {}}
-                        onDeleteStudent={async () => {}}
-                        isDragging={true}
-                      />
-                    ) : null}
+                    {activeId && sortedStudents ? (() => {
+                      const draggedStudent = sortedStudents.find(s => s.id === activeId);
+                      return draggedStudent ? (
+                        <StudentItem
+                          student={draggedStudent}
+                          onUpdateStudent={async () => {}}
+                          onDeleteStudent={async () => {}}
+                          onDetailClick={handleDetailClick}
+                          isDragging={true}
+                          disabled={false}
+                          activeId={null}
+                        />
+                      ) : null;
+                    })() : null}
                   </DragOverlay>
                 </DndContext>
               </AnimatePresence>
@@ -745,6 +870,19 @@ export default function ClassStudentsPage() {
           )}
         </div>
       </div>
+
+      {selectedStudent && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white rounded-xl max-w-4xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto shadow-2xl">
+            <StudentDetailForm
+              studentId={selectedStudent.id}
+              classId={classId}
+              onClose={handleDetailModalClose}
+              onSave={handleStudentSave}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 } 
