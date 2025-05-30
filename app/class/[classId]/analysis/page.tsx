@@ -44,6 +44,7 @@ interface AnalysisResult {
   };
   summary: string;
   type: string; // 'full', 'overview', 'students-1', 'students-2', 'students-3'
+  session_id?: string; // 세션 ID 추가
 }
 
 // 학급 정보 조회 함수
@@ -76,7 +77,7 @@ async function fetchAnalysisResults(classId: string): Promise<AnalysisResult[]> 
   console.log(`분석 목록 요청: classId=${classId}`);
   
   try {
-    // API 엔드포인트에 group_by_session=true 파라미터 추가
+    // 세션별 그룹화 활성화
     const response = await fetch(`/api/class/${classId}/analysis?group_by_session=true`);
     
     if (!response.ok) {
@@ -268,6 +269,35 @@ async function deleteAnalysis(classId: string, analysisId: string): Promise<void
   }
 }
 
+// 세션별 분석 결과 삭제 함수 (같은 세션의 모든 분석 삭제)
+async function deleteAnalysisSession(classId: string, sessionId: string): Promise<void> {
+  console.log(`🗂️ 세션 삭제 요청: classId=${classId}, sessionId=${sessionId}`);
+  
+  try {
+    // 먼저 해당 세션의 모든 분석 결과 조회
+    const response = await fetch(`/api/class/${classId}/analysis`);
+    if (!response.ok) {
+      throw new Error('분석 결과 조회 실패');
+    }
+    
+    const allResults = await response.json();
+    const sessionResults = allResults.filter((result: AnalysisResult) => result.session_id === sessionId);
+    
+    console.log(`🗂️ 세션 ${sessionId}에 속한 분석 결과 ${sessionResults.length}개 발견`);
+    
+    // 각 분석 결과를 순차적으로 삭제
+    for (const result of sessionResults) {
+      await deleteAnalysis(classId, result.id);
+      console.log(`🗑️ 세션 분석 삭제 완료: ${result.id} (${result.type})`);
+    }
+    
+    console.log(`🗂️ 세션 ${sessionId} 전체 삭제 완료`);
+  } catch (error) {
+    console.error('🗂️ 세션 삭제 요청 오류:', error);
+    throw error;
+  }
+}
+
 // 분석 유형에 따른 배지 색상 및 텍스트 가져오기
 const getAnalysisBadge = (type: string) => {
   switch(type) {
@@ -338,12 +368,23 @@ function AnalysisCard({ analysis, classDetails }: AnalysisCardProps) {
           throw new Error("DEMO_BLOCKED");
         }
       }
-      return deleteAnalysis(classId, analysis.id);
+      
+      // 세션 ID가 있으면 세션 전체 삭제, 없으면 개별 삭제
+      if (analysis.session_id) {
+        console.log(`🗂️ 세션별 삭제 시작: ${analysis.session_id}`);
+        return deleteAnalysisSession(classId, analysis.session_id);
+      } else {
+        console.log(`🗑️ 개별 삭제 시작: ${analysis.id}`);
+        return deleteAnalysis(classId, analysis.id);
+      }
     },
     onSuccess: () => {
       // 🌟 데모 학급이 아닌 경우만 성공 메시지 표시
       if (classDetails && !isDemoClass(classDetails)) {
-        toast.success('분석 결과가 삭제되었습니다.');
+        const message = analysis.session_id 
+          ? '분석 세션이 삭제되었습니다.' 
+          : '분석 결과가 삭제되었습니다.';
+        toast.success(message);
       }
       queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
       setIsDeleteDialogOpen(false);
@@ -522,8 +563,12 @@ function AnalysisCard({ analysis, classDetails }: AnalysisCardProps) {
         isOpen={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
         onConfirm={confirmDelete}
-        title="분석 결과 삭제 확인"
-        message={`${formattedDate} ${formattedTime}에 생성된 분석 결과를 정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`}
+        title={analysis.session_id ? "분석 세션 삭제 확인" : "분석 결과 삭제 확인"}
+        message={
+          analysis.session_id 
+            ? `${formattedDate} ${formattedTime}에 생성된 분석 세션 전체를 정말 삭제하시겠습니까? 이 세션에 포함된 모든 분석 결과(종합분석, 학생분석 등)가 삭제됩니다. 이 작업은 되돌릴 수 없습니다.`
+            : `${formattedDate} ${formattedTime}에 생성된 분석 결과를 정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`
+        }
         confirmText="삭제"
         isLoading={deleteMutation.isPending}
       />
@@ -1246,7 +1291,7 @@ export default function ClassAnalysisPage() {
               )}
             </button>
           </div>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 mb-2">
             각 분석 결과를 클릭하면 상세 내용을 볼 수 있습니다. 상세 페이지에서 종합분석과 학생그룹별 분석을 탭으로 확인할 수 있습니다.
           </p>
         </div>
