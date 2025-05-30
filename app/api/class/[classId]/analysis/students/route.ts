@@ -273,6 +273,12 @@ export async function POST(
     const endIndex = startIndex + studentsPerGroup;
     const groupStudents = allStudents.slice(startIndex, endIndex);
     
+    console.log(`[학생 그룹 분석 API] 그룹 ${groupIndex} 학생 분할 정보:`);
+    console.log(`[학생 그룹 분석 API] 전체 학생 수: ${allStudents.length}`);
+    console.log(`[학생 그룹 분석 API] 시작 인덱스: ${startIndex}, 끝 인덱스: ${endIndex}`);
+    console.log(`[학생 그룹 분석 API] 그룹 학생 수: ${groupStudents.length}`);
+    console.log(`[학생 그룹 분석 API] 그룹 ${groupIndex} 학생 이름들:`, groupStudents.map((s: Student) => s.name));
+    
     // 해당 그룹에 학생이 없는 경우
     if (groupStudents.length === 0) {
       console.log(`[학생 그룹 분석 API] 그룹 ${groupIndex}에 학생이 없습니다.`);

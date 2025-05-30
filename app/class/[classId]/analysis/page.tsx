@@ -90,16 +90,21 @@ async function fetchAnalysisResults(classId: string): Promise<AnalysisResult[]> 
     if (data && data.length > 0) {
       console.log('🔍 첫 번째 분석 결과 상세:', data[0]);
       console.log('🔍 result_data 타입:', typeof data[0].result_data);
-      console.log('🔍 result_data 내용:', data[0].result_data);
+      console.log('🔍 result_data 내용 (첫 100자):', 
+        typeof data[0].result_data === 'string' 
+          ? data[0].result_data.substring(0, 100) 
+          : data[0].result_data
+      );
       
-      if (typeof data[0].result_data === 'string') {
-        try {
-          const parsed = JSON.parse(data[0].result_data);
-          console.log('🔍 파싱된 result_data:', parsed);
-        } catch (e) {
-          console.log('🔍 result_data JSON 파싱 실패:', e);
-        }
-      }
+      // AI 결과는 마크다운 텍스트이므로 JSON 파싱 시도 제거
+      // if (typeof data[0].result_data === 'string') {
+      //   try {
+      //     const parsed = JSON.parse(data[0].result_data);
+      //     console.log('🔍 파싱된 result_data:', parsed);
+      //   } catch (e) {
+      //     console.log('🔍 result_data JSON 파싱 실패:', e);
+      //   }
+      // }
     }
     
     return data || [];
@@ -611,7 +616,7 @@ export default function ClassAnalysisPage() {
   const [isDeleteAllDialogOpen, setIsDeleteAllDialogOpen] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState('');
-  const [selectedModel, setSelectedModel] = useState<'gpt' | 'gemini-flash'>('gpt');
+  const [selectedModel, setSelectedModel] = useState<'gpt' | 'gemini-flash'>('gemini-flash');
   
   // 학급 정보 조회
   const { data: classDetails, isLoading: isClassLoading } = useQuery({
@@ -1182,54 +1187,12 @@ export default function ClassAnalysisPage() {
             </button>
             <h1 className="text-2xl font-bold text-black">{classDetails.name} 학급 분석</h1>
           </div>
-          <div className="flex items-center gap-3">
-            {/* AI 모델 선택 버튼 */}
-            <div className="flex bg-gray-100 rounded-lg p-1">
-              <button
-                onClick={() => setSelectedModel('gpt')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
-                  selectedModel === 'gpt'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                GPT-4
-              </button>
-              <button
-                onClick={() => setSelectedModel('gemini-flash')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
-                  selectedModel === 'gemini-flash'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Gemini 2.5
-              </button>
-            </div>
-            <button
-              onClick={runFullAnalysisSequentially}
-              disabled={isAnyRunning || isAnalyzing}
-              className="px-4 py-2 text-sm bg-indigo-500 text-white rounded-md hover:bg-indigo-600 shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 flex items-center disabled:opacity-70 disabled:cursor-not-allowed"
-            >
-              {isAnyRunning || isAnalyzing ? (
-                <>
-                  <ArrowPathIcon className="w-4 h-4 animate-spin mr-2" />
-                  분석 중...
-                </>
-              ) : (
-                <>
-                  <SparklesIcon className="w-4 h-4 mr-2" />
-                  새 분석 실행
-                </>
-              )}
-            </button>
-          </div>
         </header>
         
-        {/* 분석 실행 설명 부분은 현재 위치 유지 */}
+        {/* 분석 실행 설명 부분 - 분석 버튼을 오른쪽으로 옮김 */}
         <div className="bg-white rounded-lg shadow-md p-4 mb-8">
           <div className="flex items-center justify-between">
-            <div>
+            <div className="flex-1">
               <h2 className="text-lg font-semibold text-gray-800 flex items-center">
                 <SparklesIcon className="w-5 h-5 text-indigo-500 mr-2" />
                 AI 기반 학급 관계 분석
@@ -1238,8 +1201,27 @@ export default function ClassAnalysisPage() {
                 학생들의 관계 데이터를 AI가 분석하여 학급 내 사회적 역학 구조와 관계 패턴을 파악합니다.
               </p>
               <p className="text-xs text-gray-500 mt-1">
-                분석은 종합분석 및 학생그룹별 분석으로 나누어 진행됩니다.
+                분석은 종합분석 및 학생그룹별 분석으로 나누어 진행됩니다. (Gemini 2.5 사용)
               </p>
+            </div>
+            <div className="flex items-center gap-3 ml-4">
+              <button
+                onClick={runFullAnalysisSequentially}
+                disabled={isAnyRunning || isAnalyzing}
+                className="px-6 py-3 text-sm bg-indigo-500 text-white rounded-md hover:bg-indigo-600 shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 flex items-center disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-200"
+              >
+                {isAnyRunning || isAnalyzing ? (
+                  <>
+                    <ArrowPathIcon className="w-4 h-4 animate-spin mr-2" />
+                    분석 중...
+                  </>
+                ) : (
+                  <>
+                    <SparklesIcon className="w-4 h-4 mr-2" />
+                    새 분석 실행
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
