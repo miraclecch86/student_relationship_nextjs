@@ -29,7 +29,7 @@ export async function createClass(formData: {
     
     console.log('[Action: createClass] Attempting to insert class', className, 'with user_id:', user.id);
     
-    const { data: insertedData, error: insertError } = await supabase
+    const { data: insertedData, error: insertError } = await (supabase as any)
       .from('classes')
       .insert([{ 
         name: className,

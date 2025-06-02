@@ -37,7 +37,7 @@ interface SchoolRecord {
 
 // 학급 정보 조회 함수
 async function fetchClassDetails(classId: string): Promise<Class | null> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('classes')
     .select('*')
     .eq('id', classId)

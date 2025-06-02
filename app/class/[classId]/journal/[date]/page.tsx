@@ -18,7 +18,7 @@ import type { Class, ClassJournalWithDetails } from '@/lib/supabase';
 
 // 학급 정보 조회
 async function fetchClassDetails(classId: string): Promise<Class | null> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('classes')
     .select('*')
     .eq('id', classId)
@@ -34,7 +34,7 @@ async function fetchClassDetails(classId: string): Promise<Class | null> {
 
 // 특정 날짜의 학급 일지 조회 (특정 학급만)
 async function fetchDateJournals(date: string, classId: string): Promise<ClassJournalWithDetails[]> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('class_journals')
     .select(`
       *,

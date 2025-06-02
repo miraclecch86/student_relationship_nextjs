@@ -53,7 +53,7 @@ export async function GET(
         const queryString = `*, classes!inner(*)`;
         console.log(`실행할 쿼리: .from('analysis_results').select('${queryString}').eq('id', '${analysisId}').eq('class_id', '${classId}').single()`);
         
-        const queryResult = await supabase
+        const queryResult = await (supabase as any)
           .from('analysis_results')
           .select(queryString)
           .eq('id', analysisId)
@@ -186,7 +186,7 @@ export async function DELETE(
       try {
         // 먼저 분석 결과가 사용자의 것인지 확인
         console.log(`분석 결과 및 권한 확인: analysisId=${analysisId}`);
-        const { data: analysis, error: dataError } = await supabase
+        const { data: analysis, error: dataError } = await (supabase as any)
           .from('analysis_results')
           .select('*, classes:class_id(user_id)')
           .eq('id', analysisId)
@@ -219,7 +219,7 @@ export async function DELETE(
         
         // 분석 결과 삭제
         console.log(`분석 결과 삭제 시작: analysisId=${analysisId}`);
-        const { error: deleteError } = await supabase
+        const { error: deleteError } = await (supabase as any)
           .from('analysis_results')
           .delete()
           .eq('id', analysisId);
@@ -327,7 +327,7 @@ export async function PATCH(
       try {
         // 먼저 분석 결과가 사용자의 것인지 확인
         console.log(`분석 결과 및 권한 확인: analysisId=${analysisId}`);
-        const { data: analysis, error: dataError } = await supabase
+        const { data: analysis, error: dataError } = await (supabase as any)
           .from('analysis_results')
           .select('*, classes:class_id(user_id)')
           .eq('id', analysisId)
@@ -360,7 +360,7 @@ export async function PATCH(
         
         // 분석 결과 업데이트
         console.log(`분석 결과 업데이트 시작: analysisId=${analysisId}`);
-        const { data: updatedAnalysis, error: updateError } = await supabase
+        const { data: updatedAnalysis, error: updateError } = await (supabase as any)
           .from('analysis_results')
           .update({ summary: updateData.summary })
           .eq('id', analysisId)

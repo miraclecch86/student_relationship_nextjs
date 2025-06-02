@@ -33,7 +33,7 @@ export async function POST(
     const newClassName = body.name;
     
     // 원본 학급 정보 조회
-    const { data: originalClass, error: classError } = await supabase
+    const { data: originalClass, error: classError } = await (supabase as any)
       .from('classes')
       .select('*')
       .eq('id', classId)
@@ -55,7 +55,7 @@ export async function POST(
     }
     
     // 1. 새 학급 생성
-    const { data: newClass, error: newClassError } = await supabase
+    const { data: newClass, error: newClassError } = await (supabase as any)
       .from('classes')
       .insert({
         name: newClassName || `${originalClass.name} (복사본)`,
@@ -74,7 +74,7 @@ export async function POST(
     }
     
     // 2. 학생 데이터 복사
-    const { data: originalStudents, error: studentsError } = await supabase
+    const { data: originalStudents, error: studentsError } = await (supabase as any)
       .from('students')
       .select('*')
       .eq('class_id', classId)
@@ -84,7 +84,7 @@ export async function POST(
       throw new Error(`학생 데이터 조회 실패: ${studentsError.message}`);
     }
     
-    const studentsData = originalStudents.map(student => ({
+    const studentsData = originalStudents.map((student: any) => ({
       class_id: newClass.id,
       name: student.name,
       gender: student.gender,
@@ -93,7 +93,7 @@ export async function POST(
       display_order: student.display_order
     }));
     
-    const { data: newStudents, error: insertStudentsError } = await supabase
+    const { data: newStudents, error: insertStudentsError } = await (supabase as any)
       .from('students')
       .insert(studentsData)
       .select();
@@ -103,7 +103,7 @@ export async function POST(
     }
     
     // 3. 설문 데이터 복사
-    const { data: originalSurveys, error: surveysError } = await supabase
+    const { data: originalSurveys, error: surveysError } = await (supabase as any)
       .from('surveys')
       .select('*')
       .eq('class_id', classId)
@@ -113,13 +113,13 @@ export async function POST(
       throw new Error(`설문 데이터 조회 실패: ${surveysError.message}`);
     }
     
-    const surveysData = originalSurveys.map(survey => ({
+    const surveysData = originalSurveys.map((survey: any) => ({
       class_id: newClass.id,
       name: survey.name,
       description: survey.description
     }));
     
-    const { data: newSurveys, error: insertSurveysError } = await supabase
+    const { data: newSurveys, error: insertSurveysError } = await (supabase as any)
       .from('surveys')
       .insert(surveysData)
       .select();
@@ -129,7 +129,7 @@ export async function POST(
     }
     
     // 4. 질문 데이터 복사
-    const { data: originalQuestions, error: questionsError } = await supabase
+    const { data: originalQuestions, error: questionsError } = await (supabase as any)
       .from('questions')
       .select('*')
       .eq('class_id', classId);
@@ -144,13 +144,13 @@ export async function POST(
       surveyIdMap[originalSurveys[i].id] = newSurveys[i].id;
     }
     
-    const questionsData = originalQuestions.map(question => ({
+    const questionsData = originalQuestions.map((question: any) => ({
       class_id: newClass.id,
       survey_id: question.survey_id ? surveyIdMap[question.survey_id] : null,
       question_text: question.question_text
     }));
     
-    const { data: newQuestions, error: insertQuestionsError } = await supabase
+    const { data: newQuestions, error: insertQuestionsError } = await (supabase as any)
       .from('questions')
       .insert(questionsData)
       .select();
@@ -171,10 +171,10 @@ export async function POST(
     }
     
     while (true) {
-      const { data: relationsBatch, error: relationsError } = await supabase
+      const { data: relationsBatch, error: relationsError } = await (supabase as any)
         .from('relations')
         .select('*')
-        .in('from_student_id', originalStudents.map(s => s.id))
+        .in('from_student_id', originalStudents.map((s: any) => s.id))
         .range(from, from + batchSize - 1);
         
       if (relationsError) {
@@ -183,14 +183,14 @@ export async function POST(
       
       if (relationsBatch.length === 0) break;
       
-      const relationsData = relationsBatch.map(relation => ({
+      const relationsData = relationsBatch.map((relation: any) => ({
         from_student_id: studentIdMap[relation.from_student_id],
         to_student_id: studentIdMap[relation.to_student_id],
         relation_type: relation.relation_type,
         survey_id: surveyIdMap[relation.survey_id]
       }));
       
-      const { error: insertRelationsError } = await supabase
+      const { error: insertRelationsError } = await (supabase as any)
         .from('relations')
         .insert(relationsData);
         
@@ -213,10 +213,10 @@ export async function POST(
     }
     
     while (true) {
-      const { data: answersBatch, error: answersError } = await supabase
+      const { data: answersBatch, error: answersError } = await (supabase as any)
         .from('answers')
         .select('*')
-        .in('student_id', originalStudents.map(s => s.id))
+        .in('student_id', originalStudents.map((s: any) => s.id))
         .range(from, from + batchSize - 1);
         
       if (answersError) {
@@ -225,14 +225,14 @@ export async function POST(
       
       if (answersBatch.length === 0) break;
       
-      const answersData = answersBatch.map(answer => ({
+      const answersData = answersBatch.map((answer: any) => ({
         student_id: studentIdMap[answer.student_id],
         question_id: questionIdMap[answer.question_id],
         survey_id: surveyIdMap[answer.survey_id],
         answer_text: answer.answer_text
       }));
       
-      const { error: insertAnswersError } = await supabase
+      const { error: insertAnswersError } = await (supabase as any)
         .from('answers')
         .insert(answersData);
         

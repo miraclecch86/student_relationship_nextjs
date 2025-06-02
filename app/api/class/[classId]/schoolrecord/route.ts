@@ -58,7 +58,7 @@ export async function POST(
     console.log('[POST API] 인증 확인 완료, 사용자 ID:', session.user.id);
 
     // 학급 소유권 확인
-    const { data: classData, error: classError } = await supabase
+    const { data: classData, error: classError } = await (supabase as any)
       .from('classes')
       .select('id, name, created_at, user_id, is_demo, is_public')
       .eq('id', classId)
@@ -91,7 +91,7 @@ export async function POST(
     console.log('[POST API] 학급 권한 확인 완료 (데모 학급:', isDemoClass(classData), ')');
 
     // 학생 목록 조회
-    const { data: students, error: studentsError } = await supabase
+    const { data: students, error: studentsError } = await (supabase as any)
       .from('students')
       .select('*')
       .eq('class_id', classId);
@@ -114,7 +114,7 @@ export async function POST(
     console.log('[POST API] 학생 목록 조회 완료, 학생 수:', students.length);
 
     // 관계 데이터 조회
-    const { data: studentIds } = await supabase
+    const { data: studentIds } = await (supabase as any)
       .from('students')
       .select('id')
       .eq('class_id', classId);
@@ -127,10 +127,10 @@ export async function POST(
       );
     }
 
-    const ids = studentIds.map(s => s.id);
+    const ids = studentIds.map((s: any) => s.id);
     console.log('[POST API] 학생 ID 목록:', ids);
 
-    const { data: relationships, error: relError } = await supabase
+    const { data: relationships, error: relError } = await (supabase as any)
       .from('relations')
       .select('*')
       .in('from_student_id', ids)
@@ -148,7 +148,7 @@ export async function POST(
 
     // 학급에 속한 모든 설문지 조회
     console.log('[POST API] 설문지 정보 조회 시작');
-    const { data: surveys, error: surveysError } = await supabase
+    const { data: surveys, error: surveysError } = await (supabase as any)
       .from('surveys')
       .select('*')
       .eq('class_id', classId)
@@ -170,7 +170,7 @@ export async function POST(
       
       for (const survey of surveys) {
         // 설문지별 관계 데이터 조회
-        const { data: surveyRelationships, error: surveyRelError } = await supabase
+        const { data: surveyRelationships, error: surveyRelError } = await (supabase as any)
           .from('relations')
           .select('*')
           .in('from_student_id', ids)
@@ -178,13 +178,13 @@ export async function POST(
           .eq('survey_id', survey.id);
           
         // 설문지별 질문 조회 - 모든 질문 가져오기
-        const { data: questions, error: questionsError } = await supabase
+        const { data: questions, error: questionsError } = await (supabase as any)
           .from('questions')
           .select('*')
           .eq('class_id', classId);
           
         // 설문지의 모든 응답 조회
-        const { data: answers, error: answersError } = await supabase
+        const { data: answers, error: answersError } = await (supabase as any)
           .from('answers')
           .select('*')
           .in('student_id', ids);
@@ -202,7 +202,7 @@ export async function POST(
     
     // 모든 질문 데이터 조회
     console.log('[POST API] 전체 질문 데이터 조회 시작');
-    const { data: allQuestions, error: allQuestionsError } = await supabase
+    const { data: allQuestions, error: allQuestionsError } = await (supabase as any)
       .from('questions')
       .select('*')
       .eq('class_id', classId);
@@ -214,7 +214,7 @@ export async function POST(
     
     // 모든 응답 데이터 조회
     console.log('[POST API] 전체 응답 데이터 조회 시작');
-    const { data: allAnswers, error: allAnswersError } = await supabase
+    const { data: allAnswers, error: allAnswersError } = await (supabase as any)
       .from('answers')
       .select('*')
       .in('student_id', ids);
@@ -314,7 +314,7 @@ export async function POST(
     // Supabase에 결과 저장
     console.log('[POST API] 생활기록부 결과 저장 시작');
     
-    const { data: savedRecord, error: saveError } = await supabase
+    const { data: savedRecord, error: saveError } = await (supabase as any)
       .from('school_records')
       .insert({
         class_id: classId,
@@ -371,7 +371,7 @@ export async function GET(
 
     // 학급 정보를 먼저 조회해서 데모 학급인지 확인
     console.log('[GET API] 학급 정보 조회 중...');
-    const { data: classData, error: classError } = await supabase
+    const { data: classData, error: classError } = await (supabase as any)
       .from('classes')
       .select('id, name, created_at, user_id, is_demo, is_public')
       .eq('id', classId)
@@ -421,7 +421,7 @@ export async function GET(
 
     // 생활기록부 목록 조회
     console.log('[GET API] 생활기록부 목록 조회 시작');
-    const { data: records, error: recordsError } = await supabase
+    const { data: records, error: recordsError } = await (supabase as any)
       .from('school_records')
       .select('*')
       .eq('class_id', classId)
@@ -477,7 +477,7 @@ export async function DELETE(
     }
 
     // 학급 소유권 확인
-    const { data: classData, error: classError } = await supabase
+    const { data: classData, error: classError } = await (supabase as any)
       .from('classes')
       .select('user_id')
       .eq('id', classId)
@@ -501,7 +501,7 @@ export async function DELETE(
 
     if (isDeleteAll) {
       // 학급의 모든 생활기록부 삭제
-      const { error: deleteError } = await supabase
+      const { error: deleteError } = await (supabase as any)
         .from('school_records')
         .delete()
         .eq('class_id', classId);

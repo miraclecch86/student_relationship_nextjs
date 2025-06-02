@@ -28,7 +28,7 @@ export async function GET(
     }
 
     // 학급 소유권 확인
-    const { data: classData, error: classError } = await supabase
+    const { data: classData, error: classError } = await (supabase as any)
       .from('classes')
       .select('user_id')
       .eq('id', classId)
@@ -51,7 +51,7 @@ export async function GET(
     }
 
     // 생활기록부 조회
-    const { data: schoolRecord, error: recordError } = await supabase
+    const { data: schoolRecord, error: recordError } = await (supabase as any)
       .from('school_records')
       .select('*')
       .eq('id', recordId)
@@ -110,7 +110,7 @@ export async function DELETE(
     }
 
     // 학급 소유권 확인
-    const { data: classData, error: classError } = await supabase
+    const { data: classData, error: classError } = await (supabase as any)
       .from('classes')
       .select('user_id')
       .eq('id', classId)
@@ -133,7 +133,7 @@ export async function DELETE(
     }
 
     // 생활기록부 삭제
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await (supabase as any)
       .from('school_records')
       .delete()
       .eq('id', recordId)
@@ -195,7 +195,7 @@ export async function PATCH(
     }
 
     // 학급 소유권 확인
-    const { data: classData, error: classError } = await supabase
+    const { data: classData, error: classError } = await (supabase as any)
       .from('classes')
       .select('user_id')
       .eq('id', classId)
@@ -218,7 +218,7 @@ export async function PATCH(
     }
 
     // 생활기록부 설명 업데이트
-    const { data: updatedRecord, error: updateError } = await supabase
+    const { data: updatedRecord, error: updateError } = await (supabase as any)
       .from('school_records')
       .update({ summary })
       .eq('id', recordId)

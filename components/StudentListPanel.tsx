@@ -38,7 +38,7 @@ interface NodeData extends Student {
 
 // --- 데이터 fetching 및 mutation 함수들 --- (컴포넌트 내부 또는 별도 파일)
 async function fetchStudents(classId: string): Promise<NodeData[]> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('students')
     .select('*, position_x, position_y') 
     .eq('class_id', classId)
@@ -52,7 +52,7 @@ async function fetchStudents(classId: string): Promise<NodeData[]> {
 }
 
 async function addStudent(classId: string, name: string): Promise<Student> {
-  const { data: existingStudent, error: checkError } = await supabase
+  const { data: existingStudent, error: checkError } = await (supabase as any)
     .from('students')
     .select('id')
     .eq('class_id', classId)
@@ -61,14 +61,14 @@ async function addStudent(classId: string, name: string): Promise<Student> {
   if (checkError) throw new Error(`학생 확인 중 오류: ${checkError.message}`);
   if (existingStudent) throw new Error(`이미 '${name.trim()}' 학생이 존재합니다.`);
 
-  const { count, error: countError } = await supabase
+  const { count, error: countError } = await (supabase as any)
     .from('students')
     .select('* ', { count: 'exact', head: true })
     .eq('class_id', classId);
   if (countError) throw new Error(`학생 수 조회 오류: ${countError.message}`);
   const newOrder = (count ?? 0) + 1;
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('students')
     .insert([{ name: name.trim(), class_id: classId, display_order: newOrder }])
     .select()
@@ -78,7 +78,7 @@ async function addStudent(classId: string, name: string): Promise<Student> {
 }
 
 async function updateStudentName(studentId: string, newName: string): Promise<Student | null> {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
         .from('students')
         .update({ name: newName.trim() })
         .eq('id', studentId)
@@ -90,7 +90,7 @@ async function updateStudentName(studentId: string, newName: string): Promise<St
 
 async function deleteStudent(studentId: string): Promise<void> {
     // delete_student RPC 사용 (relations, answers 자동 삭제)
-    const { error } = await supabase.rpc('delete_student', { student_id_to_delete: studentId });
+    const { error } = await (supabase as any).rpc('delete_student', { student_id_to_delete: studentId });
     if (error) {
         console.error('RPC delete_student error:', error);
         throw new Error(`학생 삭제 실패: ${error.message}`);
@@ -98,7 +98,7 @@ async function deleteStudent(studentId: string): Promise<void> {
 }
 
 async function updateStudentOrder(studentId: string, newOrder: number): Promise<void> {
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('students')
     .update({ display_order: newOrder })
     .eq('id', studentId);
@@ -205,7 +205,7 @@ export default function StudentListPanel({ classId, onStudentSelect }: StudentLi
   const sortedStudents = useMemo(() => {
     if (!students) return [];
     // DndContext가 studentOrder 기반으로 렌더링하므로, students 배열을 studentOrder 순서에 맞게 정렬
-    const studentMap = new Map(students.map(s => [s.id, s]));
+    const studentMap = new Map(students.map((s: any) => [s.id, s]));
     return studentOrder.map(id => studentMap.get(id)).filter(Boolean) as NodeData[];
   }, [students, studentOrder]);
 

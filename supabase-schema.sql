@@ -808,3 +808,90 @@ COMMENT ON COLUMN public.students.health_status IS '건강상태 (여러 줄 입
 COMMENT ON COLUMN public.students.allergies IS '알레르기 정보 (여러 줄 입력 가능)';
 COMMENT ON COLUMN public.students.tablet_number IS '태블릿 번호';
 COMMENT ON COLUMN public.students.previous_school_records IS '이전 학적 정보 (여러 줄 입력 가능)';
+
+-- ✅ 학급 일정 테이블 (Class Schedules)
+CREATE TABLE IF NOT EXISTS public.class_schedules (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    class_id uuid REFERENCES public.classes(id) ON DELETE CASCADE NOT NULL,
+    title text NOT NULL,
+    description text,
+    schedule_date date NOT NULL,
+    end_date date,
+    start_time time,
+    end_time time,
+    is_all_day boolean DEFAULT false,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT check_end_date_after_start_date CHECK (end_date IS NULL OR end_date >= schedule_date),
+    CONSTRAINT check_all_day_no_time CHECK (
+        (is_all_day = true AND start_time IS NULL AND end_time IS NULL) OR
+        (is_all_day = false OR is_all_day IS NULL)
+    )
+);
+
+-- 인덱스 생성
+CREATE INDEX IF NOT EXISTS idx_class_schedules_class_id ON public.class_schedules(class_id);
+CREATE INDEX IF NOT EXISTS idx_class_schedules_date ON public.class_schedules(schedule_date);
+
+-- RLS 활성화
+ALTER TABLE public.class_schedules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.class_schedules FORCE ROW LEVEL SECURITY;
+
+-- RLS 정책 설정
+CREATE POLICY "Users can view their own class schedules"
+ON public.class_schedules FOR SELECT
+USING (
+    EXISTS (
+        SELECT 1 FROM public.classes
+        WHERE classes.id = class_schedules.class_id
+        AND classes.user_id = auth.uid()
+    )
+);
+
+CREATE POLICY "Users can insert their own class schedules"
+ON public.class_schedules FOR INSERT
+WITH CHECK (
+    EXISTS (
+        SELECT 1 FROM public.classes
+        WHERE classes.id = class_id
+        AND classes.user_id = auth.uid()
+    )
+);
+
+CREATE POLICY "Users can update their own class schedules"
+ON public.class_schedules FOR UPDATE
+USING (
+    EXISTS (
+        SELECT 1 FROM public.classes
+        WHERE classes.id = class_schedules.class_id
+        AND classes.user_id = auth.uid()
+    )
+);
+
+CREATE POLICY "Users can delete their own class schedules"
+ON public.class_schedules FOR DELETE
+USING (
+    EXISTS (
+        SELECT 1 FROM public.classes
+        WHERE classes.id = class_schedules.class_id
+        AND classes.user_id = auth.uid()
+    )
+);
+
+-- 업데이트 트리거
+CREATE OR REPLACE FUNCTION public.update_class_schedules_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = now();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_update_class_schedules_updated_at
+    BEFORE UPDATE ON public.class_schedules
+    FOR EACH ROW
+    EXECUTE FUNCTION public.update_class_schedules_updated_at();
+
+-- 컬럼 주석 추가
+COMMENT ON COLUMN public.class_schedules.end_date IS '일정 종료일 (단일일 일정인 경우 NULL)';
+COMMENT ON COLUMN public.class_schedules.is_all_day IS '하루종일 일정 여부';

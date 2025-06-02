@@ -19,7 +19,7 @@ function generateUUID() {
 // 데이터베이스 테이블 조회 헬퍼 함수
 async function queryTable(supabase: any, tableName: string, query: any) {
   // 먼저 복수형 테이블 이름 시도
-  const pluralResult = await supabase.from(tableName + 's').select('*').eq(...query);
+  const pluralResult = await (supabase as any).from(tableName + 's').select('*').eq(...query);
   
   if (!pluralResult.error) {
     console.log(`[학생 그룹 분석 API] ${tableName}s 테이블 조회 성공`);
@@ -27,7 +27,7 @@ async function queryTable(supabase: any, tableName: string, query: any) {
   }
   
   // 단수형 테이블 이름 시도
-  const singularResult = await supabase.from(tableName).select('*').eq(...query);
+  const singularResult = await (supabase as any).from(tableName).select('*').eq(...query);
   
   if (!singularResult.error) {
     console.log(`[학생 그룹 분석 API] ${tableName} 테이블 조회 성공`);
@@ -36,7 +36,7 @@ async function queryTable(supabase: any, tableName: string, query: any) {
   
   // 대체 복수형 시도 (일부 테이블 이름)
   if (tableName === 'relationship') {
-    const altResult = await supabase.from('relations').select('*').eq(...query);
+    const altResult = await (supabase as any).from('relations').select('*').eq(...query);
     
     if (!altResult.error) {
       console.log(`[학생 그룹 분석 API] relations 테이블 조회 성공`);
@@ -53,7 +53,7 @@ async function queryTable(supabase: any, tableName: string, query: any) {
 async function collectAdditionalData(classId: string, studentIds: string[], supabase: any) {
   try {
     // 학급에 속한 모든 설문지 조회
-    const { data: surveys, error: surveysError } = await supabase
+    const { data: surveys, error: surveysError } = await (supabase as any)
       .from('surveys')
       .select('*')
       .eq('class_id', classId)
@@ -86,7 +86,7 @@ async function collectAdditionalData(classId: string, studentIds: string[], supa
       );
       
       // 설문지별 답변 조회
-      const { data: surveyAnswers } = await supabase
+      const { data: surveyAnswers } = await (supabase as any)
         .from('answers')
         .select('*')
         .eq('survey_id', survey.id)
@@ -130,7 +130,7 @@ export async function POST(
     console.log('[학생 그룹 분석 API] 테이블 구조 확인 시도');
     
     // 직접 쿼리로 테이블 목록 확인
-    const { data: tableData, error: tableError } = await supabase
+    const { data: tableData, error: tableError } = await (supabase as any)
       .from('information_schema.tables')
       .select('table_name')
       .eq('table_schema', 'public');
@@ -183,7 +183,7 @@ export async function POST(
     
     // 학급 존재 확인
     console.log('[학생 그룹 분석 API] 학급 정보 조회 시작:', classId);
-    const { data: classData, error: classError } = await supabase
+    const { data: classData, error: classError } = await (supabase as any)
       .from('classes')
       .select('*')
       .eq('id', classId)
@@ -193,7 +193,7 @@ export async function POST(
       console.error('[학생 그룹 분석 API] 학급 정보 조회 오류:', classError);
       
       // 직접 학급 정보 쿼리를 수정하여 시도
-      const { data: classesTest, error: classesTestError } = await supabase
+      const { data: classesTest, error: classesTestError } = await (supabase as any)
         .from('classes')
         .select('id, name')
         .limit(5);
@@ -284,7 +284,7 @@ export async function POST(
       console.log(`[학생 그룹 분석 API] 그룹 ${groupIndex}에 학생이 없습니다.`);
       
       // 빈 분석 결과 저장
-      const { data: emptyAnalysis, error: insertError } = await supabase
+      const { data: emptyAnalysis, error: insertError } = await (supabase as any)
         .from('analysis_results')
         .insert({
           class_id: classId,
@@ -376,7 +376,7 @@ export async function POST(
       let summary = '';
       
       // 분석 결과 저장
-      const { data: newAnalysis, error: insertError } = await supabase
+      const { data: newAnalysis, error: insertError } = await (supabase as any)
         .from('analysis_results')
         .insert({
           class_id: classId,

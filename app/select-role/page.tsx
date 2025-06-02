@@ -92,7 +92,7 @@ function SelectRoleContent({ resetParam }: { resetParam: string | null }) {
 
       console.log('[DEBUG SelectRole] User metadata updated successfully');
 
-      const { error: profileError } = await supabase
+      const { error: profileError } = await (supabase as any)
         .from('profiles')
         .upsert({ 
           id: user.id, 
@@ -110,7 +110,7 @@ function SelectRoleContent({ resetParam }: { resetParam: string | null }) {
 
       console.log('[DEBUG SelectRole] Profile upserted successfully');
 
-      const { error: roleTableError } = await supabase
+      const { error: roleTableError } = await (supabase as any)
         .from('user_roles')
         .upsert({ 
           user_id: user.id,

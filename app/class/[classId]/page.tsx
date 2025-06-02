@@ -54,7 +54,7 @@ export interface LinkData {
 
 // Supabase 데이터 fetching 함수들
 async function fetchClassDetails(classId: string): Promise<Class | null> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('classes')
     .select('*')
     .eq('id', classId)
@@ -67,7 +67,7 @@ async function fetchClassDetails(classId: string): Promise<Class | null> {
 }
 
 async function fetchStudents(classId: string): Promise<NodeData[]> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('students')
     .select('*, position_x, position_y')
     .eq('class_id', classId)
@@ -82,7 +82,7 @@ async function fetchStudents(classId: string): Promise<NodeData[]> {
 
 async function fetchRelationships(classId: string, surveyId?: string | null): Promise<LinkData[]> {
     // 특정 학급의 학생 ID 목록 가져오기
-    const { data: students, error: studentError } = await supabase
+    const { data: students, error: studentError } = await (supabase as any)
         .from('students')
         .select('id')
         .eq('class_id', classId);
@@ -92,10 +92,10 @@ async function fetchRelationships(classId: string, surveyId?: string | null): Pr
         return [];
     }
 
-    const studentIds = students.map(s => s.id);
+    const studentIds = students.map((s: any) => s.id);
 
     // 해당 학생들 간의 관계 데이터 가져오기
-    let query = supabase
+    let query = (supabase as any)
         .from('relations')
         .select('from_student_id, to_student_id, relation_type')
         .in('from_student_id', studentIds)
@@ -116,7 +116,7 @@ async function fetchRelationships(classId: string, surveyId?: string | null): Pr
     }
 
     // D3 Link 형식으로 변환
-    const linkData = data.map(rel => ({
+    const linkData = data.map((rel: any) => ({
         source: rel.from_student_id,
         target: rel.to_student_id,
         type: rel.relation_type as keyof typeof RELATIONSHIP_TYPES,
@@ -129,7 +129,7 @@ async function fetchRelationships(classId: string, surveyId?: string | null): Pr
 // --- 학생 추가 함수 ---
 async function addStudent(classId: string, name: string): Promise<Student> {
   // 이름 중복 체크
-  const { data: existingStudent, error: checkError } = await supabase
+  const { data: existingStudent, error: checkError } = await (supabase as any)
     .from('students')
     .select('id')
     .eq('class_id', classId)
@@ -139,7 +139,7 @@ async function addStudent(classId: string, name: string): Promise<Student> {
   if (checkError) throw new Error(`학생 확인 중 오류: ${checkError.message}`);
   if (existingStudent) throw new Error(`이미 '${name.trim()}' 학생이 존재합니다.`);
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('students')
     .insert([{ name: name.trim(), class_id: classId }])
     .select()
@@ -151,7 +151,7 @@ async function addStudent(classId: string, name: string): Promise<Student> {
 // --- 학생 초기화 함수 (RPC 호출로 변경) ---
 async function resetStudentsAndRelationships(classId: string): Promise<void> {
     // RPC 함수 호출로 변경: 특정 학급의 학생 및 관련 데이터(관계, 답변) 삭제
-    const { error } = await supabase.rpc('reset_class_data', { class_id_to_reset: classId });
+    const { error } = await (supabase as any).rpc('reset_class_data', { class_id_to_reset: classId });
 
     if (error) {
         console.error('RPC reset_class_data error:', error);
@@ -162,7 +162,7 @@ async function resetStudentsAndRelationships(classId: string): Promise<void> {
 
 // --- 학생 이름 수정 함수 ---
 async function updateStudentName(studentId: string, newName: string): Promise<Student | null> {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
         .from('students')
         .update({ name: newName.trim() })
         .eq('id', studentId)
@@ -175,7 +175,7 @@ async function updateStudentName(studentId: string, newName: string): Promise<St
 // --- 학생 삭제 함수 (RPC 호출로 변경) ---
 async function deleteStudent(studentId: string): Promise<void> {
     // RPC 함수 호출로 변경: 학생 및 관련 데이터(관계, 답변) 삭제
-    const { error } = await supabase.rpc('delete_student', { student_id_to_delete: studentId });
+    const { error } = await (supabase as any).rpc('delete_student', { student_id_to_delete: studentId });
 
     if (error) {
         console.error('RPC delete_student error:', error);
@@ -186,7 +186,7 @@ async function deleteStudent(studentId: string): Promise<void> {
 
 // --- 주관식 질문 및 답변 fetching 함수 추가 ---
 async function fetchQuestions(classId: string): Promise<Question[]> {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
         .from('questions')
         .select('*')
         .eq('class_id', classId)
@@ -199,7 +199,7 @@ async function fetchQuestions(classId: string): Promise<Question[]> {
 }
 
 async function fetchAnswers(studentId: string): Promise<Answer[]> {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
         .from('answers')
         .select(`
             *,
@@ -216,7 +216,7 @@ async function fetchAnswers(studentId: string): Promise<Answer[]> {
 
 // 학생 순서 업데이트 함수 추가
 async function updateStudentOrder(studentId: string, newOrder: number): Promise<void> {
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('students')
     .update({ display_order: newOrder })
     .eq('id', studentId);
@@ -298,7 +298,7 @@ export default function ClassRelationshipPage() {
     if (!students || !relationships) return {};
 
     const rankings: { [key: string]: (Student & { count: number })[] } = {};
-    const studentMap = new Map(students.map(s => [s.id, s]));
+    const studentMap = new Map(students.map((s: any) => [s.id, s]));
 
     // 각 관계 유형별로 계산
     Object.keys(RELATIONSHIP_TYPES).forEach(type => {

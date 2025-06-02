@@ -27,28 +27,28 @@ export interface LinkData {
 }
 
 async function fetchClassDetails(classId: string): Promise<Class | null> {
-  const { data, error } = await supabase.from('classes').select('*').eq('id', classId).single();
+  const { data, error } = await (supabase as any).from('classes').select('*').eq('id', classId).single();
   if (error) { console.error('Error fetching class details:', error); return null; }
   return data;
 }
 
 async function fetchSurveyDetails(surveyId: string): Promise<Survey | null> {
-  const { data, error } = await supabase.from('surveys').select('*').eq('id', surveyId).single();
+  const { data, error } = await (supabase as any).from('surveys').select('*').eq('id', surveyId).single();
   if (error) { console.error('Error fetching survey details:', error); return null; }
   return data;
 }
 
 async function fetchStudents(classId: string): Promise<NodeData[]> {
-  const { data, error } = await supabase.from('students').select('*, position_x, position_y').eq('class_id', classId).order('display_order', { ascending: true }).order('created_at', { ascending: true });
+  const { data, error } = await (supabase as any).from('students').select('*, position_x, position_y').eq('class_id', classId).order('display_order', { ascending: true }).order('created_at', { ascending: true });
   if (error) { console.error('Error fetching students:', error); return []; }
   return data as NodeData[];
 }
 
 async function fetchRelationships(classId: string, surveyId?: string | null): Promise<LinkData[]> {
-    const { data: students, error: studentError } = await supabase.from('students').select('id').eq('class_id', classId);
+    const { data: students, error: studentError } = await (supabase as any).from('students').select('id').eq('class_id', classId);
     if (studentError || !students || students.length === 0) { console.error('Error fetching student IDs:', studentError); return []; }
-    const studentIds = students.map(s => s.id);
-    let query = supabase.from('relations').select('from_student_id, to_student_id, relation_type').in('from_student_id', studentIds).in('to_student_id', studentIds);
+    const studentIds = students.map((s: any) => s.id);
+    let query = (supabase as any).from('relations').select('from_student_id, to_student_id, relation_type').in('from_student_id', studentIds).in('to_student_id', studentIds);
     if (surveyId) {
         query = query.eq('survey_id', surveyId);
     } else { 
@@ -57,13 +57,13 @@ async function fetchRelationships(classId: string, surveyId?: string | null): Pr
     }
     const { data, error } = await query;
     if (error) { console.error('Error fetching relationships:', error); return []; }
-    const linkData = data.map(rel => ({ source: rel.from_student_id, target: rel.to_student_id, type: rel.relation_type as keyof typeof RELATIONSHIP_TYPES }));
+    const linkData = data.map((rel: any) => ({ source: rel.from_student_id, target: rel.to_student_id, type: rel.relation_type as keyof typeof RELATIONSHIP_TYPES }));
     console.log(`Fetched relationships for surveyId: ${surveyId}`, linkData);
     return linkData;
 }
 
 async function fetchQuestions(classId: string, surveyId: string): Promise<Question[]> {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
         .from('questions')
         .select('*')
         .eq('class_id', classId)
@@ -74,7 +74,7 @@ async function fetchQuestions(classId: string, surveyId: string): Promise<Questi
 }
 
 async function fetchAnswers(studentId: string): Promise<Answer[]> {
-    const { data, error } = await supabase.from('answers').select(`*, questions ( question_text )`).eq('student_id', studentId);
+    const { data, error } = await (supabase as any).from('answers').select(`*, questions ( question_text )`).eq('student_id', studentId);
     if (error) { console.error("Error fetching answers:", error); return []; }
     return data;
 }
@@ -135,7 +135,7 @@ export default function SurveyRelationshipPage() {
   const rankedStudentsByType = useMemo(() => {
     if (!students || !relationships) return {};
     const rankings: { [key: string]: (Student & { count: number })[] } = {};
-    const studentMap = new Map(students.map(s => [s.id, s]));
+    const studentMap = new Map(students.map((s: any) => [s.id, s]));
     Object.keys(RELATIONSHIP_TYPES).forEach(type => {
       const counts = new Map<string, number>();
       relationships.filter(link => link.type === type).forEach(link => {
@@ -172,7 +172,7 @@ export default function SurveyRelationshipPage() {
         throw new Error("Survey ID가 유효하지 않습니다.");
       }
       console.log(`Adding relationship: ${from} -> ${to}, type: ${type}, surveyId: ${surveyId}`);
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('relations')
         .insert({ 
           from_student_id: from, 
@@ -215,7 +215,7 @@ export default function SurveyRelationshipPage() {
         throw new Error("Survey ID가 유효하지 않습니다.");
       }
       console.log(`Deleting relationship: ${from} -> ${to}, surveyId: ${surveyId}`);
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('relations')
         .delete()
         .match({ 

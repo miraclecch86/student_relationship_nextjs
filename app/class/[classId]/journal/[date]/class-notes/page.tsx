@@ -21,7 +21,7 @@ import toast from 'react-hot-toast';
 
 // 학급 정보 조회
 async function fetchClassDetails(classId: string): Promise<Class | null> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('classes')
     .select('*')
     .eq('id', classId)
@@ -44,7 +44,7 @@ async function getOrCreateJournal(classId: string, date: string): Promise<ClassJ
   }
 
   // 먼저 기존 일지가 있는지 확인
-  const { data: existingJournal } = await supabase
+  const { data: existingJournal } = await (supabase as any)
     .from('class_journals')
     .select('*')
     .eq('class_id', classId)
@@ -56,7 +56,7 @@ async function getOrCreateJournal(classId: string, date: string): Promise<ClassJ
   }
 
   // 없으면 새로 생성
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('class_journals')
     .insert({
       class_id: classId,
@@ -74,7 +74,7 @@ async function getOrCreateJournal(classId: string, date: string): Promise<ClassJ
 
 // 기존 학급 메모 조회
 async function fetchClassMemos(classId: string, date: string): Promise<JournalClassMemo[]> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('journal_class_memos')
     .select(`
       *,
@@ -106,7 +106,7 @@ async function saveClassMemo(
 
   if (memoId) {
     // 기존 메모 업데이트
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('journal_class_memos')
       .update({
         content: content,
@@ -123,7 +123,7 @@ async function saveClassMemo(
     return data;
   } else {
     // 새 메모 생성
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('journal_class_memos')
       .insert({
         journal_id: journalId,

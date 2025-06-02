@@ -24,7 +24,7 @@ export async function GET(
     }
 
     // 학급 소유권 확인
-    const { data: classData, error: classError } = await supabase
+    const { data: classData, error: classError } = await (supabase as any)
       .from('classes')
       .select('id')
       .eq('id', classId)
@@ -36,7 +36,7 @@ export async function GET(
     }
 
     // 학생 정보 조회 (비밀번호 해시 제외)
-    const { data: student, error: studentError } = await supabase
+    const { data: student, error: studentError } = await (supabase as any)
       .from('students')
       .select(`
         id,
@@ -96,7 +96,7 @@ export async function PATCH(
     const updateData: StudentUpdateData = await request.json();
 
     // 학급 소유권 확인
-    const { data: classData, error: classError } = await supabase
+    const { data: classData, error: classError } = await (supabase as any)
       .from('classes')
       .select('id')
       .eq('id', classId)
@@ -108,7 +108,7 @@ export async function PATCH(
     }
 
     // 학생 존재 확인
-    const { data: existingStudent, error: studentCheckError } = await supabase
+    const { data: existingStudent, error: studentCheckError } = await (supabase as any)
       .from('students')
       .select('id')
       .eq('id', studentId)
@@ -137,7 +137,7 @@ export async function PATCH(
       
       // 로그인 ID 중복 확인 (다른 학생과 중복되지 않도록, null이 아닌 경우만)
       if (loginId) {
-        const { data: duplicateCheck } = await supabase
+        const { data: duplicateCheck } = await (supabase as any)
           .from('students')
           .select('id')
           .eq('student_login_id', loginId)
@@ -191,7 +191,7 @@ export async function PATCH(
     }
 
     // 학생 정보 업데이트
-    const { data: updatedStudent, error: updateError } = await supabase
+    const { data: updatedStudent, error: updateError } = await (supabase as any)
       .from('students')
       .update(updateFields)
       .eq('id', studentId)

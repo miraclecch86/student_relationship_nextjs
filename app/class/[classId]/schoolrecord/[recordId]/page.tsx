@@ -31,7 +31,7 @@ interface SchoolRecord {
 
 // 학급 정보 조회 함수
 async function fetchClassDetails(classId: string): Promise<Class | null> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('classes')
     .select('*')
     .eq('id', classId)
@@ -47,7 +47,7 @@ async function fetchClassDetails(classId: string): Promise<Class | null> {
 
 // 학생 목록 조회 함수
 async function fetchStudents(classId: string): Promise<Student[]> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('students')
     .select('*')
     .eq('class_id', classId)
@@ -64,7 +64,7 @@ async function fetchStudents(classId: string): Promise<Student[]> {
 
 // 생활기록부 조회 함수
 async function fetchSchoolRecord(recordId: string): Promise<SchoolRecord | null> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('school_records')
     .select('*')
     .eq('id', recordId)

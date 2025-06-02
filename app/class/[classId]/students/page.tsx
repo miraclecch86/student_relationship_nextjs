@@ -43,7 +43,7 @@ import { arrayMove } from '@dnd-kit/sortable';
 
 // 학급 정보 조회 함수
 async function fetchClassDetails(classId: string): Promise<Class | null> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('classes')
     .select('*')
     .eq('id', classId)
@@ -59,7 +59,7 @@ async function fetchClassDetails(classId: string): Promise<Class | null> {
 
 // 학생 목록 조회 함수
 async function fetchStudents(classId: string): Promise<Student[]> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('students')
     .select('*')
     .eq('class_id', classId)
@@ -77,7 +77,7 @@ async function fetchStudents(classId: string): Promise<Student[]> {
 // 학생 추가 함수
 async function addStudent(classId: string, name: string): Promise<Student> {
   // 이름 중복 체크
-  const { data: existingStudent, error: checkError } = await supabase
+  const { data: existingStudent, error: checkError } = await (supabase as any)
     .from('students')
     .select('id')
     .eq('class_id', classId)
@@ -87,7 +87,7 @@ async function addStudent(classId: string, name: string): Promise<Student> {
   if (checkError) throw new Error(`학생 확인 중 오류: ${checkError.message}`);
   if (existingStudent) throw new Error(`이미 '${name.trim()}' 학생이 존재합니다.`);
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('students')
     .insert([{ name: name.trim(), class_id: classId }])
     .select()
@@ -99,7 +99,7 @@ async function addStudent(classId: string, name: string): Promise<Student> {
 
 // 학생 이름 수정 함수
 async function updateStudentName(studentId: string, newName: string): Promise<Student | null> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('students')
     .update({ name: newName.trim() })
     .eq('id', studentId)
@@ -112,7 +112,7 @@ async function updateStudentName(studentId: string, newName: string): Promise<St
 
 // 학생 순서 업데이트 함수
 async function updateStudentOrder(studentId: string, newOrder: number): Promise<void> {
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('students')
     .update({ display_order: newOrder })
     .eq('id', studentId);
@@ -125,7 +125,7 @@ async function updateStudentOrder(studentId: string, newOrder: number): Promise<
 
 // 학생 삭제 함수
 async function deleteStudent(studentId: string): Promise<void> {
-  const { error } = await supabase.rpc('delete_student', { student_id_to_delete: studentId });
+  const { error } = await (supabase as any).rpc('delete_student', { student_id_to_delete: studentId });
 
   if (error) {
     console.error('RPC delete_student error:', error);

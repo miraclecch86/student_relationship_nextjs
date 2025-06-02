@@ -22,7 +22,7 @@ import toast from 'react-hot-toast';
 
 // 학급 정보 조회
 async function fetchClassDetails(classId: string): Promise<Class | null> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('classes')
     .select('*')
     .eq('id', classId)
@@ -45,7 +45,7 @@ async function getOrCreateJournal(classId: string, date: string): Promise<ClassJ
   }
 
   // 먼저 기존 일지가 있는지 확인
-  const { data: existingJournal } = await supabase
+  const { data: existingJournal } = await (supabase as any)
     .from('class_journals')
     .select('*')
     .eq('class_id', classId)
@@ -57,7 +57,7 @@ async function getOrCreateJournal(classId: string, date: string): Promise<ClassJ
   }
 
   // 없으면 새로 생성
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('class_journals')
     .insert({
       class_id: classId,
@@ -88,7 +88,7 @@ async function saveAnnouncement(
 
   const keywordsArray = keywords.split(',').map(k => k.trim()).filter(k => k.length > 0);
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('journal_announcements')
     .insert({
       journal_id: journalId,
@@ -145,7 +145,7 @@ async function generateAnnouncement(
 
 // 기존 알림장 조회
 async function fetchExistingAnnouncements(classId: string, date: string): Promise<JournalAnnouncement[]> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('journal_announcements')
     .select(`
       *,
@@ -172,7 +172,7 @@ async function updateAnnouncement(
 ): Promise<JournalAnnouncement> {
   const keywordsArray = keywords.split(',').map(k => k.trim()).filter(k => k.length > 0);
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('journal_announcements')
     .update({
       keywords: keywordsArray,
@@ -194,7 +194,7 @@ async function updateAnnouncement(
 // 알림장 삭제
 async function deleteAnnouncement(announcementId: string): Promise<void> {
   // 먼저 알림장이 속한 일지 ID를 가져옴
-  const { data: announcement, error: fetchError } = await supabase
+  const { data: announcement, error: fetchError } = await (supabase as any)
     .from('journal_announcements')
     .select('journal_id')
     .eq('id', announcementId)
@@ -207,7 +207,7 @@ async function deleteAnnouncement(announcementId: string): Promise<void> {
   const journalId = announcement.journal_id;
 
   // 알림장 삭제
-  const { error: deleteError } = await supabase
+  const { error: deleteError } = await (supabase as any)
     .from('journal_announcements')
     .delete()
     .eq('id', announcementId);
@@ -217,7 +217,7 @@ async function deleteAnnouncement(announcementId: string): Promise<void> {
   }
 
   // 해당 일지에 다른 내용이 있는지 확인
-  const { data: remainingContent, error: checkError } = await supabase
+  const { data: remainingContent, error: checkError } = await (supabase as any)
     .from('class_journals')
     .select(`
       id,
@@ -240,7 +240,7 @@ async function deleteAnnouncement(announcementId: string): Promise<void> {
     (remainingContent.journal_class_memos?.length || 0) > 0;
 
   if (!hasOtherContent) {
-    const { error: journalDeleteError } = await supabase
+    const { error: journalDeleteError } = await (supabase as any)
       .from('class_journals')
       .delete()
       .eq('id', journalId);

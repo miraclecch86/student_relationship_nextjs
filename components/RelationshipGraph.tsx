@@ -38,7 +38,7 @@ const DEFAULT_BORDER_COLOR = '#e5e7eb'; // gray-200
 const HOVER_BORDER_COLOR = '#d1d5db';   // gray-300 (Hover 시)
 
 async function updateStudentPosition(studentId: string, x: number | null, y: number | null): Promise<Student | null> {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
         .from('students')
         .update({ position_x: x, position_y: y })
         .eq('id', studentId)

@@ -156,4 +156,41 @@ export const ATTENDANCE_STATUS = {
   FIELD_TRIP: '체험학습',
 } as const;
 
-export type AttendanceStatusType = typeof ATTENDANCE_STATUS[keyof typeof ATTENDANCE_STATUS]; 
+export type AttendanceStatusType = typeof ATTENDANCE_STATUS[keyof typeof ATTENDANCE_STATUS];
+
+// 학급 일정 타입 정의
+export interface ClassSchedule {
+  id: string;
+  class_id: string;
+  title: string;
+  description?: string | null;
+  schedule_date: string; // YYYY-MM-DD 형식
+  end_date?: string | null; // YYYY-MM-DD 형식 (기간 일정인 경우)
+  start_time?: string | null; // HH:MM 형식
+  end_time?: string | null; // HH:MM 형식
+  is_all_day?: boolean; // 하루종일 일정 여부
+  color?: string; // 일정 색상
+  created_at: string;
+  updated_at: string;
+}
+
+// 학급 빠른 메모 타입 정의
+export interface ClassQuickMemo {
+  id: string;
+  class_id: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// 오늘의 우리반 기록 타입 정의
+export interface ClassDailyRecord {
+  id: string;
+  class_id: string;
+  record_date: string; // YYYY-MM-DD 형식 (기록 생성 날짜)
+  actual_date: string; // YYYY-MM-DD 형식 (실제 사건 발생 날짜)
+  title: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+} 

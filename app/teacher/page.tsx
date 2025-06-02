@@ -34,7 +34,7 @@ async function fetchClasses(): Promise<ClassWithCount[]> {
   }
 
   // 🎯 사용자 학급 + 공개 데모 학급 모두 조회
-  const { data: classesData, error: classesError } = await supabase
+  const { data: classesData, error: classesError } = await (supabase as any)
     .from('classes')
     .select('id, name, created_at, user_id, is_demo, is_public')
     .or(`user_id.eq.${session.user.id},and(is_demo.eq.true,is_public.eq.true)`)
@@ -52,15 +52,15 @@ async function fetchClasses(): Promise<ClassWithCount[]> {
   // --- 임시 주석 처리 제거 시작 ---
   // 각 학급별 학생 수와 주관식 질문 개수 가져오기
   const classesWithCounts = await Promise.all(
-    classesData.map(async (cls) => {
+    classesData.map(async (cls: any) => {
       // 1. 학생 수 가져오기
-      const { count: studentCount, error: studentCountError } = await supabase
+      const { count: studentCount, error: studentCountError } = await (supabase as any)
         .from('students')
         .select('id', { count: 'exact', head: true })
         .eq('class_id', cls.id);
 
       // 2. 설문지 개수 가져오기
-      const { count: surveyCount, error: surveyCountError } = await supabase
+      const { count: surveyCount, error: surveyCountError } = await (supabase as any)
         .from('surveys')
         .select('id', { count: 'exact', head: true })
         .eq('class_id', cls.id);
@@ -102,7 +102,7 @@ async function addClass(name: string): Promise<BaseClass> {
   if (userError) throw new Error('사용자 정보를 가져올 수 없습니다.');
   if (!user) throw new Error('로그인이 필요합니다.');
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('classes')
     .insert([{ 
       name: name.trim(),
@@ -117,7 +117,7 @@ async function addClass(name: string): Promise<BaseClass> {
 
 // 학급 수정 함수
 async function updateClass(id: string, newName: string): Promise<BaseClass | null> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('classes')
     .update({ name: newName.trim() })
     .eq('id', id)
@@ -131,7 +131,7 @@ async function updateClass(id: string, newName: string): Promise<BaseClass | nul
 // 학급 삭제 함수 (RPC 호출로 변경)
 async function deleteClass(id: string): Promise<void> {
   // RPC 함수 호출로 변경: 학급 및 하위 데이터(학생, 관계, 질문, 답변) 삭제
-  const { error } = await supabase.rpc('delete_class', { class_id_to_delete: id });
+  const { error } = await (supabase as any).rpc('delete_class', { class_id_to_delete: id });
 
   if (error) {
     console.error('RPC delete_class error:', error);

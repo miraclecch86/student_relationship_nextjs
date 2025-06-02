@@ -15,7 +15,7 @@ import { handleDemoSaveAttempt, isDemoClass } from '@/utils/demo-permissions';
 
 // 설문 목록 조회 함수
 async function fetchSurveys(classId: string): Promise<Survey[]> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('surveys')
     .select('*')
     .eq('class_id', classId)
@@ -30,7 +30,7 @@ async function fetchSurveys(classId: string): Promise<Survey[]> {
 
 // 학급 정보 조회 함수 수정 (전체 정보 필요)
 async function fetchClassDetails(classId: string): Promise<any | null> {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
         .from('classes')
         .select('*')
         .eq('id', classId)
@@ -46,7 +46,7 @@ async function fetchClassDetails(classId: string): Promise<any | null> {
 
 // 설문 생성 함수
 async function createSurvey(classId: string, name: string, description?: string): Promise<Survey> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('surveys')
     .insert([{ class_id: classId, name: name.trim(), description: description?.trim() }])
     .select()
@@ -61,7 +61,7 @@ async function createSurvey(classId: string, name: string, description?: string)
 
 // 설문 삭제 함수 (예시: CASCADE 설정이 DB에 되어 있다고 가정)
 async function deleteSurvey(surveyId: string): Promise<void> {
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('surveys')
     .delete()
     .eq('id', surveyId);
@@ -79,7 +79,7 @@ async function updateSurvey(surveyData: Partial<Survey>): Promise<Survey | null>
         return null; // 변경 사항 없으면 null 반환
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('surveys')
       .update(updateData)
       .eq('id', id)

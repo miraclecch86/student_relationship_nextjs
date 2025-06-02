@@ -13,7 +13,7 @@ import { isDemoClass as checkIsDemoClass } from '@/utils/demo-permissions';
 
 // 학급 수정 함수
 async function updateClass(id: string, newName: string): Promise<BaseClass | null> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('classes')
     .update({ name: newName.trim() })
     .eq('id', id)

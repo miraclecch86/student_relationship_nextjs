@@ -50,7 +50,7 @@ export async function POST(
     console.log('[종합분석 API] 인증 확인 완료, 사용자 ID:', session.user.id);
 
     // 학급 소유권 확인
-    const { data: classData, error: classError } = await supabase
+    const { data: classData, error: classError } = await (supabase as any)
       .from('classes')
       .select('id, name, created_at, user_id, is_demo, is_public')
       .eq('id', classId)
@@ -83,7 +83,7 @@ export async function POST(
     console.log('[종합분석 API] 학급 권한 확인 완료 (데모 학급:', isDemoClass(classData), ')');
 
     // 학생 목록 조회
-    const { data: students, error: studentsError } = await supabase
+    const { data: students, error: studentsError } = await (supabase as any)
       .from('students')
       .select('*')
       .eq('class_id', classId);
@@ -106,7 +106,7 @@ export async function POST(
     console.log('[종합분석 API] 학생 목록 조회 완료, 학생 수:', students.length);
 
     // 관계 데이터 조회
-    const { data: studentIds } = await supabase
+    const { data: studentIds } = await (supabase as any)
       .from('students')
       .select('id')
       .eq('class_id', classId);
@@ -119,10 +119,10 @@ export async function POST(
       );
     }
 
-    const ids = studentIds.map(s => s.id);
+    const ids = studentIds.map((s: any) => s.id);
     console.log('[종합분석 API] 학생 ID 목록:', ids);
 
-    const { data: relationships, error: relError } = await supabase
+    const { data: relationships, error: relError } = await (supabase as any)
       .from('relations')
       .select('*')
       .in('from_student_id', ids)
@@ -163,7 +163,7 @@ export async function POST(
       
       // 학급에 속한 모든 설문지 조회
       console.log('[종합분석 API] 설문지 정보 조회 시작');
-      const { data: surveys, error: surveysError } = await supabase
+      const { data: surveys, error: surveysError } = await (supabase as any)
         .from('surveys')
         .select('*')
         .eq('class_id', classId)
@@ -185,7 +185,7 @@ export async function POST(
         
         for (const survey of surveys) {
           // 설문지별 관계 데이터 조회
-          const { data: surveyRelationships, error: surveyRelError } = await supabase
+          const { data: surveyRelationships, error: surveyRelError } = await (supabase as any)
             .from('relations')
             .select('*')
             .in('from_student_id', ids)
@@ -193,14 +193,14 @@ export async function POST(
             .eq('survey_id', survey.id);
             
           // 설문지별 질문 조회
-          const { data: questions, error: questionsError } = await supabase
+          const { data: questions, error: questionsError } = await (supabase as any)
             .from('questions')
             .select('*')
             .eq('class_id', classId)
             .eq('survey_id', survey.id);
             
           // 설문지의 모든 응답 조회
-          const { data: answers, error: answersError } = await supabase
+          const { data: answers, error: answersError } = await (supabase as any)
             .from('answers')
             .select('*')
             .in('student_id', ids)
@@ -219,7 +219,7 @@ export async function POST(
       
       // 모든 질문 데이터 조회
       console.log('[종합분석 API] 전체 질문 데이터 조회 시작');
-      const { data: allQuestions, error: allQuestionsError } = await supabase
+      const { data: allQuestions, error: allQuestionsError } = await (supabase as any)
         .from('questions')
         .select('*')
         .eq('class_id', classId);
@@ -231,7 +231,7 @@ export async function POST(
       
       // 모든 응답 데이터 조회
       console.log('[종합분석 API] 전체 응답 데이터 조회 시작');
-      const { data: allAnswers, error: allAnswersError } = await supabase
+      const { data: allAnswers, error: allAnswersError } = await (supabase as any)
         .from('answers')
         .select('*')
         .in('student_id', ids);
@@ -243,7 +243,7 @@ export async function POST(
       
       // 학급 정보 상세 조회
       console.log('[종합분석 API] 학급 상세 정보 조회 시작');
-      const { data: classDetails, error: classDetailsError } = await supabase
+      const { data: classDetails, error: classDetailsError } = await (supabase as any)
         .from('classes')
         .select('*')
         .eq('id', classId)
@@ -305,7 +305,7 @@ export async function POST(
       
       // 결과를 명시적으로 JSON 문자열로 변환하여 저장
       
-      const { data: savedAnalysis, error: saveError } = await supabase
+      const { data: savedAnalysis, error: saveError } = await (supabase as any)
         .from('analysis_results')
         .insert([
           {

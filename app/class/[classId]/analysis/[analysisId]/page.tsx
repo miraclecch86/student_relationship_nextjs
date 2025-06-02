@@ -35,7 +35,7 @@ interface AnalysisResult {
 
 // 학급 정보 조회 함수
 async function fetchClassDetails(classId: string): Promise<Class | null> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('classes')
     .select('*')
     .eq('id', classId)
@@ -51,7 +51,7 @@ async function fetchClassDetails(classId: string): Promise<Class | null> {
 
 // 학생 목록 조회 함수 추가
 async function fetchStudents(classId: string): Promise<Student[]> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('students')
     .select('*')
     .eq('class_id', classId)
@@ -68,7 +68,7 @@ async function fetchStudents(classId: string): Promise<Student[]> {
 
 // 분석 결과 조회 함수
 async function fetchAnalysisResult(analysisId: string): Promise<AnalysisResult | null> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('analysis_results')
     .select('*')
     .eq('id', analysisId)
@@ -84,7 +84,7 @@ async function fetchAnalysisResult(analysisId: string): Promise<AnalysisResult |
 
 // 특정 타입의 최신 분석 결과 조회 함수
 async function fetchLatestAnalysisResultByType(classId: string, type: string): Promise<AnalysisResult | null> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('analysis_results')
     .select('*')
     .eq('class_id', classId)
@@ -216,7 +216,7 @@ export default function AnalysisDetailPage() {
     queryFn: async () => {
       if (sessionId) {
         // 같은 세션의 'overview' 타입 분석 조회
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from('analysis_results')
           .select('*')
           .eq('class_id', classId)
@@ -248,7 +248,7 @@ export default function AnalysisDetailPage() {
     queryFn: async () => {
       if (sessionId) {
         // 같은 세션의 'students-1' 타입 분석 조회
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from('analysis_results')
           .select('*')
           .eq('class_id', classId)
@@ -280,7 +280,7 @@ export default function AnalysisDetailPage() {
     queryFn: async () => {
       if (sessionId) {
         // 같은 세션의 'students-2' 타입 분석 조회
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from('analysis_results')
           .select('*')
           .eq('class_id', classId)
@@ -312,7 +312,7 @@ export default function AnalysisDetailPage() {
     queryFn: async () => {
       if (sessionId) {
         // 같은 세션의 'students-3' 타입 분석 조회
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from('analysis_results')
           .select('*')
           .eq('class_id', classId)
@@ -344,7 +344,7 @@ export default function AnalysisDetailPage() {
     queryFn: async () => {
       if (sessionId) {
         // 같은 세션의 'students-4' 타입 분석 조회
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from('analysis_results')
           .select('*')
           .eq('class_id', classId)
@@ -376,7 +376,7 @@ export default function AnalysisDetailPage() {
     queryFn: async () => {
       if (sessionId) {
         // 같은 세션의 'students-5' 타입 분석 조회
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from('analysis_results')
           .select('*')
           .eq('class_id', classId)
@@ -408,7 +408,7 @@ export default function AnalysisDetailPage() {
     queryFn: async () => {
       if (sessionId) {
         // 같은 세션의 'students-6' 타입 분석 조회
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from('analysis_results')
           .select('*')
           .eq('class_id', classId)
@@ -440,7 +440,7 @@ export default function AnalysisDetailPage() {
     queryFn: async () => {
       if (sessionId) {
         // 같은 세션의 'students-7' 타입 분석 조회
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from('analysis_results')
           .select('*')
           .eq('class_id', classId)
@@ -472,7 +472,7 @@ export default function AnalysisDetailPage() {
     queryFn: async () => {
       if (sessionId) {
         // 같은 세션의 'students-8' 타입 분석 조회
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from('analysis_results')
           .select('*')
           .eq('class_id', classId)

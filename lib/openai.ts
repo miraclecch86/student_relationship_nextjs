@@ -376,7 +376,7 @@ export async function analyzeSurveyResults(
       surveyName: survey.name,
       surveyDescription: survey.description,
       questions: questions.map(q => q.question_text),
-      responses: students.map(student => {
+      responses: students.map((student: any) => {
         const studentAnswers = answers.filter(a => a.student_id === student.id)
           .map(a => {
             const question = questions.find(q => q.id === a.question_id);
@@ -541,7 +541,7 @@ export async function analyzeStudentGroup(
     }
     
     // 선택된 학생 그룹에 대한 정보와 관계만 필터링
-    const studentIds = studentGroup.map(s => s.id);
+    const studentIds = studentGroup.map((s: any) => s.id);
     const filteredRelationships = relationships.filter(r => 
       studentIds.includes(r.from_student_id) || studentIds.includes(r.to_student_id)
     );
@@ -646,7 +646,7 @@ export async function generateSchoolRecord(
       },
       
       // 학생 정보 (개별 특성 포함)
-      students: students.map(student => {
+      students: students.map((student: any) => {
         // 해당 학생과 관련된 모든 관계 정보 수집
         const studentRelationships = {
           // 이 학생이 다른 학생들에게 표현한 관계
@@ -668,7 +668,7 @@ export async function generateSchoolRecord(
         };
 
         // 해당 학생의 모든 설문 답변 수집
-        const studentAnswers = answers?.filter(a => a.student_id === student.id).map(answer => {
+        const studentAnswers = answers?.filter(a => a.student_id === student.id).map((answer: any) => {
           const question = questions?.find(q => q.id === answer.question_id);
           const surveyContext = additionalData?.surveyData?.find(sd => 
             sd.answers.some(sa => sa.id === answer.id)

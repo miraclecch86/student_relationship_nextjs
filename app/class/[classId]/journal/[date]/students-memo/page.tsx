@@ -21,7 +21,7 @@ import toast from 'react-hot-toast';
 
 // 학급 정보 조회
 async function fetchClassDetails(classId: string): Promise<Class | null> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('classes')
     .select('*')
     .eq('id', classId)
@@ -37,7 +37,7 @@ async function fetchClassDetails(classId: string): Promise<Class | null> {
 
 // 학급 학생 목록 조회
 async function fetchStudents(classId: string): Promise<Student[]> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('students')
     .select('*')
     .eq('class_id', classId)
@@ -60,7 +60,7 @@ async function getOrCreateJournal(classId: string, date: string): Promise<ClassJ
   }
 
   // 먼저 기존 일지가 있는지 확인
-  const { data: existingJournal } = await supabase
+  const { data: existingJournal } = await (supabase as any)
     .from('class_journals')
     .select('*')
     .eq('class_id', classId)
@@ -72,7 +72,7 @@ async function getOrCreateJournal(classId: string, date: string): Promise<ClassJ
   }
 
   // 없으면 새로 생성
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('class_journals')
     .insert({
       class_id: classId,
@@ -90,7 +90,7 @@ async function getOrCreateJournal(classId: string, date: string): Promise<ClassJ
 
 // 기존 학생 상태 조회
 async function fetchStudentStatuses(classId: string, date: string): Promise<JournalStudentStatus[]> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('journal_student_status')
     .select(`
       *,
@@ -122,7 +122,7 @@ async function saveStudentStatus(
   }
 
   // upsert 사용 (있으면 업데이트, 없으면 생성)
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('journal_student_status')
     .upsert({
       journal_id: journalId,

@@ -31,7 +31,7 @@ type CurrentStudentData = Student & { gender?: 'male' | 'female' | null };
 
 // 🆕 학급 정보 조회 함수 추가
 async function fetchClassDetails(classId: string) {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
         .from('classes')
         .select('*')
         .eq('id', classId)
@@ -41,7 +41,7 @@ async function fetchClassDetails(classId: string) {
 }
 
 async function fetchCurrentStudent(studentId: string): Promise<CurrentStudentData | null> {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
         .from('students')
         .select('*, gender') // gender 필드 조회 추가
         .eq('id', studentId)
@@ -52,7 +52,7 @@ async function fetchCurrentStudent(studentId: string): Promise<CurrentStudentDat
 
 // 이름순 대신 생성순으로 모든 학생 조회하는 함수로 변경
 async function fetchAllStudentsOrdered(classId: string): Promise<Student[]> { // TargetStudent 대신 Student 사용 (created_at 필요)
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
         .from('students')
         // Student 타입에 필요한 모든 필수 필드 선택
         .select('id, name, class_id, created_at, gender, position_x, position_y') // 필요한 모든 필드 명시 (Student 타입 기준)
@@ -64,31 +64,31 @@ async function fetchAllStudentsOrdered(classId: string): Promise<Student[]> { //
 }
 
 async function fetchExistingRelationships(studentId: string): Promise<RelationshipSetting> {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
         .from('relations')
         .select('to_student_id, relation_type')
         .eq('from_student_id', studentId);
     if (error) { console.error('Error fetching relationships:', error); return {}; }
 
     const settings: RelationshipSetting = {};
-    data.forEach(rel => {
+    data.forEach((rel: any) => {
         settings[rel.to_student_id] = rel.relation_type as keyof typeof RELATIONSHIP_TYPES;
     });
     return settings;
 }
 
 async function fetchQuestions(classId: string): Promise<Question[]> {
-    const { data, error } = await supabase.from('questions').select('*').eq('class_id', classId).order('created_at');
+    const { data, error } = await (supabase as any).from('questions').select('*').eq('class_id', classId).order('created_at');
     if (error) { console.error("Error fetching questions:", error); return []; }
     return data;
 }
 
 async function fetchAnswers(studentId: string): Promise<AnswerSetting> {
-    const { data, error } = await supabase.from('answers').select('question_id, answer_text').eq('student_id', studentId);
+    const { data, error } = await (supabase as any).from('answers').select('question_id, answer_text').eq('student_id', studentId);
     if (error) { console.error("Error fetching answers:", error); return {}; }
 
     const settings: AnswerSetting = {};
-    data.forEach(ans => {
+    data.forEach((ans: any) => {
         settings[ans.question_id] = ans.answer_text;
     });
     return settings;
@@ -144,7 +144,7 @@ async function saveAllSettings(
 
     // Upsert 실행
     if (relationshipsToUpsert.length > 0) {
-        const { error: upsertError } = await supabase.from('relations').upsert(relationshipsToUpsert, {
+        const { error: upsertError } = await (supabase as any).from('relations').upsert(relationshipsToUpsert, {
             onConflict: 'from_student_id, to_student_id',
         });
         if (upsertError) throw new Error(`관계 저장 실패: ${upsertError.message}`);
@@ -152,7 +152,7 @@ async function saveAllSettings(
 
     // Delete 실행
     if (relationshipsToDelete.length > 0) {
-        const { error: deleteError } = await supabase
+        const { error: deleteError } = await (supabase as any)
             .from('relations')
             .delete()
             .eq('from_student_id', studentId)
@@ -167,7 +167,7 @@ async function saveAllSettings(
         answer_text: text,
     }));
     if (answerUpserts.length > 0) {
-        const { error: ansError } = await supabase.from('answers').upsert(answerUpserts, {
+        const { error: ansError } = await (supabase as any).from('answers').upsert(answerUpserts, {
             onConflict: 'student_id, question_id',
         });
         if (ansError) throw new Error(`답변 저장 실패: ${ansError.message}`);
@@ -177,7 +177,7 @@ async function saveAllSettings(
 }
 
 async function addQuestion(classId: string, questionText: string): Promise<Question> {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
         .from('questions')
         .insert([{ class_id: classId, question_text: questionText.trim() }])
         .select()
@@ -189,11 +189,11 @@ async function addQuestion(classId: string, questionText: string): Promise<Quest
 // 질문 및 관련 답변 모두 삭제 (주의! RPC 함수로 만드는 것이 더 안전하고 효율적일 수 있음)
 async function deleteQuestionAndAnswers(questionId: string): Promise<void> {
     // 1. 해당 질문에 대한 모든 답변 삭제
-    const { error: ansError } = await supabase.from('answers').delete().eq('question_id', questionId);
+    const { error: ansError } = await (supabase as any).from('answers').delete().eq('question_id', questionId);
     if (ansError) throw new Error(`답변 삭제 실패: ${ansError.message}`);
 
     // 2. 질문 삭제
-    const { error: qError } = await supabase.from('questions').delete().eq('id', questionId);
+    const { error: qError } = await (supabase as any).from('questions').delete().eq('id', questionId);
     if (qError) throw new Error(`질문 삭제 실패: ${qError.message}`);
 }
 
@@ -201,7 +201,7 @@ async function deleteQuestionAndAnswers(questionId: string): Promise<void> {
 async function updateStudentGender(studentId: string, gender: 'male' | 'female' | null): Promise<void> {
     // DB에 저장하기 전에 소문자로 변환 (또는 DB 제약조건에 맞는 다른 값으로)
     const valueToSave = gender ? gender.toLowerCase() : null;
-    const { error } = await supabase
+    const { error } = await (supabase as any)
         .from('students')
         .update({ gender: valueToSave }) // 소문자 또는 null 값으로 업데이트
         .eq('id', studentId);

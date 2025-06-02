@@ -45,7 +45,7 @@ export async function middleware(req: NextRequest) {
   if (!userRole) {
     console.log('[Middleware FINAL] Role missing in metadata, checking profiles...');
     try {
-      const { data: profile, error: profileError } = await supabase
+      const { data: profileData, error: profileError } = await (supabase as any)
         .from('profiles')
         .select('role')
         .eq('id', user.id)
@@ -55,7 +55,7 @@ export async function middleware(req: NextRequest) {
         console.error('[Middleware FINAL] Error fetching profile:', profileError);
         return NextResponse.redirect(new URL('/login?error=profile_fetch_failed_mw', req.url));
       }
-      userRole = profile?.role;
+      userRole = profileData?.role;
       console.log('[Middleware FINAL] Role from profile:', userRole);
     } catch (err) {
        console.error('[Middleware FINAL] Exception fetching profile:', err);

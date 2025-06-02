@@ -598,7 +598,7 @@ export async function generateSchoolRecordWithGemini(
       },
       
       // 학생 정보 (개별 특성 포함)
-      students: students.map(student => {
+      students: students.map((student: any) => {
         // 해당 학생과 관련된 모든 관계 정보 수집
         const studentRelationships = {
           // 이 학생이 다른 학생들에게 표현한 관계
@@ -620,7 +620,7 @@ export async function generateSchoolRecordWithGemini(
         };
 
         // 해당 학생의 모든 설문 답변 수집
-        const studentAnswers = answers?.filter(a => a.student_id === student.id).map(answer => {
+        const studentAnswers = answers?.filter(a => a.student_id === student.id).map((answer: any) => {
           const question = questions?.find(q => q.id === answer.question_id);
           const surveyContext = additionalData?.surveyData?.find(sd => 
             sd.answers.some(sa => sa.id === answer.id)

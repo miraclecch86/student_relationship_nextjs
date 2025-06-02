@@ -36,7 +36,7 @@ export async function GET(request: Request) {
     
     // profiles 테이블에서도 역할 정보 초기화
     if (session.user?.id) {
-      const { error: profileError } = await supabase
+      const { data: profile, error: profileError } = await (supabase as any)
         .from('profiles')
         .update({ 
           role: null,
