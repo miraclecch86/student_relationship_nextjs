@@ -14,7 +14,10 @@ import {
   PlusIcon,
   XMarkIcon,
   ClockIcon,
-  PaperAirplaneIcon
+  PaperAirplaneIcon,
+  ClipboardDocumentListIcon,
+  ChartBarIcon,
+  DocumentTextIcon
 } from '@heroicons/react/24/outline';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, getDay } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -78,25 +81,37 @@ const fetchRealTimeHolidays = async (year: number): Promise<{ [key: string]: str
   try {
     const response = await fetch(`https://holidays.hyunbin.page/${year}.json`);
     if (!response.ok) {
-      throw new Error('Failed to fetch holidays');
+      console.warn(`공휴일 데이터를 찾을 수 없습니다: ${year}년`);
+      return getKoreanHolidays(year);
     }
     
     const holidayData = await response.json();
+    
+    // 빈 객체이거나 null인 경우 처리
+    if (!holidayData || typeof holidayData !== 'object') {
+      console.warn(`공휴일 데이터가 올바르지 않습니다: ${year}년`);
+      return getKoreanHolidays(year);
+    }
+    
     const holidays: { [key: string]: string } = {};
     
     // JSON 데이터를 우리 형식으로 변환
     Object.entries(holidayData).forEach(([date, names]) => {
-      if (Array.isArray(names)) {
-        // 여러 개의 공휴일이 겹치는 경우 첫 번째 이름 사용
-        holidays[date] = names[0];
-      } else {
-        holidays[date] = names as string;
+      try {
+        if (Array.isArray(names)) {
+          // 여러 개의 공휴일이 겹치는 경우 첫 번째 이름 사용
+          holidays[date] = names[0];
+        } else if (typeof names === 'string') {
+          holidays[date] = names;
+        }
+      } catch (entryError) {
+        console.warn(`공휴일 데이터 변환 오류: ${date}`, entryError);
       }
     });
     
     return holidays;
   } catch (error) {
-    console.error('실시간 공휴일 데이터 가져오기 실패:', error);
+    console.warn(`실시간 공휴일 데이터 가져오기 실패 (${year}년):`, error);
     // 실패 시 기본 데이터 사용
     return getKoreanHolidays(year);
   }
@@ -452,11 +467,11 @@ export default function ClassJournalPage() {
   const calendarStart = new Date(monthStart);
   calendarStart.setDate(monthStart.getDate() - monthStart.getDay());
   
-  // 캘린더에서 실제 표시되는 마지막 날 (월의 마지막 주 토요일)
-  const calendarEnd = new Date(monthEnd);
-  calendarEnd.setDate(monthEnd.getDate() + (6 - monthEnd.getDay()));
+  // 캘린더를 항상 6주(42일)로 고정
+  const calendarEnd = new Date(calendarStart);
+  calendarEnd.setDate(calendarStart.getDate() + 41); // 42일째 (0부터 시작하므로 41을 더함)
   
-  // 캘린더 전체 날짜 (42일 - 6주)
+  // 캘린더 전체 날짜 (항상 42일 - 6주)
   const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
 
   // 학급 정보 조회
@@ -471,6 +486,7 @@ export default function ClassJournalPage() {
     queryKey: ['monthly-journals', classId, currentDate.getFullYear(), currentDate.getMonth() + 1],
     queryFn: () => fetchMonthlyJournals(currentDate.getFullYear(), currentDate.getMonth() + 1, classId),
     enabled: !!classId,
+    placeholderData: (previousData) => previousData,
   });
 
   // 월별 일정 조회
@@ -478,6 +494,7 @@ export default function ClassJournalPage() {
     queryKey: ['monthly-schedules', classId, currentDate.getFullYear(), currentDate.getMonth() + 1],
     queryFn: () => fetchClassSchedules(classId, currentDate.getFullYear(), currentDate.getMonth() + 1),
     enabled: !!classId,
+    placeholderData: (previousData) => previousData,
   });
 
   // 빠른 메모 조회
@@ -492,6 +509,7 @@ export default function ClassJournalPage() {
     queryKey: ['monthly-daily-records', classId, currentDate.getFullYear(), currentDate.getMonth() + 1],
     queryFn: () => fetchClassDailyRecords(classId, currentDate.getFullYear(), currentDate.getMonth() + 1),
     enabled: !!classId,
+    placeholderData: (previousData) => previousData,
   });
 
   // 날짜별 일지 존재 여부 맵
@@ -636,6 +654,9 @@ export default function ClassJournalPage() {
   // 이전/다음 달 이동
   const goToPreviousMonth = () => setCurrentDate(prev => subMonths(prev, 1));
   const goToNextMonth = () => setCurrentDate(prev => addMonths(prev, 1));
+
+  // 오늘로 이동
+  const goToToday = () => setCurrentDate(new Date());
 
   // 검색 실행
   const handleSearch = async () => {
@@ -816,14 +837,22 @@ export default function ClassJournalPage() {
   // 실시간 공휴일 데이터 가져오기
   useEffect(() => {
     const loadHolidays = async () => {
-      const holidays = await fetchRealTimeHolidays(currentDate.getFullYear());
-      setRealTimeHolidays(holidays);
+      try {
+        const holidays = await fetchRealTimeHolidays(currentDate.getFullYear());
+        setRealTimeHolidays(holidays);
+      } catch (error) {
+        console.warn('공휴일 데이터 로딩 실패:', error);
+        // 에러 발생 시 기본 데이터로 폴백
+        const fallbackHolidays = getKoreanHolidays(currentDate.getFullYear());
+        setRealTimeHolidays(fallbackHolidays);
+      }
     };
     
     loadHolidays();
   }, [currentDate.getFullYear()]);
 
-  if (isClassLoading || isJournalsLoading || isSchedulesLoading || isMemosLoading || isDailyRecordsLoading) {
+  // 학급 정보 로딩 중일 때만 전체 로딩 화면 표시
+  if (isClassLoading) {
     return <div className="flex justify-center items-center h-screen">로딩 중...</div>;
   }
 
@@ -887,8 +916,8 @@ export default function ClassJournalPage() {
                     onClick={() => router.push(`/class/${classId}/students`)}
                     className="w-full text-left p-3 rounded-lg bg-white hover:bg-blue-50 hover:text-blue-600 transition-colors border border-gray-200 flex items-center space-x-3"
                   >
-                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                      <span className="text-blue-600 text-sm font-semibold">👥</span>
+                    <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
+                      <span className="text-emerald-600 text-sm font-semibold">👥</span>
                     </div>
                     <span className="text-sm font-medium text-gray-900">학생 정보</span>
                   </button>
@@ -901,6 +930,42 @@ export default function ClassJournalPage() {
                       <span className="text-purple-600 text-sm font-semibold">📝</span>
                     </div>
                     <span className="text-sm font-medium text-gray-900">오늘의 우리반</span>
+                  </button>
+
+                  <button
+                    onClick={() => router.push(`/class/${classId}/survey`)}
+                    className="w-full text-left p-3 rounded-lg bg-white hover:bg-blue-50 hover:text-blue-600 transition-colors border border-gray-200 flex items-center space-x-3"
+                  >
+                    <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                      <ClipboardDocumentListIcon className="h-4 w-4 text-indigo-600" />
+                    </div>
+                    <span className="text-sm font-medium text-gray-900">설문 작성</span>
+                  </button>
+
+                  <button
+                    onClick={() => router.push(`/class/${classId}/analysis`)}
+                    className="w-full text-left p-3 rounded-lg bg-white hover:bg-blue-50 hover:text-blue-600 transition-colors border border-gray-200 flex items-center justify-between"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                        <ChartBarIcon className="h-4 w-4 text-purple-600" />
+                      </div>
+                      <span className="text-sm font-medium text-gray-900">학급 분석</span>
+                    </div>
+                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-medium border border-gray-200">AI</span>
+                  </button>
+
+                  <button
+                    onClick={() => router.push(`/class/${classId}/schoolrecord`)}
+                    className="w-full text-left p-3 rounded-lg bg-white hover:bg-blue-50 hover:text-blue-600 transition-colors border border-gray-200 flex items-center justify-between"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center">
+                        <DocumentTextIcon className="h-4 w-4 text-amber-600" />
+                      </div>
+                      <span className="text-sm font-medium text-gray-900">쫑알쫑알</span>
+                    </div>
+                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-medium border border-gray-200">AI</span>
                   </button>
                 </div>
               </div>
@@ -942,6 +1007,13 @@ export default function ClassJournalPage() {
                 </h2>
                 
                 <div className="flex items-center space-x-2">
+                  <button
+                    onClick={goToToday}
+                    className="flex items-center space-x-2 bg-gray-100 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-200 transition-colors text-sm"
+                  >
+                    <span>📅</span>
+                    <span>오늘로 이동</span>
+                  </button>
                   {activeTab === 'schedule' && (
                     <button
                       onClick={handleAddScheduleClick}
@@ -975,129 +1047,145 @@ export default function ClassJournalPage() {
               </div>
 
               {/* 캘린더 그리드 */}
-              <div className="grid grid-cols-7 gap-1">
-                {calendarDays.map((day, index) => {
-                  const dateStr = format(day, 'yyyy-MM-dd');
-                  const dayJournals = journalMap.get(dateStr) || [];
-                  const daySchedules = scheduleMap.get(dateStr) || [];
-                  const dayDailyRecords = dailyRecordsMap.get(dateStr) || [];
-                  const isToday = isSameDay(day, new Date());
-                  const isWeekendDay = isWeekend(day);
-                  const holidayName = getHolidayName(day, realTimeHolidays);
-                  const isHoliday = holidayName !== null;
-                  const isSundayDay = isSunday(day);
-                  const isSaturdayDay = isSaturday(day);
-                  const isCurrentMonth = isSameMonth(day, currentDate);
-
-                  const dayFeatures = {
-                    hasAnnouncements: false,
-                    hasStudentStatus: false,
-                    hasClassMemos: false,
-                    hasDailyRecords: dayDailyRecords.length > 0,
-                    announcementCount: 0,
-                    studentStatusCount: 0,
-                    classMemoCount: 0,
-                    dailyRecordsCount: dayDailyRecords.length
-                  };
-
-                  dayJournals.forEach(journal => {
-                    if (journal.hasAnnouncements) {
-                      dayFeatures.hasAnnouncements = true;
-                      dayFeatures.announcementCount += journal.announcementCount || 0;
-                    }
-                    if (journal.hasStudentStatus) {
-                      dayFeatures.hasStudentStatus = true;
-                      dayFeatures.studentStatusCount += journal.studentStatusCount || 0;
-                    }
-                    if (journal.hasClassMemos) {
-                      dayFeatures.hasClassMemos = true;
-                      dayFeatures.classMemoCount += journal.classMemoCount || 0;
-                    }
-                  });
-
-                  const hasAnyContent = dayFeatures.hasAnnouncements || dayFeatures.hasStudentStatus || dayFeatures.hasClassMemos || dayFeatures.hasDailyRecords;
-
-                  // 배경색 결정 로직
-                  let backgroundColor = 'bg-white';
-                  let borderColor = 'border-gray-200';
-                  
-                  if (isToday) {
-                    backgroundColor = 'bg-white';
-                    borderColor = 'border-2 border-blue-500';
-                  } else if (isWeekendDay && isCurrentMonth) {
-                    backgroundColor = 'bg-gray-50';
-                    borderColor = 'border-gray-200';
-                  } else if (!isCurrentMonth) {
-                    backgroundColor = 'bg-gray-25';
-                    borderColor = 'border-gray-100';
-                  }
-
-                  return (
+              <div className="grid grid-cols-7 gap-1 h-[720px]">
+                {(isJournalsLoading || isSchedulesLoading || isDailyRecordsLoading) ? (
+                  // 로딩 중일 때도 캘린더 구조 유지
+                  Array.from({ length: 42 }, (_, index) => (
                     <div
-                      key={day.toISOString()}
-                      className={`
-                        p-2 min-h-[120px] border transition-all duration-200
-                        ${backgroundColor} ${borderColor}
-                      `}
+                      key={`loading-${index}`}
+                      className="p-2 min-h-[120px] border bg-white border-gray-200 animate-pulse"
                     >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className={`text-sm font-medium ${
-                          !isCurrentMonth
-                            ? 'text-gray-300'
-                            : isHoliday 
-                              ? 'text-red-600 font-bold' 
-                              : isSundayDay
-                                ? 'text-red-500'
-                                : isSaturdayDay 
-                                  ? 'text-blue-500'
-                                  : 'text-gray-900'
-                        }`}>
-                          {format(day, 'd')}
-                        </div>
+                      <div className="h-4 bg-gray-200 rounded mb-2 w-6"></div>
+                      <div className="space-y-1">
+                        <div className="h-3 bg-gray-100 rounded w-full"></div>
+                        <div className="h-3 bg-gray-100 rounded w-3/4"></div>
                       </div>
-                      
-                      {/* 공휴일 표시 (현재 월만) */}
-                      {isHoliday && isCurrentMonth && (
-                        <div className="text-[10px] text-red-600 font-semibold mb-1 truncate">
-                          {holidayName}
-                        </div>
-                      )}
-                      
-                      {/* 일정 표시 (현재 월만) */}
-                      {activeTab === 'schedule' && daySchedules.length > 0 && isCurrentMonth && (
-                        <div className="space-y-0.5 mb-2">
-                          {daySchedules.slice(0, 4).map((schedule) => {
-                            const isStartDate = schedule.schedule_date === dateStr;
-                            const colorClasses = getColorClasses(schedule.color || 'blue');
-                            
-                            return (
-                              <div
-                                key={`${schedule.id}-${dateStr}`}
-                                onClick={(e) => handleScheduleClick(schedule, e)}
-                                className={`text-[10px] px-1 py-0.5 rounded truncate cursor-pointer hover:brightness-110 transition-all ${colorClasses.bg} ${colorClasses.text}`}
-                                title={`${schedule.title}${schedule.description ? ` - ${schedule.description}` : ''}`}
-                              >
-                                {schedule.title}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
+                    </div>
+                  ))
+                ) : (
+                  calendarDays.map((day, index) => {
+                    const dateStr = format(day, 'yyyy-MM-dd');
+                    const dayJournals = journalMap.get(dateStr) || [];
+                    const daySchedules = scheduleMap.get(dateStr) || [];
+                    const dayDailyRecords = dailyRecordsMap.get(dateStr) || [];
+                    const isToday = isSameDay(day, new Date());
+                    const isWeekendDay = isWeekend(day);
+                    const holidayName = getHolidayName(day, realTimeHolidays);
+                    const isHoliday = holidayName !== null;
+                    const isSundayDay = isSunday(day);
+                    const isSaturdayDay = isSaturday(day);
+                    const isCurrentMonth = isSameMonth(day, currentDate);
 
-                      {/* 일일 기록만 표시 (알림장, 오늘의 아이들 제거) */}
-                      {activeTab !== 'schedule' && dayFeatures.hasDailyRecords && isCurrentMonth && (
-                        <div className="space-y-0.5">
-                          <div 
-                            className="text-[10px] bg-teal-100 text-teal-800 px-1.5 py-0.5 rounded truncate cursor-pointer hover:bg-teal-200 transition-colors"
-                            onClick={() => router.push(`/class/${classId}/journal/${dateStr}/daily-records`)}
-                          >
-                            오늘의 우리반
+                    const dayFeatures = {
+                      hasAnnouncements: false,
+                      hasStudentStatus: false,
+                      hasClassMemos: false,
+                      hasDailyRecords: dayDailyRecords.length > 0,
+                      announcementCount: 0,
+                      studentStatusCount: 0,
+                      classMemoCount: 0,
+                      dailyRecordsCount: dayDailyRecords.length
+                    };
+
+                    dayJournals.forEach(journal => {
+                      if (journal.hasAnnouncements) {
+                        dayFeatures.hasAnnouncements = true;
+                        dayFeatures.announcementCount += journal.announcementCount || 0;
+                      }
+                      if (journal.hasStudentStatus) {
+                        dayFeatures.hasStudentStatus = true;
+                        dayFeatures.studentStatusCount += journal.studentStatusCount || 0;
+                      }
+                      if (journal.hasClassMemos) {
+                        dayFeatures.hasClassMemos = true;
+                        dayFeatures.classMemoCount += journal.classMemoCount || 0;
+                      }
+                    });
+
+                    const hasAnyContent = dayFeatures.hasAnnouncements || dayFeatures.hasStudentStatus || dayFeatures.hasClassMemos || dayFeatures.hasDailyRecords;
+
+                    // 배경색 결정 로직
+                    let backgroundColor = 'bg-white';
+                    let borderColor = 'border-gray-200';
+                    
+                    if (isToday) {
+                      backgroundColor = 'bg-white';
+                      borderColor = 'border-2 border-blue-500';
+                    } else if (isWeekendDay && isCurrentMonth) {
+                      backgroundColor = 'bg-gray-50';
+                      borderColor = 'border-gray-200';
+                    } else if (!isCurrentMonth) {
+                      backgroundColor = 'bg-gray-25';
+                      borderColor = 'border-gray-100';
+                    }
+
+                    return (
+                      <div
+                        key={day.toISOString()}
+                        className={`
+                          p-2 min-h-[120px] border transition-all duration-200
+                          ${backgroundColor} ${borderColor}
+                        `}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className={`text-sm font-medium ${
+                            !isCurrentMonth
+                              ? 'text-gray-300'
+                              : isHoliday 
+                                ? 'text-red-600 font-bold' 
+                                : isSundayDay
+                                  ? 'text-red-500'
+                                  : isSaturdayDay 
+                                    ? 'text-blue-500'
+                                    : 'text-gray-900'
+                          }`}>
+                            {format(day, 'd')}
                           </div>
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
+                        
+                        {/* 공휴일 표시 (현재 월만) */}
+                        {isHoliday && isCurrentMonth && (
+                          <div className="text-[10px] text-red-600 font-semibold mb-1 truncate">
+                            {holidayName}
+                          </div>
+                        )}
+                        
+                        {/* 일정 표시 (현재 월만) */}
+                        {activeTab === 'schedule' && daySchedules.length > 0 && isCurrentMonth && (
+                          <div className="space-y-0.5 mb-2">
+                            {daySchedules.slice(0, 4).map((schedule) => {
+                              const isStartDate = schedule.schedule_date === dateStr;
+                              const colorClasses = getColorClasses(schedule.color || 'blue');
+                              
+                              return (
+                                <div
+                                  key={`${schedule.id}-${dateStr}`}
+                                  onClick={(e) => handleScheduleClick(schedule, e)}
+                                  className={`text-[10px] px-1 py-0.5 rounded truncate cursor-pointer hover:brightness-110 transition-all ${colorClasses.bg} ${colorClasses.text}`}
+                                  title={`${schedule.title}${schedule.description ? ` - ${schedule.description}` : ''}`}
+                                >
+                                  {schedule.title}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* 일일 기록만 표시 (알림장, 오늘의 아이들 제거) */}
+                        {activeTab !== 'schedule' && dayFeatures.hasDailyRecords && isCurrentMonth && (
+                          <div className="space-y-0.5">
+                            <div 
+                              className="text-[10px] bg-teal-100 text-teal-800 px-1.5 py-0.5 rounded truncate cursor-pointer hover:bg-teal-200 transition-colors"
+                              onClick={() => router.push(`/class/${classId}/journal/${dateStr}/daily-records`)}
+                            >
+                              오늘의 우리반
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
           </div>
@@ -1132,7 +1220,11 @@ export default function ClassJournalPage() {
 
             {/* 빠른 메모 목록 - 동적 높이 영역 */}
             <div className={`mb-4 flex flex-col bg-white rounded-lg border border-gray-200 ${showAllMemos ? 'h-[600px]' : 'h-[350px]'}`}>
-              {quickMemos && quickMemos.length > 0 ? (
+              {isMemosLoading ? (
+                <div className="flex-1 px-4 py-6 flex items-center justify-center">
+                  <div className="animate-pulse text-gray-400">메모를 불러오는 중...</div>
+                </div>
+              ) : quickMemos && quickMemos.length > 0 ? (
                 <>
                   <div 
                     className={`flex-1 px-4 py-2 ${showAllMemos ? 'overflow-y-scroll' : 'overflow-hidden'}`}
