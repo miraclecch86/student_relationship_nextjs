@@ -192,7 +192,6 @@ export default function DailyRecordsPage() {
 
   const [editingRecord, setEditingRecord] = useState<ClassDailyRecord | null>(null);
   const [newRecord, setNewRecord] = useState({
-    title: '',
     content: '',
     actual_date: recordDate // 기본값은 현재 페이지 날짜
   });
@@ -203,6 +202,9 @@ export default function DailyRecordsPage() {
   // 학생 상세정보 모달 상태
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
   const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
+
+  // 기록 작성/수정 모달 상태
+  const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
 
   // 검색 상태
   const [searchQuery, setSearchQuery] = useState('');
@@ -293,8 +295,9 @@ export default function DailyRecordsPage() {
     onSuccess: () => {
       toast.success('기록이 추가되었습니다.');
       queryClient.invalidateQueries({ queryKey: ['daily-records'] });
-      setNewRecord({ title: '', content: '', actual_date: recordDate });
+      setNewRecord({ content: '', actual_date: recordDate });
       setEditingRecord(null);
+      setIsRecordModalOpen(false);
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -308,8 +311,9 @@ export default function DailyRecordsPage() {
     onSuccess: () => {
       toast.success('기록이 수정되었습니다.');
       queryClient.invalidateQueries({ queryKey: ['daily-records'] });
-      setNewRecord({ title: '', content: '', actual_date: recordDate });
+      setNewRecord({ content: '', actual_date: recordDate });
       setEditingRecord(null);
+      setIsRecordModalOpen(false);
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -324,7 +328,7 @@ export default function DailyRecordsPage() {
       queryClient.invalidateQueries({ queryKey: ['daily-records'] });
       // 삭제된 기록이 현재 편집 중인 기록이면 폼 초기화
       if (editingRecord) {
-        setNewRecord({ title: '', content: '', actual_date: recordDate });
+        setNewRecord({ content: '', actual_date: recordDate });
         setEditingRecord(null);
       }
     },
@@ -336,25 +340,22 @@ export default function DailyRecordsPage() {
   // 새 기록 작성 모드로 전환
   const handleNewRecord = () => {
     setEditingRecord(null);
-    setNewRecord({ title: '', content: '', actual_date: recordDate });
+    setNewRecord({ content: '', actual_date: recordDate });
+    setIsRecordModalOpen(true);
   };
 
   // 기록 수정 핸들러
   const handleEditRecord = (record: any) => {
     setEditingRecord(record);
     setNewRecord({
-      title: record.title,
       content: record.content,
       actual_date: record.actual_date || record.record_date // 실제 날짜가 없으면 기록 날짜 사용
     });
+    setIsRecordModalOpen(true);
   };
 
   // 기록 저장 핸들러
   const handleSaveRecord = () => {
-    if (!newRecord.title.trim()) {
-      toast.error('제목을 입력해주세요.');
-      return;
-    }
     if (!newRecord.content.trim()) {
       toast.error('내용을 입력해주세요.');
       return;
@@ -362,11 +363,14 @@ export default function DailyRecordsPage() {
 
     // 저장하기 전에 학생 이름을 해시태그로 변환
     const convertedContent = convertStudentNamesToHashtags(newRecord.content, students);
+    
+    // 내용의 앞부분을 제목으로 사용 (50자 제한)
+    const autoTitle = convertedContent.slice(0, 50).replace(/\n/g, ' ').trim();
 
     const recordData = {
       class_id: classId,
       record_date: recordDate,
-      title: newRecord.title.trim(),
+      title: autoTitle,
       content: convertedContent,
       actual_date: newRecord.actual_date
     };
@@ -479,7 +483,8 @@ export default function DailyRecordsPage() {
   // 폼 취소 핸들러
   const handleCancelEdit = () => {
     setEditingRecord(null);
-    setNewRecord({ title: '', content: '', actual_date: recordDate });
+    setNewRecord({ content: '', actual_date: recordDate });
+    setIsRecordModalOpen(false);
   };
 
   // 학생 클릭 핸들러
@@ -532,7 +537,7 @@ export default function DailyRecordsPage() {
             <div className="h-6 w-px bg-gray-300" />
             <h1 className="text-2xl font-bold text-gray-800 flex items-center space-x-2">
               <CalendarDaysIcon className="h-6 w-6 text-purple-600" />
-              <span>오늘의 우리반</span>
+              <span>누가 기록</span>
             </h1>
           </div>
         </div>
@@ -550,397 +555,417 @@ export default function DailyRecordsPage() {
           </div>
         </div>
 
-        {/* 2-Column 레이아웃 */}
-        <div className="grid grid-cols-12 gap-6">
-          {/* 왼쪽: 기록 목록 */}
-          <div className="col-span-5">
-            <div className="bg-white rounded-xl shadow-sm p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-800">
-                  {searchQuery ? `검색 결과` : '기록 목록'}
-                  {dailyRecords && (
-                    <span className="text-sm font-normal text-gray-500 ml-2">
-                      ({searchQuery ? 
-                        Array.from(monthlyGroupedRecords.values()).reduce((sum, records) => sum + records.length, 0) :
-                        dailyRecords.length
-                      }개)
-                    </span>
-                  )}
-                </h3>
-                <button
-                  onClick={handleNewRecord}
-                  className="flex items-center space-x-2 bg-purple-500 text-white px-3 py-1.5 rounded-lg hover:bg-purple-600 transition-colors text-sm"
-                >
-                  <PlusIcon className="h-4 w-4" />
-                  <span>새 기록</span>
-                </button>
+        {/* 메인 콘텐츠 - 기록 목록만 전체 화면 */}
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          {/* 헤더 - 검색창과 새 기록 버튼 */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex-1 max-w-md">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm text-gray-900 placeholder-gray-500"
+                  placeholder="제목이나 내용으로 검색..."
+                />
               </div>
+              {searchQuery && (
+                <p className="text-xs text-gray-500 mt-1">
+                  "{searchQuery}" 검색 결과
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center space-x-3">
+              <h3 className="text-lg font-semibold text-gray-800">
+                {searchQuery ? `검색 결과` : '기록 목록'}
+                {dailyRecords && (
+                  <span className="text-sm font-normal text-gray-500 ml-2">
+                    ({searchQuery ? 
+                      Array.from(monthlyGroupedRecords.values()).reduce((sum, records) => sum + records.length, 0) :
+                      dailyRecords.length
+                    }개)
+                  </span>
+                )}
+              </h3>
               
-              <div className="space-y-3 max-h-[70vh] overflow-y-auto">
-                <AnimatePresence>
-                  {monthlyGroupedRecords.size > 0 ? (
-                    // 월별로 순서대로 정렬 (1월부터 12월까지)
-                    Array.from(monthlyGroupedRecords.entries())
-                      .sort(([a], [b]) => a.localeCompare(b))
-                      .map(([monthKey, records]) => {
-                        const isExpanded = expandedMonths.has(monthKey);
-                        const monthDate = parseISO(`${monthKey}-01`);
-                        const monthLabel = format(monthDate, 'yyyy년 M월', { locale: ko });
-                        
-                        return (
-                          <div key={monthKey} className="border border-gray-200 rounded-lg overflow-hidden">
-                            {/* 월별 헤더 */}
-                            <button
-                              onClick={() => toggleMonth(monthKey)}
-                              className="w-full p-3 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-between"
-                            >
-                              <div className="flex items-center space-x-2">
-                                <span className="text-sm font-medium text-gray-700">{monthLabel}</span>
-                                <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded-full">
-                                  {records.length}개
-                                </span>
-                              </div>
-                              <motion.div
-                                animate={{ rotate: isExpanded ? 180 : 0 }}
-                                transition={{ duration: 0.2 }}
-                              >
-                                <ChevronDownIcon className="h-4 w-4 text-gray-500" />
-                              </motion.div>
-                            </button>
-
-                            {/* 월별 기록 목록 */}
-                            <AnimatePresence>
-                              {isExpanded && (
-                                <motion.div
-                                  initial={{ height: 0, opacity: 0 }}
-                                  animate={{ height: 'auto', opacity: 1 }}
-                                  exit={{ height: 0, opacity: 0 }}
-                                  transition={{ duration: 0.2 }}
-                                  className="overflow-hidden"
-                                >
-                                  <div className="p-2 space-y-2 bg-white">
-                                    {records.map((record: any) => {
-                                      const isSelected = editingRecord?.id === record.id;
-
-                                      return (
-                                        <motion.div
-                                          key={record.id}
-                                          layout
-                                          initial={{ opacity: 0, y: 10 }}
-                                          animate={{ opacity: 1, y: 0 }}
-                                          exit={{ opacity: 0, y: -10 }}
-                                          className={`p-2 rounded-lg border cursor-pointer transition-all group hover:shadow-sm ${
-                                            isSelected 
-                                              ? 'border-purple-500 bg-purple-50 border-2' 
-                                              : 'border-gray-200 hover:border-gray-300 bg-white'
-                                          }`}
-                                          onClick={() => handleEditRecord(record)}
-                                        >
-                                          <div className="flex items-center justify-between mb-1">
-                                            <div className="flex items-center space-x-2 flex-1 min-w-0">
-                                              <div className="w-4 h-4 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                                                <CalendarDaysIcon className="h-2.5 w-2.5 text-blue-600" />
-                                              </div>
-                                              <div className="min-w-0 flex-1">
-                                                <h4 className="text-xs font-medium text-gray-800 truncate">{record.title}</h4>
-                                              </div>
-                                              <div className="flex items-center space-x-1 flex-shrink-0">
-                                                <span className="text-xs text-blue-600 font-medium">
-                                                  {format(parseISO(record.actual_date || record.record_date), 'M/d', { locale: ko })}
-                                                </span>
-                                                <span className="text-xs text-gray-500">
-                                                  {format(parseISO(record.created_at), 'HH:mm', { locale: ko })}
-                                                </span>
-                                              </div>
-                                            </div>
-                                            <button
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleDeleteRecord(record.id);
-                                              }}
-                                              className="opacity-0 group-hover:opacity-100 p-0.5 text-gray-400 hover:text-red-600 hover:bg-red-100 rounded transition-all ml-1"
-                                            >
-                                              <TrashIcon className="h-3 w-3" />
-                                            </button>
-                                          </div>
-                                        </motion.div>
-                                      );
-                                    })}
-                                  </div>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                          </div>
-                        );
-                      })
-                  ) : (
-                    <div className="text-center py-8">
-                      <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                        {searchQuery ? (
-                          <MagnifyingGlassIcon className="h-6 w-6 text-purple-600" />
-                        ) : (
-                          <CalendarDaysIcon className="h-6 w-6 text-purple-600" />
-                        )}
-                      </div>
-                      {searchQuery ? (
-                        <>
-                          <p className="text-sm text-gray-600 mb-3">
-                            "{searchQuery}"에 대한 검색 결과가 없습니다
-                          </p>
-                          <button
-                            onClick={() => setSearchQuery('')}
-                            className="text-sm text-purple-600 hover:text-purple-800 font-medium"
-                          >
-                            모든 기록 보기
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <p className="text-sm text-gray-600 mb-3">아직 기록이 없습니다</p>
-                          <button
-                            onClick={handleNewRecord}
-                            className="text-sm text-purple-600 hover:text-purple-800 font-medium"
-                          >
-                            첫 번째 기록 작성하기
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </AnimatePresence>
-              </div>
+              <button
+                onClick={handleNewRecord}
+                className="flex items-center space-x-2 bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 transition-colors"
+              >
+                <PlusIcon className="h-5 w-5" />
+                <span>새 기록</span>
+              </button>
+              
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors border border-gray-300 rounded-lg"
+                >
+                  초기화
+                </button>
+              )}
             </div>
           </div>
+          
+          {/* 기록 목록 */}
+          <div className="space-y-4">
+            <AnimatePresence>
+              {monthlyGroupedRecords.size > 0 ? (
+                // 월별로 순서대로 정렬 (1월부터 12월까지)
+                Array.from(monthlyGroupedRecords.entries())
+                  .sort(([a], [b]) => a.localeCompare(b))
+                  .map(([monthKey, records]) => {
+                    const isExpanded = expandedMonths.has(monthKey);
+                    const monthDate = parseISO(`${monthKey}-01`);
+                    const monthLabel = format(monthDate, 'yyyy년 M월', { locale: ko });
+                    
+                    return (
+                      <div key={monthKey} className="border border-gray-200 rounded-lg overflow-hidden">
+                        {/* 월별 헤더 */}
+                        <button
+                          onClick={() => toggleMonth(monthKey)}
+                          className="w-full p-4 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-between"
+                        >
+                          <div className="flex items-center space-x-3">
+                            <span className="text-lg font-semibold text-gray-800">{monthLabel}</span>
+                            <span className="text-sm text-gray-500 bg-gray-200 px-3 py-1 rounded-full">
+                              {records.length}개
+                            </span>
+                          </div>
+                          <motion.div
+                            animate={{ rotate: isExpanded ? 180 : 0 }}
+                            transition={{ duration: 0.2 }}
+                          >
+                            <ChevronDownIcon className="h-5 w-5 text-gray-500" />
+                          </motion.div>
+                        </button>
 
-          {/* 오른쪽: 작성/수정 폼 */}
-          <div className="col-span-7">
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              {/* 검색창 */}
-              <div className="mb-6 pb-4 border-b">
-                <div className="flex items-center space-x-3">
-                  <div className="relative flex-1">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
-                    </div>
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm text-gray-900 placeholder-gray-500"
-                      placeholder="제목이나 내용으로 검색..."
-                    />
+                        {/* 월별 기록 목록 */}
+                        <AnimatePresence>
+                          {isExpanded && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.2 }}
+                              className="overflow-hidden"
+                            >
+                              <div className="bg-white divide-y divide-gray-100">
+                                {records.map((record: any) => (
+                                  <motion.div
+                                    key={record.id}
+                                    layout
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -10 }}
+                                    className="p-2 cursor-pointer transition-all group hover:bg-gray-50"
+                                    onClick={() => handleEditRecord(record)}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center space-x-2 flex-1 min-w-0">
+                                        <div className="w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                          <CalendarDaysIcon className="h-3 w-3 text-purple-600" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          {/* 내용 */}
+                                          <div className="text-gray-800 text-xs truncate">
+                                            {renderTextWithHashtags(record.content, students)}
+                                          </div>
+                                        </div>
+                                      </div>
+                                      
+                                      {/* 오른쪽: 날짜, 버튼 */}
+                                      <div className="flex items-center space-x-2 flex-shrink-0">
+                                        {/* 날짜 */}
+                                        <div className="text-gray-600 text-xs font-medium">
+                                          {format(parseISO(record.actual_date || record.record_date), 'M/d (E)', { locale: ko })}
+                                        </div>
+                                        
+                                        {/* 수정/삭제 버튼 */}
+                                        <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleEditRecord(record);
+                                            }}
+                                            className="p-1 text-gray-400 hover:text-purple-600 hover:bg-purple-100 rounded transition-all"
+                                            title="수정"
+                                          >
+                                            <PencilIcon className="h-3 w-3" />
+                                          </button>
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleDeleteRecord(record.id);
+                                            }}
+                                            className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-100 rounded transition-all"
+                                            title="삭제"
+                                          >
+                                            <TrashIcon className="h-3 w-3" />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </motion.div>
+                                ))}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    );
+                  })
+              ) : (
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    {searchQuery ? (
+                      <MagnifyingGlassIcon className="h-8 w-8 text-purple-600" />
+                    ) : (
+                      <CalendarDaysIcon className="h-8 w-8 text-purple-600" />
+                    )}
                   </div>
-                  {searchQuery && (
-                    <button
-                      onClick={() => setSearchQuery('')}
-                      className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
-                    >
-                      초기화
-                    </button>
+                  {searchQuery ? (
+                    <>
+                      <p className="text-gray-600 mb-4">
+                        "{searchQuery}"에 대한 검색 결과가 없습니다
+                      </p>
+                      <button
+                        onClick={() => setSearchQuery('')}
+                        className="text-purple-600 hover:text-purple-800 font-medium"
+                      >
+                        모든 기록 보기
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-gray-600 mb-4">아직 기록이 없습니다</p>
+                      <button
+                        onClick={handleNewRecord}
+                        className="text-purple-600 hover:text-purple-800 font-medium"
+                      >
+                        첫 번째 기록 작성하기
+                      </button>
+                    </>
                   )}
                 </div>
-                {searchQuery && (
-                  <p className="text-xs text-gray-500 mt-2">
-                    "{searchQuery}" 검색 결과가 왼쪽 목록에 표시됩니다.
-                  </p>
-                )}
-              </div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+      </div>
 
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-semibold text-gray-800">
-                  {editingRecord ? '기록 수정' : '새 기록 작성'}
-                </h3>
-                {editingRecord && (
+      {/* 기록 작성/수정 모달 */}
+      <AnimatePresence>
+        {isRecordModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 flex items-center justify-center z-50 p-4"
+            style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+            onClick={handleCancelEdit}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6">
+                {/* 모달 헤더 */}
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-semibold text-gray-800">
+                    {editingRecord ? '기록 수정' : '새 기록 작성'}
+                  </h3>
                   <button
                     onClick={handleCancelEdit}
-                    className="text-sm text-gray-600 hover:text-gray-800 transition-colors"
+                    className="text-gray-500 hover:text-gray-700 p-1"
                   >
-                    취소
+                    <XMarkIcon className="h-6 w-6" />
                   </button>
-                )}
-              </div>
-
-              <div className="space-y-6">
-                {/* 실제 발생 날짜 선택 */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">실제 발생 날짜</label>
-                  <input
-                    type="date"
-                    value={newRecord.actual_date}
-                    onChange={(e) => setNewRecord(prev => ({ ...prev, actual_date: e.target.value }))}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-900"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    언제 일어난 일인지 날짜를 선택하세요. (오늘 입력하지만 어제 일어난 일일 수도 있어요)
-                  </p>
                 </div>
 
-                {/* 제목 입력 */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">제목</label>
-                  <input
-                    type="text"
-                    value={newRecord.title}
-                    onChange={(e) => setNewRecord(prev => ({ ...prev, title: e.target.value }))}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-900"
-                    placeholder="기록의 제목을 입력하세요"
-                  />
-                </div>
+                <div className="space-y-6">
+                  {/* 실제 발생 날짜 선택 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">실제 발생 날짜</label>
+                    <input
+                      type="date"
+                      value={newRecord.actual_date}
+                      onChange={(e) => setNewRecord(prev => ({ ...prev, actual_date: e.target.value }))}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-900"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      언제 일어난 일인지 날짜를 선택하세요. (오늘 입력하지만 어제 일어난 일일 수도 있어요)
+                    </p>
+                  </div>
 
-                {/* 내용 입력 */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">내용</label>
-                  <div
-                    contentEditable={true}
-                    suppressContentEditableWarning={true}
-                    className="w-full min-h-[300px] p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none text-gray-900 leading-relaxed"
-                    style={{
-                      whiteSpace: 'pre-wrap',
-                      wordBreak: 'break-word',
-                      outline: 'none'
-                    }}
-                    ref={editableRef}
-                    onInput={(e) => {
-                      const target = e.currentTarget;
-                      if (target) {
-                        const text = target.innerText || '';
-                        handleContentChange(text);
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      // 백스페이스 키 처리 - 해시태그 통째로 삭제
-                      if (e.key === 'Backspace' && editableRef.current) {
-                        const selection = window.getSelection();
-                        if (selection && selection.rangeCount > 0) {
-                          const range = selection.getRangeAt(0);
-                          const container = range.startContainer;
-                          
-                          // 커서가 해시태그 span 내부에 있는지 확인
-                          let hashtagElement = null;
-                          if (container.nodeType === Node.TEXT_NODE) {
-                            const parent = container.parentElement;
-                            if (parent && parent.classList.contains('hashtag-student')) {
-                              hashtagElement = parent;
-                            }
-                          } else if (container.nodeType === Node.ELEMENT_NODE) {
-                            const element = container as HTMLElement;
-                            if (element.classList.contains('hashtag-student')) {
-                              hashtagElement = element;
-                            }
-                          }
-                          
-                          // 해시태그 내부에 있으면 전체 삭제
-                          if (hashtagElement) {
-                            e.preventDefault();
-                            
-                            // 해시태그 앞의 텍스트 위치 계산
-                            let textLength = 0;
-                            const walker = document.createTreeWalker(
-                              editableRef.current,
-                              NodeFilter.SHOW_TEXT,
-                              null
-                            );
-                            
-                            let node;
-                            while (node = walker.nextNode()) {
-                              if (node.parentElement === hashtagElement) {
-                                break;
-                              }
-                              textLength += node.textContent?.length || 0;
-                            }
-                            
-                            // 현재 내용에서 해시태그 제거
-                            const currentText = editableRef.current.innerText || '';
-                            const hashtagText = hashtagElement.textContent || '';
-                            const beforeHashtag = currentText.substring(0, textLength);
-                            const afterHashtag = currentText.substring(textLength + hashtagText.length);
-                            const newText = beforeHashtag + afterHashtag;
-                            
-                            // 상태 업데이트
-                            setNewRecord(prev => ({ ...prev, content: newText }));
-                            
-                            // DOM 업데이트 후 커서 위치 복원
-                            setTimeout(() => {
-                              if (editableRef.current) {
-                                restoreCaretPosition(editableRef.current, textLength);
-                              }
-                            }, 10);
-                            
-                            return;
-                          }
+                  {/* 내용 입력 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">내용</label>
+                    <div
+                      contentEditable={true}
+                      suppressContentEditableWarning={true}
+                      className="w-full min-h-[300px] p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none text-gray-900 leading-relaxed"
+                      style={{
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word',
+                        outline: 'none'
+                      }}
+                      ref={editableRef}
+                      onInput={(e) => {
+                        const target = e.currentTarget;
+                        if (target) {
+                          const text = target.innerText || '';
+                          handleContentChange(text);
                         }
-                      }
-                      
-                      // 스페이스바, 엔터, 탭, 쉼표, 마침표 등을 눌렀을 때 변환 체크
-                      if ([' ', 'Enter', 'Tab', ',', '.', '!', '?'].includes(e.key)) {
-                        setTimeout(() => {
-                          if (editableRef.current) {
-                            // 현재 커서 위치 저장 (실제 텍스트 위치)
-                            const selection = window.getSelection();
-                            let caretPos = 0;
+                      }}
+                      onKeyDown={(e) => {
+                        // 백스페이스 키 처리 - 해시태그 통째로 삭제
+                        if (e.key === 'Backspace' && editableRef.current) {
+                          const selection = window.getSelection();
+                          if (selection && selection.rangeCount > 0) {
+                            const range = selection.getRangeAt(0);
+                            const container = range.startContainer;
                             
-                            if (selection && selection.rangeCount > 0) {
-                              const range = selection.getRangeAt(0);
-                              const preCaretRange = range.cloneRange();
-                              preCaretRange.selectNodeContents(editableRef.current);
-                              preCaretRange.setEnd(range.endContainer, range.endOffset);
-                              caretPos = preCaretRange.toString().length;
+                            // 커서가 해시태그 span 내부에 있는지 확인
+                            let hashtagElement = null;
+                            if (container.nodeType === Node.TEXT_NODE) {
+                              const parent = container.parentElement;
+                              if (parent && parent.classList.contains('hashtag-student')) {
+                                hashtagElement = parent;
+                              }
+                            } else if (container.nodeType === Node.ELEMENT_NODE) {
+                              const element = container as HTMLElement;
+                              if (element.classList.contains('hashtag-student')) {
+                                hashtagElement = element;
+                              }
                             }
                             
-                            const currentValue = editableRef.current.innerText || '';
-                            const convertedValue = convertStudentNamesToHashtags(currentValue, students);
-                            
-                            if (currentValue !== convertedValue) {
-                              // 변환 전 커서 앞의 텍스트
-                              const textBeforeCaret = currentValue.slice(0, caretPos);
-                              const convertedTextBeforeCaret = convertStudentNamesToHashtags(textBeforeCaret, students);
+                            // 해시태그 내부에 있으면 전체 삭제
+                            if (hashtagElement) {
+                              e.preventDefault();
                               
-                              // 변환된 텍스트로 상태 업데이트
-                              setNewRecord(prev => ({ ...prev, content: convertedValue }));
+                              // 해시태그 앞의 텍스트 위치 계산
+                              let textLength = 0;
+                              const walker = document.createTreeWalker(
+                                editableRef.current,
+                                NodeFilter.SHOW_TEXT,
+                                null
+                              );
+                              
+                              let node;
+                              while (node = walker.nextNode()) {
+                                if (node.parentElement === hashtagElement) {
+                                  break;
+                                }
+                                textLength += node.textContent?.length || 0;
+                              }
+                              
+                              // 현재 내용에서 해시태그 제거
+                              const currentText = editableRef.current.innerText || '';
+                              const hashtagText = hashtagElement.textContent || '';
+                              const beforeHashtag = currentText.substring(0, textLength);
+                              const afterHashtag = currentText.substring(textLength + hashtagText.length);
+                              const newText = beforeHashtag + afterHashtag;
+                              
+                              // 상태 업데이트
+                              setNewRecord(prev => ({ ...prev, content: newText }));
                               
                               // DOM 업데이트 후 커서 위치 복원
                               setTimeout(() => {
                                 if (editableRef.current) {
-                                  // 변환된 텍스트에서의 새로운 커서 위치
-                                  const newCaretPos = convertedTextBeforeCaret.length;
-                                  restoreCaretPosition(editableRef.current, newCaretPos);
+                                  restoreCaretPosition(editableRef.current, textLength);
                                 }
                               }, 10);
+                              
+                              return;
                             }
                           }
-                        }, 100);
+                        }
+                        
+                        // 스페이스바, 엔터, 탭, 쉼표, 마침표 등을 눌렀을 때 변환 체크
+                        if ([' ', 'Enter', 'Tab', ',', '.', '!', '?'].includes(e.key)) {
+                          setTimeout(() => {
+                            if (editableRef.current) {
+                              // 현재 커서 위치 저장 (실제 텍스트 위치)
+                              const selection = window.getSelection();
+                              let caretPos = 0;
+                              
+                              if (selection && selection.rangeCount > 0) {
+                                const range = selection.getRangeAt(0);
+                                const preCaretRange = range.cloneRange();
+                                preCaretRange.selectNodeContents(editableRef.current);
+                                preCaretRange.setEnd(range.endContainer, range.endOffset);
+                                caretPos = preCaretRange.toString().length;
+                              }
+                              
+                              const currentValue = editableRef.current.innerText || '';
+                              const convertedValue = convertStudentNamesToHashtags(currentValue, students);
+                              
+                              if (currentValue !== convertedValue) {
+                                // 변환 전 커서 앞의 텍스트
+                                const textBeforeCaret = currentValue.slice(0, caretPos);
+                                const convertedTextBeforeCaret = convertStudentNamesToHashtags(textBeforeCaret, students);
+                                
+                                // 변환된 텍스트로 상태 업데이트
+                                setNewRecord(prev => ({ ...prev, content: convertedValue }));
+                                
+                                // DOM 업데이트 후 커서 위치 복원
+                                setTimeout(() => {
+                                  if (editableRef.current) {
+                                    // 변환된 텍스트에서의 새로운 커서 위치
+                                    const newCaretPos = convertedTextBeforeCaret.length;
+                                    restoreCaretPosition(editableRef.current, newCaretPos);
+                                  }
+                                }, 10);
+                              }
+                            }
+                          }, 100);
+                        }
+                      }}
+                      onClick={handleEditableClick}
+                      data-placeholder={newRecord.content ? '' : '자세한 내용을 입력하세요...'}
+                    />
+                    <style jsx>{`
+                      [contenteditable]:empty:before {
+                        content: attr(data-placeholder);
+                        color: #9CA3AF;
+                        pointer-events: none;
                       }
-                    }}
-                    onClick={handleEditableClick}
-                    data-placeholder={newRecord.content ? '' : '자세한 내용을 입력하세요...'}
-                  />
-                  <style jsx>{`
-                    [contenteditable]:empty:before {
-                      content: attr(data-placeholder);
-                      color: #9CA3AF;
-                      pointer-events: none;
-                    }
-                  `}</style>
-                  <p className="text-xs text-gray-500 mt-2">
-                    💡 학생 이름을 입력하고 스페이스바나 쉼표를 누르면 자동으로 해시태그가 됩니다. 해시태그를 클릭하면 학생 상세정보를 볼 수 있어요.
-                  </p>
-                </div>
+                    `}</style>
+                    <p className="text-xs text-gray-500 mt-2">
+                      💡 학생 이름을 입력하고 스페이스바나 쉼표를 누르면 자동으로 해시태그가 됩니다. 해시태그를 클릭하면 학생 상세정보를 볼 수 있어요.
+                    </p>
+                  </div>
 
-                {/* 저장 버튼 */}
-                <div className="flex items-center justify-end space-x-3 pt-4 border-t">
-                  <button
-                    onClick={handleSaveRecord}
-                    disabled={addRecordMutation.isPending || updateRecordMutation.isPending}
-                    className="bg-purple-500 text-white px-6 py-2.5 rounded-lg hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
-                  >
-                    {editingRecord ? '수정하기' : '저장하기'}
-                  </button>
+                  {/* 저장 버튼 */}
+                  <div className="flex items-center justify-end space-x-3 pt-4 border-t">
+                    <button
+                      onClick={handleCancelEdit}
+                      className="px-6 py-2.5 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      취소
+                    </button>
+                    <button
+                      onClick={handleSaveRecord}
+                      disabled={addRecordMutation.isPending || updateRecordMutation.isPending}
+                      className="bg-purple-500 text-white px-6 py-2.5 rounded-lg hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                    >
+                      {editingRecord ? '수정하기' : '저장하기'}
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-      </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* 학생 상세정보 모달 */}
       <AnimatePresence>

@@ -989,33 +989,13 @@ export default function ClassJournalPage() {
                 <h3 className="text-base font-semibold text-gray-800 mb-4">메뉴</h3>
                 <div className="space-y-2">
                   <button
-                    onClick={() => router.push(`/class/${classId}/attendance-analysis`)}
-                    className="w-full text-left p-3 rounded-lg bg-white hover:bg-blue-50 hover:text-blue-600 transition-colors border border-gray-200 flex items-center space-x-3"
-                  >
-                    <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                      <span className="text-green-600 text-sm font-semibold">📊</span>
-                    </div>
-                    <span className="text-sm font-medium text-gray-900">출석 분석</span>
-                  </button>
-                  
-                  <button
-                    onClick={() => router.push(`/class/${classId}/students`)}
-                    className="w-full text-left p-3 rounded-lg bg-white hover:bg-blue-50 hover:text-blue-600 transition-colors border border-gray-200 flex items-center space-x-3"
-                  >
-                    <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
-                      <span className="text-emerald-600 text-sm font-semibold">👥</span>
-                    </div>
-                    <span className="text-sm font-medium text-gray-900">학생 정보</span>
-                  </button>
-                  
-                  <button
                     onClick={() => router.push(`/class/${classId}/journal/${format(new Date(), 'yyyy-MM-dd')}/daily-records`)}
                     className="w-full text-left p-3 rounded-lg bg-white hover:bg-blue-50 hover:text-blue-600 transition-colors border border-gray-200 flex items-center space-x-3"
                   >
                     <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
                       <span className="text-purple-600 text-sm font-semibold">📝</span>
                     </div>
-                    <span className="text-sm font-medium text-gray-900">오늘의 우리반</span>
+                    <span className="text-sm font-medium text-gray-900">누가 기록</span>
                   </button>
 
                   <button
@@ -1065,6 +1045,26 @@ export default function ClassJournalPage() {
                       <span className="text-sm font-medium text-gray-900">쫑알쫑알</span>
                     </div>
                     <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-medium border border-gray-200">AI</span>
+                  </button>
+
+                  <button
+                    onClick={() => router.push(`/class/${classId}/attendance-analysis`)}
+                    className="w-full text-left p-3 rounded-lg bg-white hover:bg-blue-50 hover:text-blue-600 transition-colors border border-gray-200 flex items-center space-x-3"
+                  >
+                    <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                      <span className="text-green-600 text-sm font-semibold">📊</span>
+                    </div>
+                    <span className="text-sm font-medium text-gray-900">출석 분석</span>
+                  </button>
+                  
+                  <button
+                    onClick={() => router.push(`/class/${classId}/students`)}
+                    className="w-full text-left p-3 rounded-lg bg-white hover:bg-blue-50 hover:text-blue-600 transition-colors border border-gray-200 flex items-center space-x-3"
+                  >
+                    <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
+                      <span className="text-emerald-600 text-sm font-semibold">👥</span>
+                    </div>
+                    <span className="text-sm font-medium text-gray-900">학생 정보</span>
                   </button>
                 </div>
               </div>
@@ -1297,18 +1297,23 @@ export default function ClassJournalPage() {
                                 router.push(`/class/${classId}/journal/${dateStr}/daily-records`);
                               }}
                             >
-                              오늘의 우리반
+                              누가 기록
                             </div>
                           </div>
                         )}
 
                         {/* 출석부 탭일 때 출석 완료 표시 - 맨 아래 고정 */}
-                        {activeTab === 'attendance' && isAttendanceCompleteDay && isCurrentMonth && (
-                          <div className="absolute bottom-0.5 left-0 right-0 flex items-center justify-center">
-                            <div className="flex items-center space-x-1">
-                              <div className="text-green-600 text-sm font-bold">✓</div>
-                              <div className="text-xs text-green-600 font-semibold">출석완료</div>
-                            </div>
+                        {activeTab === 'attendance' && isCurrentMonth && (
+                          <div className="absolute bottom-1 left-1 right-1">
+                            {dayAttendance.length === totalStudents && totalStudents > 0 ? (
+                              <div className="text-[10px] bg-green-100 text-green-800 px-1.5 py-0.5 rounded truncate">
+                                출석체크완료
+                              </div>
+                            ) : dayAttendance.length > 0 && totalStudents > 0 ? (
+                              <div className="text-[10px] bg-red-100 text-red-800 px-1.5 py-0.5 rounded truncate">
+                                진행중
+                              </div>
+                            ) : null}
                           </div>
                         )}
                       </div>
