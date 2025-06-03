@@ -387,6 +387,49 @@ export default function DailyRecordsPage() {
   // contentEditable div 참조
   const editableRef = useRef<HTMLDivElement>(null);
 
+  // 커서 위치 저장 및 복원 함수들
+  const saveCaretPosition = (element: HTMLElement) => {
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const preCaretRange = range.cloneRange();
+      preCaretRange.selectNodeContents(element);
+      preCaretRange.setEnd(range.endContainer, range.endOffset);
+      return preCaretRange.toString().length;
+    }
+    return 0;
+  };
+
+  const restoreCaretPosition = (element: HTMLElement, caretPos: number) => {
+    const selection = window.getSelection();
+    if (selection) {
+      let charIndex = 0;
+      const range = document.createRange();
+      range.setStart(element, 0);
+      range.collapse(true);
+
+      const nodeIterator = document.createNodeIterator(
+        element,
+        NodeFilter.SHOW_TEXT,
+        null
+      );
+
+      let textNode;
+      while (textNode = nodeIterator.nextNode()) {
+        const textLength = textNode.textContent?.length || 0;
+        if (charIndex + textLength >= caretPos) {
+          range.setStart(textNode, caretPos - charIndex);
+          break;
+        }
+        charIndex += textLength;
+      }
+
+      range.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+  };
+
   // contentEditable div에서 사용할 HTML 생성 함수
   const generateEditableHTML = (text: string): string => {
     if (!text) return '';
@@ -765,15 +808,104 @@ export default function DailyRecordsPage() {
                       }
                     }}
                     onKeyDown={(e) => {
+                      // 백스페이스 키 처리 - 해시태그 통째로 삭제
+                      if (e.key === 'Backspace' && editableRef.current) {
+                        const selection = window.getSelection();
+                        if (selection && selection.rangeCount > 0) {
+                          const range = selection.getRangeAt(0);
+                          const container = range.startContainer;
+                          
+                          // 커서가 해시태그 span 내부에 있는지 확인
+                          let hashtagElement = null;
+                          if (container.nodeType === Node.TEXT_NODE) {
+                            const parent = container.parentElement;
+                            if (parent && parent.classList.contains('hashtag-student')) {
+                              hashtagElement = parent;
+                            }
+                          } else if (container.nodeType === Node.ELEMENT_NODE) {
+                            const element = container as HTMLElement;
+                            if (element.classList.contains('hashtag-student')) {
+                              hashtagElement = element;
+                            }
+                          }
+                          
+                          // 해시태그 내부에 있으면 전체 삭제
+                          if (hashtagElement) {
+                            e.preventDefault();
+                            
+                            // 해시태그 앞의 텍스트 위치 계산
+                            let textLength = 0;
+                            const walker = document.createTreeWalker(
+                              editableRef.current,
+                              NodeFilter.SHOW_TEXT,
+                              null
+                            );
+                            
+                            let node;
+                            while (node = walker.nextNode()) {
+                              if (node.parentElement === hashtagElement) {
+                                break;
+                              }
+                              textLength += node.textContent?.length || 0;
+                            }
+                            
+                            // 현재 내용에서 해시태그 제거
+                            const currentText = editableRef.current.innerText || '';
+                            const hashtagText = hashtagElement.textContent || '';
+                            const beforeHashtag = currentText.substring(0, textLength);
+                            const afterHashtag = currentText.substring(textLength + hashtagText.length);
+                            const newText = beforeHashtag + afterHashtag;
+                            
+                            // 상태 업데이트
+                            setNewRecord(prev => ({ ...prev, content: newText }));
+                            
+                            // DOM 업데이트 후 커서 위치 복원
+                            setTimeout(() => {
+                              if (editableRef.current) {
+                                restoreCaretPosition(editableRef.current, textLength);
+                              }
+                            }, 10);
+                            
+                            return;
+                          }
+                        }
+                      }
+                      
                       // 스페이스바, 엔터, 탭, 쉼표, 마침표 등을 눌렀을 때 변환 체크
                       if ([' ', 'Enter', 'Tab', ',', '.', '!', '?'].includes(e.key)) {
                         setTimeout(() => {
                           if (editableRef.current) {
+                            // 현재 커서 위치 저장 (실제 텍스트 위치)
+                            const selection = window.getSelection();
+                            let caretPos = 0;
+                            
+                            if (selection && selection.rangeCount > 0) {
+                              const range = selection.getRangeAt(0);
+                              const preCaretRange = range.cloneRange();
+                              preCaretRange.selectNodeContents(editableRef.current);
+                              preCaretRange.setEnd(range.endContainer, range.endOffset);
+                              caretPos = preCaretRange.toString().length;
+                            }
+                            
                             const currentValue = editableRef.current.innerText || '';
                             const convertedValue = convertStudentNamesToHashtags(currentValue, students);
                             
                             if (currentValue !== convertedValue) {
+                              // 변환 전 커서 앞의 텍스트
+                              const textBeforeCaret = currentValue.slice(0, caretPos);
+                              const convertedTextBeforeCaret = convertStudentNamesToHashtags(textBeforeCaret, students);
+                              
+                              // 변환된 텍스트로 상태 업데이트
                               setNewRecord(prev => ({ ...prev, content: convertedValue }));
+                              
+                              // DOM 업데이트 후 커서 위치 복원
+                              setTimeout(() => {
+                                if (editableRef.current) {
+                                  // 변환된 텍스트에서의 새로운 커서 위치
+                                  const newCaretPos = convertedTextBeforeCaret.length;
+                                  restoreCaretPosition(editableRef.current, newCaretPos);
+                                }
+                              }, 10);
                             }
                           }
                         }, 100);

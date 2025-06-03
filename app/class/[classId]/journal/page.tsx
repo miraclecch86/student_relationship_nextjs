@@ -16,9 +16,121 @@ import {
   ClockIcon,
   PaperAirplaneIcon
 } from '@heroicons/react/24/outline';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, getDay } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import toast from 'react-hot-toast';
+
+// 한국 공휴일 데이터 (2025년 기준)
+const getKoreanHolidays = (year: number): { [key: string]: string } => {
+  const holidays: { [key: string]: string } = {};
+  
+  // 고정 공휴일
+  holidays[`${year}-01-01`] = '신정';
+  holidays[`${year}-03-01`] = '삼일절';
+  holidays[`${year}-05-05`] = '어린이날';
+  holidays[`${year}-06-06`] = '현충일';
+  holidays[`${year}-08-15`] = '광복절';
+  holidays[`${year}-10-03`] = '개천절';
+  holidays[`${year}-10-09`] = '한글날';
+  holidays[`${year}-12-25`] = '크리스마스';
+  
+  // 2025년 음력 공휴일 (매년 달라짐)
+  if (year === 2025) {
+    holidays['2025-01-28'] = '설날연휴';
+    holidays['2025-01-29'] = '설날';
+    holidays['2025-01-30'] = '설날연휴';
+    holidays['2025-05-05'] = '어린이날'; // 이미 위에 있음
+    holidays['2025-05-06'] = '어린이날 대체휴일';
+    holidays['2025-08-14'] = '추석연휴';
+    holidays['2025-08-15'] = '광복절'; // 이미 위에 있음
+    holidays['2025-08-16'] = '추석연휴';
+    holidays['2025-08-18'] = '추석 대체휴일';
+  }
+  
+  // 2024년 음력 공휴일
+  if (year === 2024) {
+    holidays['2024-02-09'] = '설날연휴';
+    holidays['2024-02-10'] = '설날';
+    holidays['2024-02-11'] = '설날연휴';
+    holidays['2024-02-12'] = '설날 대체휴일';
+    holidays['2024-04-10'] = '국회의원선거일';
+    holidays['2024-05-06'] = '어린이날 대체휴일';
+    holidays['2024-09-16'] = '추석연휴';
+    holidays['2024-09-17'] = '추석';
+    holidays['2024-09-18'] = '추석연휴';
+  }
+  
+  // 2026년 음력 공휴일 (예상)
+  if (year === 2026) {
+    holidays['2026-02-16'] = '설날연휴';
+    holidays['2026-02-17'] = '설날';
+    holidays['2026-02-18'] = '설날연휴';
+    holidays['2026-10-05'] = '추석연휴';
+    holidays['2026-10-06'] = '추석';
+    holidays['2026-10-07'] = '추석연휴';
+  }
+  
+  return holidays;
+};
+
+// 실시간 공휴일 데이터 가져오기 (GitHub CDN 사용)
+const fetchRealTimeHolidays = async (year: number): Promise<{ [key: string]: string }> => {
+  try {
+    const response = await fetch(`https://holidays.hyunbin.page/${year}.json`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch holidays');
+    }
+    
+    const holidayData = await response.json();
+    const holidays: { [key: string]: string } = {};
+    
+    // JSON 데이터를 우리 형식으로 변환
+    Object.entries(holidayData).forEach(([date, names]) => {
+      if (Array.isArray(names)) {
+        // 여러 개의 공휴일이 겹치는 경우 첫 번째 이름 사용
+        holidays[date] = names[0];
+      } else {
+        holidays[date] = names as string;
+      }
+    });
+    
+    return holidays;
+  } catch (error) {
+    console.error('실시간 공휴일 데이터 가져오기 실패:', error);
+    // 실패 시 기본 데이터 사용
+    return getKoreanHolidays(year);
+  }
+};
+
+// 주말 여부 확인 함수
+const isWeekend = (date: Date): boolean => {
+  const day = getDay(date); // 0: 일요일, 6: 토요일
+  return day === 0 || day === 6;
+};
+
+// 일요일 여부 확인 함수
+const isSunday = (date: Date): boolean => {
+  return getDay(date) === 0;
+};
+
+// 토요일 여부 확인 함수
+const isSaturday = (date: Date): boolean => {
+  return getDay(date) === 6;
+};
+
+// 공휴일 여부 확인 함수
+const getHolidayName = (date: Date, realTimeHolidays?: { [key: string]: string }): string | null => {
+  const dateStr = format(date, 'yyyy-MM-dd');
+  
+  // 실시간 데이터가 있으면 우선 사용
+  if (realTimeHolidays && realTimeHolidays[dateStr]) {
+    return realTimeHolidays[dateStr];
+  }
+  
+  // 없으면 기본 데이터 사용
+  const holidays = getKoreanHolidays(date.getFullYear());
+  return holidays[dateStr] || null;
+};
 
 // 학급 정보 조회
 async function fetchClassDetails(classId: string): Promise<Class | null> {
@@ -306,6 +418,9 @@ export default function ClassJournalPage() {
   // 메모 스크롤 ref
   const memoScrollRef = useRef<HTMLDivElement>(null);
 
+  // 실시간 공휴일 데이터 상태
+  const [realTimeHolidays, setRealTimeHolidays] = useState<{ [key: string]: string }>({});
+
   // 탭 옵션 정의
   const tabs = [
     { key: 'schedule', label: '일정관리', icon: '📅' },
@@ -332,11 +447,17 @@ export default function ClassJournalPage() {
   // 현재 월의 첫날과 마지막날
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
-  const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
-
+  
   // 캘린더에서 실제 표시되는 첫 번째 날 (월의 첫째 주 일요일)
   const calendarStart = new Date(monthStart);
   calendarStart.setDate(monthStart.getDate() - monthStart.getDay());
+  
+  // 캘린더에서 실제 표시되는 마지막 날 (월의 마지막 주 토요일)
+  const calendarEnd = new Date(monthEnd);
+  calendarEnd.setDate(monthEnd.getDate() + (6 - monthEnd.getDay()));
+  
+  // 캘린더 전체 날짜 (42일 - 6주)
+  const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
 
   // 학급 정보 조회
   const { data: classDetails, isLoading: isClassLoading } = useQuery<Class | null, Error>({
@@ -692,6 +813,16 @@ export default function ClassJournalPage() {
     }
   }, [showAllMemos, quickMemos]);
 
+  // 실시간 공휴일 데이터 가져오기
+  useEffect(() => {
+    const loadHolidays = async () => {
+      const holidays = await fetchRealTimeHolidays(currentDate.getFullYear());
+      setRealTimeHolidays(holidays);
+    };
+    
+    loadHolidays();
+  }, [currentDate.getFullYear()]);
+
   if (isClassLoading || isJournalsLoading || isSchedulesLoading || isMemosLoading || isDailyRecordsLoading) {
     return <div className="flex justify-center items-center h-screen">로딩 중...</div>;
   }
@@ -831,8 +962,13 @@ export default function ClassJournalPage() {
 
               {/* 요일 헤더 */}
               <div className="grid grid-cols-7 gap-1 mb-2">
-                {['일', '월', '화', '수', '목', '금', '토'].map((day) => (
-                  <div key={day} className="p-3 text-center text-sm font-medium text-gray-500">
+                {['일', '월', '화', '수', '목', '금', '토'].map((day, index) => (
+                  <div 
+                    key={day} 
+                    className={`p-3 text-center text-sm font-medium ${
+                      index === 0 ? 'text-red-500' : index === 6 ? 'text-blue-500' : 'text-gray-500'
+                    }`}
+                  >
                     {day}
                   </div>
                 ))}
@@ -840,12 +976,18 @@ export default function ClassJournalPage() {
 
               {/* 캘린더 그리드 */}
               <div className="grid grid-cols-7 gap-1">
-                {monthDays.map((day, index) => {
+                {calendarDays.map((day, index) => {
                   const dateStr = format(day, 'yyyy-MM-dd');
                   const dayJournals = journalMap.get(dateStr) || [];
                   const daySchedules = scheduleMap.get(dateStr) || [];
                   const dayDailyRecords = dailyRecordsMap.get(dateStr) || [];
                   const isToday = isSameDay(day, new Date());
+                  const isWeekendDay = isWeekend(day);
+                  const holidayName = getHolidayName(day, realTimeHolidays);
+                  const isHoliday = holidayName !== null;
+                  const isSundayDay = isSunday(day);
+                  const isSaturdayDay = isSaturday(day);
+                  const isCurrentMonth = isSameMonth(day, currentDate);
 
                   const dayFeatures = {
                     hasAnnouncements: false,
@@ -875,21 +1017,54 @@ export default function ClassJournalPage() {
 
                   const hasAnyContent = dayFeatures.hasAnnouncements || dayFeatures.hasStudentStatus || dayFeatures.hasClassMemos || dayFeatures.hasDailyRecords;
 
+                  // 배경색 결정 로직
+                  let backgroundColor = 'bg-white';
+                  let borderColor = 'border-gray-200';
+                  
+                  if (isToday) {
+                    backgroundColor = 'bg-white';
+                    borderColor = 'border-2 border-blue-500';
+                  } else if (isWeekendDay && isCurrentMonth) {
+                    backgroundColor = 'bg-gray-50';
+                    borderColor = 'border-gray-200';
+                  } else if (!isCurrentMonth) {
+                    backgroundColor = 'bg-gray-25';
+                    borderColor = 'border-gray-100';
+                  }
+
                   return (
                     <div
                       key={day.toISOString()}
                       className={`
                         p-2 min-h-[120px] border transition-all duration-200
-                        ${isToday ? 'bg-white border-2 border-blue-500' : 'bg-white border-gray-200'}
+                        ${backgroundColor} ${borderColor}
                       `}
                     >
                       <div className="flex items-center justify-between mb-2">
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className={`text-sm font-medium ${
+                          !isCurrentMonth
+                            ? 'text-gray-300'
+                            : isHoliday 
+                              ? 'text-red-600 font-bold' 
+                              : isSundayDay
+                                ? 'text-red-500'
+                                : isSaturdayDay 
+                                  ? 'text-blue-500'
+                                  : 'text-gray-900'
+                        }`}>
                           {format(day, 'd')}
                         </div>
                       </div>
                       
-                      {activeTab === 'schedule' && daySchedules.length > 0 && (
+                      {/* 공휴일 표시 (현재 월만) */}
+                      {isHoliday && isCurrentMonth && (
+                        <div className="text-[10px] text-red-600 font-semibold mb-1 truncate">
+                          {holidayName}
+                        </div>
+                      )}
+                      
+                      {/* 일정 표시 (현재 월만) */}
+                      {activeTab === 'schedule' && daySchedules.length > 0 && isCurrentMonth && (
                         <div className="space-y-0.5 mb-2">
                           {daySchedules.slice(0, 4).map((schedule) => {
                             const isStartDate = schedule.schedule_date === dateStr;
@@ -898,7 +1073,9 @@ export default function ClassJournalPage() {
                             return (
                               <div
                                 key={`${schedule.id}-${dateStr}`}
-                                className={`text-[10px] px-1 py-0.5 rounded truncate ${colorClasses.bg} ${colorClasses.text}`}
+                                onClick={(e) => handleScheduleClick(schedule, e)}
+                                className={`text-[10px] px-1 py-0.5 rounded truncate cursor-pointer hover:brightness-110 transition-all ${colorClasses.bg} ${colorClasses.text}`}
+                                title={`${schedule.title}${schedule.description ? ` - ${schedule.description}` : ''}`}
                               >
                                 {schedule.title}
                               </div>
@@ -907,28 +1084,15 @@ export default function ClassJournalPage() {
                         </div>
                       )}
 
-                      {hasAnyContent && (
+                      {/* 일일 기록만 표시 (알림장, 오늘의 아이들 제거) */}
+                      {activeTab !== 'schedule' && dayFeatures.hasDailyRecords && isCurrentMonth && (
                         <div className="space-y-0.5">
-                          {dayFeatures.hasAnnouncements && (
-                            <div className="text-[10px] bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded truncate">
-                              📢 알림장
-                            </div>
-                          )}
-                          {dayFeatures.hasStudentStatus && (
-                            <div className="text-[10px] bg-green-100 text-green-800 px-1.5 py-0.5 rounded truncate">
-                              👥 오늘의 아이들
-                            </div>
-                          )}
-                          {activeTab !== 'schedule' && dayFeatures.hasClassMemos && (
-                            <div className="text-[10px] bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded truncate">
-                              오늘의 우리반
-                            </div>
-                          )}
-                          {activeTab !== 'schedule' && dayFeatures.hasDailyRecords && (
-                            <div className="text-[10px] bg-teal-100 text-teal-800 px-1.5 py-0.5 rounded truncate">
-                              오늘의 우리반
-                            </div>
-                          )}
+                          <div 
+                            className="text-[10px] bg-teal-100 text-teal-800 px-1.5 py-0.5 rounded truncate cursor-pointer hover:bg-teal-200 transition-colors"
+                            onClick={() => router.push(`/class/${classId}/journal/${dateStr}/daily-records`)}
+                          >
+                            오늘의 우리반
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1040,6 +1204,178 @@ export default function ClassJournalPage() {
           </div>
         </div>
       </div>
+
+      {/* 일정 추가/수정 모달 */}
+      {isScheduleModalOpen && (
+        <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md border-2 border-gray-200">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {isEditMode ? '일정 수정' : '새 일정 추가'}
+                </h3>
+                <button
+                  onClick={() => setIsScheduleModalOpen(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <XMarkIcon className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* 일정 제목 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    일정 제목 *
+                  </label>
+                  <input
+                    type="text"
+                    value={newSchedule.title}
+                    onChange={(e) => setNewSchedule(prev => ({ ...prev, title: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-black placeholder-gray-500"
+                    placeholder="일정 제목을 입력하세요"
+                  />
+                </div>
+
+                {/* 일정 설명 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    설명
+                  </label>
+                  <textarea
+                    value={newSchedule.description}
+                    onChange={(e) => setNewSchedule(prev => ({ ...prev, description: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-black placeholder-gray-500"
+                    rows={3}
+                    placeholder="일정 설명을 입력하세요 (선택사항)"
+                  />
+                </div>
+
+                {/* 날짜 선택 */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      시작일 *
+                    </label>
+                    <input
+                      type="date"
+                      value={selectedDate ? format(selectedDate, 'yyyy-MM-dd') : ''}
+                      onChange={(e) => setSelectedDate(new Date(e.target.value))}
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-black"
+                    />
+                  </div>
+
+                  {/* 종료일 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      종료일
+                    </label>
+                    <input
+                      type="date"
+                      value={newSchedule.end_date}
+                      onChange={(e) => setNewSchedule(prev => ({ ...prev, end_date: e.target.value }))}
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-black"
+                      min={selectedDate ? format(selectedDate, 'yyyy-MM-dd') : ''}
+                    />
+                  </div>
+                </div>
+
+                {/* 시간 설정 */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      시작 시간
+                    </label>
+                    <input
+                      type="time"
+                      value={newSchedule.start_time}
+                      onChange={(e) => setNewSchedule(prev => ({ ...prev, start_time: e.target.value }))}
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-black"
+                      disabled={newSchedule.is_all_day}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      종료 시간
+                    </label>
+                    <input
+                      type="time"
+                      value={newSchedule.end_time}
+                      onChange={(e) => setNewSchedule(prev => ({ ...prev, end_time: e.target.value }))}
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-black"
+                      disabled={newSchedule.is_all_day}
+                    />
+                  </div>
+                </div>
+
+                {/* 하루종일 체크박스 */}
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="allDay"
+                    checked={newSchedule.is_all_day}
+                    onChange={(e) => handleAllDayChange(e.target.checked)}
+                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                  />
+                  <label htmlFor="allDay" className="ml-2 text-sm text-gray-700">
+                    하루종일
+                  </label>
+                </div>
+
+                {/* 색상 선택 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    색상
+                  </label>
+                  <div className="flex flex-wrap gap-1">
+                    {colorOptions.map((color) => (
+                      <button
+                        key={color.value}
+                        onClick={() => setNewSchedule(prev => ({ ...prev, color: color.value }))}
+                        className={`h-6 w-6 rounded-full ${color.solid} ${
+                          newSchedule.color === color.value ? 'ring-2 ring-gray-400 ring-offset-1' : ''
+                        } transition-all hover:scale-110 flex-shrink-0`}
+                        title={color.label}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* 버튼 영역 */}
+              <div className="flex items-center justify-between mt-6 pt-4 border-t">
+                {isEditMode && editingSchedule && (
+                  <button
+                    onClick={(e) => {
+                      handleDeleteSchedule(editingSchedule.id, e);
+                      setIsScheduleModalOpen(false);
+                    }}
+                    className="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 transition-colors"
+                  >
+                    삭제
+                  </button>
+                )}
+                
+                <div className={`flex space-x-3 ${!isEditMode ? 'ml-auto' : ''}`}>
+                  <button
+                    onClick={() => setIsScheduleModalOpen(false)}
+                    className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-md hover:bg-gray-100 transition-colors"
+                  >
+                    취소
+                  </button>
+                  <button
+                    onClick={handleSaveSchedule}
+                    disabled={!newSchedule.title.trim() || !selectedDate}
+                    className="px-4 py-2 text-sm font-medium text-white bg-blue-500 border border-transparent rounded-md hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isEditMode ? '수정' : '추가'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 
