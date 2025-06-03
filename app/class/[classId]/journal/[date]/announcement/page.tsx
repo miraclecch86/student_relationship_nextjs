@@ -581,6 +581,21 @@ export default function AnnouncementPage() {
               <span>알림장 {editingAnnouncementId ? '수정' : '생성'}</span>
             </h1>
           </div>
+          
+          {/* 날짜 선택 */}
+          <div className="flex items-center space-x-3">
+            <label className="text-sm font-medium text-gray-700">날짜:</label>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => {
+                if (e.target.value) {
+                  router.push(`/class/${classId}/journal/${e.target.value}/announcement`);
+                }
+              }}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent text-gray-900 bg-white"
+            />
+          </div>
         </div>
 
         {/* 학급 및 날짜 정보 */}

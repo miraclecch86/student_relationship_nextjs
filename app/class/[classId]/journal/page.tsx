@@ -17,7 +17,9 @@ import {
   PaperAirplaneIcon,
   ClipboardDocumentListIcon,
   ChartBarIcon,
-  DocumentTextIcon
+  DocumentTextIcon,
+  PencilIcon,
+  TrashIcon
 } from '@heroicons/react/24/outline';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, getDay } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -397,6 +399,47 @@ async function fetchClassDailyRecords(classId: string, year: number, month: numb
   return data || [];
 }
 
+// 월별 출석 데이터 조회 함수
+async function fetchMonthlyAttendance(classId: string, year: number, month: number): Promise<any[]> {
+  const startDate = format(new Date(year, month - 1, 1), 'yyyy-MM-dd');
+  const endDate = format(new Date(year, month, 0), 'yyyy-MM-dd');
+
+  const { data, error } = await (supabase as any)
+    .from('journal_student_status')
+    .select(`
+      *,
+      class_journals!inner(
+        journal_date,
+        class_id
+      )
+    `)
+    .eq('class_journals.class_id', classId)
+    .gte('class_journals.journal_date', startDate)
+    .lte('class_journals.journal_date', endDate);
+
+  if (error) {
+    console.error('Error fetching attendance data:', error);
+    return [];
+  }
+
+  return data || [];
+}
+
+// 학급의 총 학생 수 조회 함수
+async function fetchClassStudentCount(classId: string): Promise<number> {
+  const { data, error } = await (supabase as any)
+    .from('students')
+    .select('id')
+    .eq('class_id', classId);
+
+  if (error) {
+    console.error('Error fetching student count:', error);
+    return 0;
+  }
+
+  return data?.length || 0;
+}
+
 export default function ClassJournalPage() {
   const router = useRouter();
   const params = useParams();
@@ -425,13 +468,7 @@ export default function ClassJournalPage() {
   const [quickMemoText, setQuickMemoText] = useState('');
 
   // 탭 관련 상태
-  const [activeTab, setActiveTab] = useState<'schedule' | 'classroom' | 'tbd'>('schedule');
-
-  // 메모 표시 관련 상태
-  const [showAllMemos, setShowAllMemos] = useState(false);
-
-  // 메모 스크롤 ref
-  const memoScrollRef = useRef<HTMLDivElement>(null);
+  const [activeTab, setActiveTab] = useState<'schedule' | 'classroom' | 'attendance'>('schedule');
 
   // 실시간 공휴일 데이터 상태
   const [realTimeHolidays, setRealTimeHolidays] = useState<{ [key: string]: string }>({});
@@ -440,7 +477,7 @@ export default function ClassJournalPage() {
   const tabs = [
     { key: 'schedule', label: '일정관리', icon: '📅' },
     { key: 'classroom', label: '교실관리', icon: '🏫' },
-    { key: 'tbd', label: '제목 미정', icon: '📋' }
+    { key: 'attendance', label: '출석부', icon: '✅' }
   ] as const;
 
   // 색상 옵션 정의
@@ -512,6 +549,21 @@ export default function ClassJournalPage() {
     placeholderData: (previousData) => previousData,
   });
 
+  // 월별 출석 데이터 조회
+  const { data: monthlyAttendance, isLoading: isAttendanceLoading } = useQuery<any[], Error>({
+    queryKey: ['monthly-attendance', classId, currentDate.getFullYear(), currentDate.getMonth() + 1],
+    queryFn: () => fetchMonthlyAttendance(classId, currentDate.getFullYear(), currentDate.getMonth() + 1),
+    enabled: !!classId,
+    placeholderData: (previousData) => previousData,
+  });
+
+  // 학급 학생 수 조회
+  const { data: classStudentCount } = useQuery<number, Error>({
+    queryKey: ['class-student-count', classId],
+    queryFn: () => fetchClassStudentCount(classId),
+    enabled: !!classId,
+  });
+
   // 날짜별 일지 존재 여부 맵
   const journalMap = useMemo(() => {
     const map = new Map<string, any[]>();
@@ -568,6 +620,34 @@ export default function ClassJournalPage() {
     return map;
   }, [monthlySchedules]);
 
+  // 날짜별 출석 데이터 맵
+  const attendanceMap = useMemo(() => {
+    const map = new Map<string, any[]>();
+    monthlyAttendance?.forEach(attendance => {
+      const dateKey = attendance.class_journals.journal_date;
+      if (!map.has(dateKey)) {
+        map.set(dateKey, []);
+      }
+      map.get(dateKey)!.push(attendance);
+    });
+    return map;
+  }, [monthlyAttendance]);
+
+  // 출석 완료 여부 확인 함수
+  const isAttendanceComplete = (dateStr: string): boolean => {
+    const dayAttendance = attendanceMap.get(dateStr) || [];
+    const totalStudents = classStudentCount || 0;
+    
+    // 출석부가 작성되어 있고, 전체 학생 수와 출석 기록 수가 일치하면 완료
+    return dayAttendance.length > 0 && dayAttendance.length === totalStudents && totalStudents > 0;
+  };
+
+  // 출석부 페이지로 이동하는 함수
+  const handleAttendanceDateClick = (date: Date) => {
+    const formattedDate = format(date, 'yyyy-MM-dd');
+    router.push(`/class/${classId}/attendance/${formattedDate}`);
+  };
+
   // 일정 추가 뮤테이션
   const addScheduleMutation = useMutation({
     mutationFn: addClassSchedule,
@@ -596,6 +676,19 @@ export default function ClassJournalPage() {
     onSuccess: () => {
       toast.success('일정이 삭제되었습니다.');
       queryClient.invalidateQueries({ queryKey: ['monthly-schedules'] });
+      // 모달 닫기 및 상태 초기화
+      setIsScheduleModalOpen(false);
+      setIsEditMode(false);
+      setEditingSchedule(null);
+      setNewSchedule({
+        title: '',
+        description: '',
+        start_time: '',
+        end_time: '',
+        end_date: '',
+        is_all_day: false,
+        color: 'blue'
+      });
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -630,7 +723,7 @@ export default function ClassJournalPage() {
   const addMemoMutation = useMutation({
     mutationFn: addClassQuickMemo,
     onSuccess: () => {
-      toast.success('메모가 추가되었습니다.');
+      toast.success('빠른 메모가 추가되었습니다.');
       queryClient.invalidateQueries({ queryKey: ['quick-memos'] });
       setQuickMemoText('');
     },
@@ -643,7 +736,7 @@ export default function ClassJournalPage() {
   const deleteMemoMutation = useMutation({
     mutationFn: deleteClassQuickMemo,
     onSuccess: () => {
-      toast.success('메모가 삭제되었습니다.');
+      toast.success('빠른 메모가 삭제되었습니다.');
       queryClient.invalidateQueries({ queryKey: ['quick-memos'] });
     },
     onError: (error: Error) => {
@@ -784,7 +877,7 @@ export default function ClassJournalPage() {
   // 빠른 메모 추가 핸들러
   const handleAddQuickMemo = () => {
     if (!quickMemoText.trim()) {
-      toast.error('메모 내용을 입력해주세요.');
+      toast.error('빠른 메모를 입력해주세요.');
       return;
     }
 
@@ -826,13 +919,6 @@ export default function ClassJournalPage() {
       return format(date, isSameYear ? 'M월 d일 HH:mm' : 'yyyy년 M월 d일 HH:mm', { locale: ko });
     }
   };
-
-  // 메모 스크롤을 맨 위로 이동시키는 useEffect
-  useEffect(() => {
-    if (showAllMemos && memoScrollRef.current) {
-      memoScrollRef.current.scrollTop = 0;
-    }
-  }, [showAllMemos, quickMemos]);
 
   // 실시간 공휴일 데이터 가져오기
   useEffect(() => {
@@ -903,13 +989,13 @@ export default function ClassJournalPage() {
                 <h3 className="text-base font-semibold text-gray-800 mb-4">메뉴</h3>
                 <div className="space-y-2">
                   <button
-                    onClick={() => {/* 출석 체크 페이지로 이동 */}}
+                    onClick={() => router.push(`/class/${classId}/attendance-analysis`)}
                     className="w-full text-left p-3 rounded-lg bg-white hover:bg-blue-50 hover:text-blue-600 transition-colors border border-gray-200 flex items-center space-x-3"
                   >
                     <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                      <span className="text-green-600 text-sm font-semibold">✓</span>
+                      <span className="text-green-600 text-sm font-semibold">📊</span>
                     </div>
-                    <span className="text-sm font-medium text-gray-900">출석 체크</span>
+                    <span className="text-sm font-medium text-gray-900">출석 분석</span>
                   </button>
                   
                   <button
@@ -937,9 +1023,22 @@ export default function ClassJournalPage() {
                     className="w-full text-left p-3 rounded-lg bg-white hover:bg-blue-50 hover:text-blue-600 transition-colors border border-gray-200 flex items-center space-x-3"
                   >
                     <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
-                      <ClipboardDocumentListIcon className="h-4 w-4 text-indigo-600" />
+                      <span className="text-indigo-600 text-sm font-semibold">📋</span>
                     </div>
                     <span className="text-sm font-medium text-gray-900">설문 작성</span>
+                  </button>
+
+                  <button
+                    onClick={() => router.push(`/class/${classId}/journal/${format(new Date(), 'yyyy-MM-dd')}/announcement`)}
+                    className="w-full text-left p-3 rounded-lg bg-white hover:bg-blue-50 hover:text-blue-600 transition-colors border border-gray-200 flex items-center justify-between"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                        <span className="text-orange-600 text-sm font-semibold">📢</span>
+                      </div>
+                      <span className="text-sm font-medium text-gray-900">알림장 생성</span>
+                    </div>
+                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-medium border border-gray-200">AI</span>
                   </button>
 
                   <button
@@ -1048,7 +1147,7 @@ export default function ClassJournalPage() {
 
               {/* 캘린더 그리드 */}
               <div className="grid grid-cols-7 gap-1 h-[720px]">
-                {(isJournalsLoading || isSchedulesLoading || isDailyRecordsLoading) ? (
+                {(isJournalsLoading || isSchedulesLoading || isDailyRecordsLoading || isAttendanceLoading) ? (
                   // 로딩 중일 때도 캘린더 구조 유지
                   Array.from({ length: 42 }, (_, index) => (
                     <div
@@ -1068,6 +1167,7 @@ export default function ClassJournalPage() {
                     const dayJournals = journalMap.get(dateStr) || [];
                     const daySchedules = scheduleMap.get(dateStr) || [];
                     const dayDailyRecords = dailyRecordsMap.get(dateStr) || [];
+                    const dayAttendance = attendanceMap.get(dateStr) || [];
                     const isToday = isSameDay(day, new Date());
                     const isWeekendDay = isWeekend(day);
                     const holidayName = getHolidayName(day, realTimeHolidays);
@@ -1076,11 +1176,16 @@ export default function ClassJournalPage() {
                     const isSaturdayDay = isSaturday(day);
                     const isCurrentMonth = isSameMonth(day, currentDate);
 
+                    // 출석 완료 여부 확인
+                    const totalStudents = classStudentCount || 0;
+                    const isAttendanceCompleteDay = dayAttendance.length > 0 && dayAttendance.length === totalStudents && totalStudents > 0;
+
                     const dayFeatures = {
                       hasAnnouncements: false,
                       hasStudentStatus: false,
                       hasClassMemos: false,
                       hasDailyRecords: dayDailyRecords.length > 0,
+                      hasAttendance: dayAttendance.length > 0,
                       announcementCount: 0,
                       studentStatusCount: 0,
                       classMemoCount: 0,
@@ -1102,8 +1207,6 @@ export default function ClassJournalPage() {
                       }
                     });
 
-                    const hasAnyContent = dayFeatures.hasAnnouncements || dayFeatures.hasStudentStatus || dayFeatures.hasClassMemos || dayFeatures.hasDailyRecords;
-
                     // 배경색 결정 로직
                     let backgroundColor = 'bg-white';
                     let borderColor = 'border-gray-200';
@@ -1119,13 +1222,27 @@ export default function ClassJournalPage() {
                       borderColor = 'border-gray-100';
                     }
 
+                    // 클릭 핸들러 결정
+                    const handleDateClickForTab = () => {
+                      if (activeTab === 'attendance') {
+                        handleAttendanceDateClick(day);
+                      }
+                      // 일정관리와 교실관리 탭에서는 날짜 클릭 비활성화
+                    };
+
+                    // 날짜 셀 스타일 결정
+                    const dateInteractionClass = activeTab === 'attendance' 
+                      ? 'cursor-pointer hover:bg-gray-50' 
+                      : '';
+
                     return (
                       <div
                         key={day.toISOString()}
                         className={`
-                          p-2 min-h-[120px] border transition-all duration-200
-                          ${backgroundColor} ${borderColor}
+                          p-2 min-h-[120px] border transition-all duration-200 relative
+                          ${backgroundColor} ${borderColor} ${dateInteractionClass}
                         `}
+                        onClick={activeTab === 'attendance' ? handleDateClickForTab : undefined}
                       >
                         <div className="flex items-center justify-between mb-2">
                           <div className={`text-sm font-medium ${
@@ -1150,11 +1267,10 @@ export default function ClassJournalPage() {
                           </div>
                         )}
                         
-                        {/* 일정 표시 (현재 월만) */}
+                        {/* 일정 표시 (일정 탭일 때만) */}
                         {activeTab === 'schedule' && daySchedules.length > 0 && isCurrentMonth && (
-                          <div className="space-y-0.5 mb-2">
+                          <div className="absolute bottom-1 left-1 right-1 flex flex-col-reverse space-y-reverse space-y-0.5">
                             {daySchedules.slice(0, 4).map((schedule) => {
-                              const isStartDate = schedule.schedule_date === dateStr;
                               const colorClasses = getColorClasses(schedule.color || 'blue');
                               
                               return (
@@ -1171,14 +1287,27 @@ export default function ClassJournalPage() {
                           </div>
                         )}
 
-                        {/* 일일 기록만 표시 (알림장, 오늘의 아이들 제거) */}
-                        {activeTab !== 'schedule' && dayFeatures.hasDailyRecords && isCurrentMonth && (
-                          <div className="space-y-0.5">
+                        {/* 교실관리 탭일 때 일일 기록 표시 */}
+                        {activeTab === 'classroom' && dayFeatures.hasDailyRecords && isCurrentMonth && (
+                          <div className="absolute bottom-1 left-1 right-1">
                             <div 
                               className="text-[10px] bg-teal-100 text-teal-800 px-1.5 py-0.5 rounded truncate cursor-pointer hover:bg-teal-200 transition-colors"
-                              onClick={() => router.push(`/class/${classId}/journal/${dateStr}/daily-records`)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/class/${classId}/journal/${dateStr}/daily-records`);
+                              }}
                             >
                               오늘의 우리반
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 출석부 탭일 때 출석 완료 표시 - 맨 아래 고정 */}
+                        {activeTab === 'attendance' && isAttendanceCompleteDay && isCurrentMonth && (
+                          <div className="absolute bottom-0.5 left-0 right-0 flex items-center justify-center">
+                            <div className="flex items-center space-x-1">
+                              <div className="text-green-600 text-sm font-bold">✓</div>
+                              <div className="text-xs text-green-600 font-semibold">출석완료</div>
                             </div>
                           </div>
                         )}
@@ -1189,280 +1318,277 @@ export default function ClassJournalPage() {
               </div>
             </div>
           </div>
+        </div>
 
-          {/* 빠간 메모 입력 섹션 - 캘린더 아래로 이동 */}
-          <div className="mt-6 bg-gray-50 rounded-lg p-4">
-            <h3 className="text-sm font-semibold text-gray-800 mb-3">빠른 메모</h3>
-            
-            {/* 입력창 - 메모 목록 위로 이동 */}
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="flex-1">
-                <textarea
-                  value={quickMemoText}
-                  onChange={(e) => setQuickMemoText(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="빠른 메모를 입력하세요"
-                  className="w-full p-3 bg-white border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-gray-900 placeholder-gray-500"
-                  rows={2}
-                />
-              </div>
+        {/* 캘린더 하단 빠른 메모 섹션 - 전체 너비 */}
+        <div className="bg-white rounded-xl shadow-sm p-4 mt-4">
+          <div className="flex items-center justify-between mb-4">
+            <button
+              onClick={() => router.push(`/class/${classId}/quick-memos`)}
+              className="text-lg font-semibold text-gray-800 flex items-center space-x-2 hover:text-blue-600 transition-colors cursor-pointer"
+            >
+              <PencilIcon className="h-5 w-5 text-blue-600" />
+              <span>빠른 메모</span>
+            </button>
+            <div className="flex items-center space-x-2">
+              <span className="text-xs text-gray-500">
+                {quickMemos?.length || 0}개 메모
+              </span>
+            </div>
+          </div>
+
+          {/* 메모 입력 영역 */}
+          <div className="mb-4">
+            <div className="flex space-x-3">
+              <textarea
+                value={quickMemoText}
+                onChange={(e) => setQuickMemoText(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="빠른 메모를 입력하세요... (Shift+Enter로 줄바꿈, Enter로 저장)"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-gray-900 placeholder-gray-500 text-sm"
+                rows={2}
+                maxLength={500}
+              />
               <button
                 onClick={handleAddQuickMemo}
-                disabled={addMemoMutation.isPending || !quickMemoText.trim()}
-                className="p-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                disabled={!quickMemoText.trim() || addMemoMutation.isPending}
+                className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center self-start text-sm"
+                title={addMemoMutation.isPending ? '추가 중...' : '메모 추가'}
               >
-                <PaperAirplaneIcon className="h-5 w-5" />
+                <PaperAirplaneIcon className="h-4 w-4" />
               </button>
             </div>
-            <div className="text-xs text-gray-500 mb-4">
-              💡 Enter로 빠르게 추가, Shift+Enter로 줄바꿈
-            </div>
+          </div>
 
-            {/* 빠른 메모 목록 - 동적 높이 영역 */}
-            <div className={`mb-4 flex flex-col bg-white rounded-lg border border-gray-200 ${showAllMemos ? 'h-[600px]' : 'h-[350px]'}`}>
-              {isMemosLoading ? (
-                <div className="flex-1 px-4 py-6 flex items-center justify-center">
-                  <div className="animate-pulse text-gray-400">메모를 불러오는 중...</div>
-                </div>
-              ) : quickMemos && quickMemos.length > 0 ? (
-                <>
-                  <div 
-                    className={`flex-1 px-4 py-2 ${showAllMemos ? 'overflow-y-scroll' : 'overflow-hidden'}`}
-                    ref={memoScrollRef}
-                  >
-                    {/* 메모를 최신 순으로 위에서부터 표시 */}
-                    <div className="space-y-0">
-                      {(showAllMemos 
-                        ? quickMemos 
-                        : quickMemos.slice(0, 5)
-                      ).map((memo, index) => (
-                        <div
-                          key={memo.id}
-                          className="py-2 hover:bg-gray-50 transition-all group border-b border-gray-100 last:border-b-0"
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <p className="text-gray-800 text-sm leading-snug mb-1">{memo.content}</p>
-                              <div className="flex items-center space-x-2">
-                                <ClockIcon className="h-3 w-3 text-gray-400" />
-                                <span className="text-xs text-gray-500">
-                                  {formatMemoTime(memo.created_at)}
-                                </span>
-                              </div>
-                            </div>
-                            <button
-                              onClick={() => handleDeleteMemo(memo.id)}
-                              className="opacity-0 group-hover:opacity-100 p-1 text-red-500 hover:bg-red-100 rounded transition-all ml-2"
-                            >
-                              <XMarkIcon className="h-3 w-3" />
-                            </button>
+          {/* 메모 목록 - 최근 5개만 표시 */}
+          <div className="space-y-1.5">
+            {quickMemos && quickMemos.length > 0 ? (
+              <div>
+                {/* 메모 표시 영역 */}
+                <div className="space-y-1.5">
+                  {quickMemos.slice(0, 5).map((memo) => (
+                    <div
+                      key={memo.id}
+                      className="bg-gray-50 rounded p-2 border border-gray-200 hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 pr-2">
+                          <p className="text-gray-800 text-xs leading-relaxed break-words">{memo.content}</p>
+                          <div className="flex items-center mt-1 text-xs text-gray-500">
+                            <ClockIcon className="h-3 w-3 mr-1" />
+                            <span>{formatMemoTime(memo.created_at)}</span>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  {/* 더 보기/접기 버튼 영역 - 항상 고정된 높이 확보 */}
-                  <div className="h-12 flex items-center justify-center flex-shrink-0 border-t border-gray-100">
-                    {(showAllMemos || quickMemos.length > 5) ? (
-                      <button
-                        onClick={() => setShowAllMemos(!showAllMemos)}
-                        className="text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors flex items-center justify-center space-x-1 w-full py-2 hover:bg-blue-50 rounded-lg mx-2"
-                      >
-                        <span>
-                          {showAllMemos 
-                            ? `접기` 
-                            : `더 보기 (${Math.min(quickMemos.length - 5, 5)}개 더)`
-                          }
-                        </span>
-                        <motion.div
-                          animate={{ rotate: showAllMemos ? 180 : 0 }}
-                          transition={{ duration: 0.2 }}
+                        <button
+                          onClick={() => handleDeleteMemo(memo.id)}
+                          className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors flex-shrink-0"
+                          title="메모 삭제"
                         >
-                          <ChevronRightIcon className="h-4 w-4 transform rotate-90" />
-                        </motion.div>
-                      </button>
-                    ) : (
-                      <div className="w-full h-full"></div>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <div className="flex items-center justify-center h-full text-gray-400 text-sm">
-                  아직 메모가 없습니다. 위에서 첫 번째 메모를 작성해보세요!
+                          <TrashIcon className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              )}
-            </div>
+                
+                {/* 전체 보기 안내 */}
+                {quickMemos.length > 5 && (
+                  <div className="text-center pt-2 border-t border-gray-200">
+                    <button
+                      onClick={() => router.push(`/class/${classId}/quick-memos`)}
+                      className="text-xs text-gray-500 hover:text-blue-600 transition-colors"
+                    >
+                      {quickMemos.length - 5}개 메모 더 있음 • 전체 보기
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-4 text-gray-500 bg-gray-50 rounded border-2 border-dashed border-gray-300">
+                <PencilIcon className="h-5 w-5 mx-auto mb-2 text-gray-300" />
+                <p className="text-xs font-medium text-gray-600">아직 작성된 메모가 없습니다</p>
+                <p className="text-xs text-gray-500 mt-0.5">위에서 빠른 메모를 추가해보세요!</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       {/* 일정 추가/수정 모달 */}
       {isScheduleModalOpen && (
-        <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md border-2 border-gray-200">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  {isEditMode ? '일정 수정' : '새 일정 추가'}
-                </h3>
-                <button
-                  onClick={() => setIsScheduleModalOpen(false)}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <XMarkIcon className="h-6 w-6" />
-                </button>
+        <div className="fixed inset-0 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 shadow-xl border border-gray-200">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                {isEditMode ? '일정 수정' : '일정 추가'}
+              </h3>
+              <button
+                onClick={() => {
+                  setIsScheduleModalOpen(false);
+                  setIsEditMode(false);
+                  setEditingSchedule(null);
+                  setNewSchedule({
+                    title: '',
+                    description: '',
+                    start_time: '',
+                    end_time: '',
+                    end_date: '',
+                    is_all_day: false,
+                    color: 'blue'
+                  });
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <XMarkIcon className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* 제목 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-1">제목</label>
+                <input
+                  type="text"
+                  value={newSchedule.title}
+                  onChange={(e) => setNewSchedule(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="일정 제목을 입력하세요"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                  maxLength={100}
+                />
               </div>
 
-              <div className="space-y-4">
-                {/* 일정 제목 */}
+              {/* 설명 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-1">설명 (선택사항)</label>
+                <textarea
+                  value={newSchedule.description}
+                  onChange={(e) => setNewSchedule(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="일정 설명을 입력하세요"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-gray-900"
+                  rows={3}
+                  maxLength={500}
+                />
+              </div>
+
+              {/* 날짜 */}
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    일정 제목 *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-900 mb-1">시작일</label>
                   <input
-                    type="text"
-                    value={newSchedule.title}
-                    onChange={(e) => setNewSchedule(prev => ({ ...prev, title: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-black placeholder-gray-500"
-                    placeholder="일정 제목을 입력하세요"
+                    type="date"
+                    value={selectedDate ? format(selectedDate, 'yyyy-MM-dd') : ''}
+                    onChange={(e) => setSelectedDate(new Date(e.target.value))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                   />
                 </div>
-
-                {/* 일정 설명 */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    설명
-                  </label>
-                  <textarea
-                    value={newSchedule.description}
-                    onChange={(e) => setNewSchedule(prev => ({ ...prev, description: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-black placeholder-gray-500"
-                    rows={3}
-                    placeholder="일정 설명을 입력하세요 (선택사항)"
+                  <label className="block text-sm font-medium text-gray-900 mb-1">종료일</label>
+                  <input
+                    type="date"
+                    value={newSchedule.end_date}
+                    onChange={(e) => setNewSchedule(prev => ({ ...prev, end_date: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                   />
                 </div>
+              </div>
 
-                {/* 날짜 선택 */}
-                <div className="grid grid-cols-2 gap-3">
+              {/* 시간 (하루종일이 아닐 때만) */}
+              {!newSchedule.is_all_day && (
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      시작일 *
-                    </label>
-                    <input
-                      type="date"
-                      value={selectedDate ? format(selectedDate, 'yyyy-MM-dd') : ''}
-                      onChange={(e) => setSelectedDate(new Date(e.target.value))}
-                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-black"
-                    />
-                  </div>
-
-                  {/* 종료일 */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      종료일
-                    </label>
-                    <input
-                      type="date"
-                      value={newSchedule.end_date}
-                      onChange={(e) => setNewSchedule(prev => ({ ...prev, end_date: e.target.value }))}
-                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-black"
-                      min={selectedDate ? format(selectedDate, 'yyyy-MM-dd') : ''}
-                    />
-                  </div>
-                </div>
-
-                {/* 시간 설정 */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      시작 시간
-                    </label>
+                    <label className="block text-sm font-medium text-gray-900 mb-1">시작 시간</label>
                     <input
                       type="time"
                       value={newSchedule.start_time}
                       onChange={(e) => setNewSchedule(prev => ({ ...prev, start_time: e.target.value }))}
-                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-black"
-                      disabled={newSchedule.is_all_day}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      종료 시간
-                    </label>
+                    <label className="block text-sm font-medium text-gray-900 mb-1">종료 시간</label>
                     <input
                       type="time"
                       value={newSchedule.end_time}
                       onChange={(e) => setNewSchedule(prev => ({ ...prev, end_time: e.target.value }))}
-                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-black"
-                      disabled={newSchedule.is_all_day}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                     />
                   </div>
                 </div>
+              )}
 
-                {/* 하루종일 체크박스 */}
-                <div className="flex items-center">
+              {/* 하루종일 체크박스 */}
+              <div>
+                <label className="flex items-center space-x-2">
                   <input
                     type="checkbox"
-                    id="allDay"
                     checked={newSchedule.is_all_day}
                     onChange={(e) => handleAllDayChange(e.target.checked)}
-                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
-                  <label htmlFor="allDay" className="ml-2 text-sm text-gray-700">
-                    하루종일
-                  </label>
-                </div>
-
-                {/* 색상 선택 */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    색상
-                  </label>
-                  <div className="flex flex-wrap gap-1">
-                    {colorOptions.map((color) => (
-                      <button
-                        key={color.value}
-                        onClick={() => setNewSchedule(prev => ({ ...prev, color: color.value }))}
-                        className={`h-6 w-6 rounded-full ${color.solid} ${
-                          newSchedule.color === color.value ? 'ring-2 ring-gray-400 ring-offset-1' : ''
-                        } transition-all hover:scale-110 flex-shrink-0`}
-                        title={color.label}
-                      />
-                    ))}
-                  </div>
-                </div>
+                  <span className="text-sm text-gray-900">하루종일</span>
+                </label>
               </div>
 
-              {/* 버튼 영역 */}
-              <div className="flex items-center justify-between mt-6 pt-4 border-t">
+              {/* 색상 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-2">색상</label>
+                <div className="flex items-center space-x-2">
+                  {colorOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => setNewSchedule(prev => ({ ...prev, color: option.value }))}
+                      className={`w-8 h-8 rounded-full border-2 transition-all ${option.solid} ${
+                        newSchedule.color === option.value
+                          ? 'border-gray-800 scale-110'
+                          : 'border-gray-300 hover:border-gray-400'
+                      }`}
+                      title={option.label}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* 버튼 */}
+            <div className="flex items-center justify-between mt-6">
+              <div>
                 {isEditMode && editingSchedule && (
                   <button
-                    onClick={(e) => {
-                      handleDeleteSchedule(editingSchedule.id, e);
-                      setIsScheduleModalOpen(false);
-                    }}
-                    className="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 transition-colors"
+                    onClick={(e) => handleDeleteSchedule(editingSchedule.id, e)}
+                    className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center space-x-2"
                   >
-                    삭제
+                    <TrashIcon className="h-4 w-4" />
+                    <span>삭제</span>
                   </button>
                 )}
-                
-                <div className={`flex space-x-3 ${!isEditMode ? 'ml-auto' : ''}`}>
-                  <button
-                    onClick={() => setIsScheduleModalOpen(false)}
-                    className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-md hover:bg-gray-100 transition-colors"
-                  >
-                    취소
-                  </button>
-                  <button
-                    onClick={handleSaveSchedule}
-                    disabled={!newSchedule.title.trim() || !selectedDate}
-                    className="px-4 py-2 text-sm font-medium text-white bg-blue-500 border border-transparent rounded-md hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {isEditMode ? '수정' : '추가'}
-                  </button>
-                </div>
+              </div>
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={() => {
+                    setIsScheduleModalOpen(false);
+                    setIsEditMode(false);
+                    setEditingSchedule(null);
+                    setNewSchedule({
+                      title: '',
+                      description: '',
+                      start_time: '',
+                      end_time: '',
+                      end_date: '',
+                      is_all_day: false,
+                      color: 'blue'
+                    });
+                  }}
+                  className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  취소
+                </button>
+                <button
+                  onClick={handleSaveSchedule}
+                  disabled={!newSchedule.title.trim()}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isEditMode ? '수정' : '추가'}
+                </button>
               </div>
             </div>
           </div>
@@ -1470,4 +1596,4 @@ export default function ClassJournalPage() {
       )}
     </div>
   );
-} 
+}

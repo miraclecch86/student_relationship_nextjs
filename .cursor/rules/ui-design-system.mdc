@@ -1,0 +1,103 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# UI 디자인 시스템
+
+## 색상 팔레트
+
+### 기본 색상
+- **Primary**: Blue (`bg-blue-500`, `text-blue-600`)
+- **Secondary**: Gray (`bg-gray-100`, `text-gray-600`)
+- **Success**: Green (`bg-green-100`, `text-green-600`)
+- **Warning**: Yellow (`bg-yellow-100`, `text-yellow-600`)
+- **Danger**: Red (`bg-red-100`, `text-red-600`)
+
+### 메뉴 색상 시스템
+- **출석 체크**: Green (`bg-green-100`, `text-green-600`)
+- **학생 정보**: Emerald (`bg-emerald-100`, `text-emerald-600`)
+- **오늘의 우리반**: Purple (`bg-purple-100`, `text-purple-600`)
+- **설문 작성**: Indigo (`bg-indigo-100`, `text-indigo-600`)
+- **학급 분석**: Purple (`bg-purple-100`, `text-purple-600`)
+- **쫑알쫑알**: Amber (`bg-amber-100`, `text-amber-600`)
+
+### AI 기능 배지
+```css
+bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-medium border border-gray-200
+```
+
+## 버튼 스타일
+
+### Primary 버튼
+```css
+bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors
+```
+
+### Secondary 버튼
+```css
+bg-gray-100 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-200 transition-colors
+```
+
+### Danger 버튼
+```css
+text-red-600 bg-red-50 border border-red-200 rounded-md hover:bg-red-100
+```
+
+## 입력 필드
+
+### 기본 입력
+```css
+w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-black placeholder-gray-500
+```
+
+### 텍스트영역
+```css
+w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-black placeholder-gray-500
+```
+
+## 카드/컨테이너
+
+### 기본 카드
+```css
+bg-white rounded-xl shadow-sm p-6
+```
+
+### 메뉴 카드
+```css
+bg-gray-50 rounded-lg p-4
+```
+
+### 모달
+```css
+bg-white rounded-lg shadow-xl w-full max-w-md border-2 border-gray-200
+```
+
+## 타이포그래피
+
+### 제목
+- **H1**: `text-3xl font-bold text-gray-800`
+- **H2**: `text-2xl font-bold text-gray-800`
+- **H3**: `text-lg font-semibold text-gray-900`
+
+### 본문
+- **일반**: `text-sm text-gray-900`
+- **보조**: `text-xs text-gray-500`
+- **메타**: `text-xs text-gray-400`
+
+## 애니메이션
+
+### 호버 효과
+```css
+hover:bg-blue-50 hover:text-blue-600 transition-colors
+```
+
+### 로딩
+```css
+animate-pulse
+```
+
+### 버튼 확대
+```css
+hover:scale-110 transition-all
+```

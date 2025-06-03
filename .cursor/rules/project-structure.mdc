@@ -1,0 +1,43 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# 학생 관계 관리 시스템 프로젝트 구조
+
+이 프로젝트는 Next.js 14 기반의 학생 관계 관리 시스템입니다.
+
+## 주요 기술 스택
+- **프레임워크**: Next.js 14 (App Router)
+- **언어**: TypeScript
+- **스타일링**: Tailwind CSS
+- **데이터베이스**: Supabase
+- **상태관리**: React Query (@tanstack/react-query)
+- **애니메이션**: Framer Motion
+- **알림**: React Hot Toast
+- **아이콘**: Heroicons
+
+## 핵심 파일 구조
+- [app/layout.tsx](mdc:app/layout.tsx) - 루트 레이아웃
+- [app/class/[classId]/journal/page.tsx](mdc:app/class/[classId]/journal/page.tsx) - 학급 일지 캘린더 페이지
+- [lib/supabase.ts](mdc:lib/supabase.ts) - Supabase 클라이언트 및 타입 정의
+
+## 페이지 구조
+- `/` - 홈페이지
+- `/class/[classId]/dashboard` - 학급 대시보드
+- `/class/[classId]/journal` - 학급 일지 캘린더
+- `/class/[classId]/journal/[date]` - 특정 날짜 일지
+- `/class/[classId]/students` - 학생 정보
+- `/class/[classId]/survey` - 설문 작성
+- `/class/[classId]/analysis` - 학급 분석 (AI)
+- `/class/[classId]/schoolrecord` - 쫑알쫑알 (AI)
+
+## 데이터베이스 테이블
+- `classes` - 학급 정보
+- `class_journals` - 학급 일지
+- `class_schedules` - 학급 일정
+- `class_quick_memos` - 빠른 메모
+- `class_daily_records` - 일일 기록 (오늘의 우리반)
+- `journal_announcements` - 알림장
+- `journal_student_status` - 학생 상태
+- `journal_class_memos` - 학급 메모
