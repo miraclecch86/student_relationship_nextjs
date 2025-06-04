@@ -703,6 +703,75 @@ export interface AnnouncementRequest {
   date: string;
 }
 
+export interface SafetyNoticeRequest {
+  category: string;
+  content: string;
+}
+
+// 안전 수칙 생성 함수
+export async function generateSafetyNoticeWithGemini({
+  category,
+  content
+}: SafetyNoticeRequest): Promise<string> {
+  try {
+    const systemPrompt = `당신은 초등학교 안전교육 전문가입니다. 주어진 카테고리와 상황에 맞는 한 문장의 간단한 안전 수칙을 생성해주세요.
+
+**작성 가이드라인:**
+1. 초등학생이 이해하기 쉬운 언어 사용
+2. 구체적이고 실행 가능한 안전 수칙 제시
+3. **반드시 한 문장으로만 작성**
+4. 상황에 맞는 맞춤형 안전 수칙 제공
+
+**형식:**
+[이모지] [카테고리] 안전 수칙: [한 문장의 구체적인 안전 수칙]
+
+**예시:**
+🔔 교실안전 안전 수칙: 교실에서는 뛰어다니지 않고 천천히 걸어다닙니다.
+🔔 교통안전 안전 수칙: 횡단보도를 건널 때는 좌우를 꼼꼼히 살펴봅니다.
+🔔 운동장안전 안전 수칙: 운동 전에는 충분한 준비운동으로 몸을 풀어줍니다.
+
+**중요**: 마크다운 형식을 사용하지 말고 일반 텍스트로만 작성해주세요.
+
+위 형식을 정확히 따라 한 문장으로만 안전 수칙을 작성해주세요:`;
+
+    const userContent = `**안전 카테고리:** ${category}
+
+**오늘의 활동 상황:**
+${content}
+
+위 상황과 카테고리에 맞는 한 문장의 구체적이고 실용적인 안전 수칙을 생성해주세요.
+중요: 일반 텍스트로만 작성하고 마크다운 형식은 사용하지 마세요.`;
+
+    return await callGemini(systemPrompt, userContent, 'flash', 0.3);
+  } catch (error) {
+    console.error('Gemini 안전 수칙 생성 오류:', error);
+    
+    // 폴백 템플릿
+    const fallbackMessages: { [key: string]: string[] } = {
+      '교실안전': [
+        '교실에서는 뛰어다니지 않고 천천히 걸어다닙니다.',
+        '의자를 뒤로 젖히지 않고 바른 자세로 앉습니다.',
+        '교실 바닥에 물이나 이물질이 있으면 즉시 선생님께 알립니다.'
+      ],
+      '교통안전': [
+        '횡단보도를 건널 때는 좌우를 꼼꼼히 살펴봅니다.',
+        '신호등을 반드시 지키고 초록불이어도 한 번 더 확인합니다.',
+        '차도 근처에서는 절대 뛰어다니지 않습니다.'
+      ],
+      '운동장안전': [
+        '운동 전에는 충분한 준비운동으로 몸을 풀어줍니다.',
+        '운동기구 사용 시 선생님의 안전 수칙을 꼭 지킵니다.',
+        '친구들과 안전한 거리를 유지하며 활동합니다.'
+      ]
+    };
+
+    const messages = fallbackMessages[category] || ['안전에 주의하며 활동합니다.'];
+    const selectedMessage = messages[Math.floor(Math.random() * messages.length)];
+    
+    return `🔔 ${category} 안전 수칙: ${selectedMessage}`;
+  }
+}
+
 export async function generateAnnouncementWithGemini({
   keywords,
   details,
@@ -710,33 +779,59 @@ export async function generateAnnouncementWithGemini({
   date
 }: AnnouncementRequest): Promise<string> {
   try {
-    const systemPrompt = `당신은 초등학교 선생님입니다. 학부모님께 보낼 알림장을 작성해주세요.
+    const systemPrompt = `당신은 경험이 풍부한 초등학교 담임교사입니다. 학부모님께 보낼 따뜻하고 친근한 알림장을 작성해주세요.
 
 **작성 가이드라인:**
-1. 따뜻하고 친근한 톤으로 작성
-2. 학부모님이 이해하기 쉽게 구체적으로 설명
-3. 아이들의 긍정적인 면을 강조
-4. 가정에서의 연계 활동이나 대화 주제 제안
-5. 감사 인사로 마무리
+1. 바로 내일의 주요 활동과 일정으로 시작 (인사말 없이)
+2. 내일의 주요 활동과 일정을 구체적으로 안내
+3. 가정에서 준비해야 할 사항이나 협조 요청 사항 안내
+4. 따뜻한 감사와 협력을 표현하는 마무리 인사
 
-**형식:**
-- 인사말로 시작
-- 주요 활동 내용 설명
-- 아이들의 모습이나 성장 포인트
-- 가정 연계 제안 (선택사항)
-- 감사 인사로 마무리
+**구성 (총 150-250자 수준):**
+- 내일 활동 소개 (1-2문장)
+- 시간 및 일정 안내 (1-2문장)
+- 준비사항 또는 가정 협조 요청 (1-2문장) 
+- 따뜻한 마무리 인사 (1문장)
+
+**톤앤매너:**
+- 따뜻하고 친근한 어조 (중요!)
+- 부드럽고 정감 있는 표현 사용
+- 긍정적이고 기대감을 주는 메시지
+- 학부모와의 소통과 협력 강조
+
+**중요**: 
+- "내일은..." 으로 자연스럽게 시작해주세요.
+- **단락을 구분하여 작성해주세요** (빈 줄로 구분)
+- 마크다운 형식(**굵은글씨**, *이탤릭* 등)을 사용하지 말고 일반 텍스트로만 작성해주세요.
+- 별표(**), 언더스코어(_), 해시태그(#) 등의 특수문자는 사용하지 마세요.
+- 날짜나 요일은 포함하지 마세요. (시스템에서 자동으로 추가됩니다)
+- 안전 관련 키워드가 제공되더라도 본문에는 포함하지 마세요. (별도 안전 수칙으로 처리됩니다)
 
 알림장을 작성해주세요:`;
 
+    // 키워드가 있는 경우와 없는 경우를 구분하여 처리
+    const hasKeywords = keywords && keywords.trim().length > 0;
+    
+    // 안전 카테고리인지 확인 (교실안전, 교통안전, 운동장안전)
+    const safetyCategories = ['교실안전', '교통안전', '운동장안전'];
+    const isSafetyKeyword = hasKeywords && safetyCategories.includes(keywords.trim());
+    
     const userContent = `**학급 정보:**
 - 학급명: ${className}
-- 날짜: ${date}
 
-**오늘의 주요 키워드:**
+${hasKeywords && !isSafetyKeyword ? `**내일의 주요 활동:**
 ${keywords}
 
-**상세 내용:**
-${details}`;
+` : ''}**활동 상세 내용:**
+${details}
+
+${hasKeywords && !isSafetyKeyword ? 
+  '위 활동과 상세 내용을 바탕으로 내일 일정을 안내하는 따뜻하고 친근한 알림장을 작성해주세요.' : 
+  '상세 내용을 바탕으로 내일 일정을 안내하는 따뜻하고 친근한 알림장을 작성해주세요.'
+}
+
+중요: 일반 텍스트로만 작성하고 마크다운 형식은 사용하지 마세요. 날짜나 요일, 안전 관련 내용은 포함하지 마세요. 
+**단락별로 빈 줄을 넣어 구분해주세요**: 1) 활동 소개 2) 시간 안내 3) 준비사항/협조 요청 4) 마무리 인사`;
 
     return await callGemini(systemPrompt, userContent, 'flash', 0.3);
   } catch (error) {
@@ -754,19 +849,17 @@ function generateFallbackAnnouncement({
   className,
   date
 }: AnnouncementRequest): string {
-  return `안녕하세요, ${className} 학부모님!
+  const hasKeywords = keywords && keywords.trim().length > 0;
+  
+  return `내일 있을 활동에 대해 안내드립니다.
 
-${date} 하루 동안 아이들과 함께한 소중한 시간을 공유드립니다.
+${hasKeywords ? `📅 내일의 주요 활동: ${keywords}
 
-🔑 오늘의 주요 활동: ${keywords}
-
-📝 상세 내용:
+` : ''}📝 상세 안내:
 ${details}
 
-오늘도 아이들이 건강하고 즐겁게 학교생활을 마쳤습니다. 
-집에서도 오늘 있었던 일들에 대해 아이와 대화해보시면 좋겠습니다.
-
-항상 관심과 사랑으로 지켜봐 주시는 학부모님께 감사드립니다.
+내일 활동이 원활히 진행될 수 있도록 미리 준비해주시면 감사하겠습니다. 
+궁금한 사항이 있으시면 언제든 연락주세요.
 
 ${className} 담임교사 드림`;
 } 

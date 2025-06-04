@@ -76,7 +76,7 @@ export default function DateJournalPage() {
 
   // 3가지 기능으로 이동하는 핸들러들
   const handleAnnouncementClick = () => {
-    router.push(`/class/${classId}/journal/${date}/announcement`);
+    router.push(`/class/${classId}/announcements`);
   };
 
   const handleStudentsClick = () => {

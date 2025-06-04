@@ -477,6 +477,10 @@ export default function DailyRecordsPage() {
   const handleDeleteRecord = (recordId: string) => {
     if (confirm('정말로 이 기록을 삭제하시겠습니까?')) {
       deleteRecordMutation.mutate(recordId);
+      // 삭제 후 모달 닫기
+      setIsRecordModalOpen(false);
+      setEditingRecord(null);
+      setNewRecord({ content: '', actual_date: recordDate });
     }
   };
 
@@ -678,35 +682,11 @@ export default function DailyRecordsPage() {
                                         </div>
                                       </div>
                                       
-                                      {/* 오른쪽: 날짜, 버튼 */}
+                                      {/* 오른쪽: 날짜 */}
                                       <div className="flex items-center space-x-2 flex-shrink-0">
                                         {/* 날짜 */}
-                                        <div className="text-gray-600 text-xs font-medium">
+                                        <div className="text-purple-600 text-xs font-medium">
                                           {format(parseISO(record.actual_date || record.record_date), 'M/d (E)', { locale: ko })}
-                                        </div>
-                                        
-                                        {/* 수정/삭제 버튼 */}
-                                        <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                          <button
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleEditRecord(record);
-                                            }}
-                                            className="p-1 text-gray-400 hover:text-purple-600 hover:bg-purple-100 rounded transition-all"
-                                            title="수정"
-                                          >
-                                            <PencilIcon className="h-3 w-3" />
-                                          </button>
-                                          <button
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleDeleteRecord(record.id);
-                                            }}
-                                            className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-100 rounded transition-all"
-                                            title="삭제"
-                                          >
-                                            <TrashIcon className="h-3 w-3" />
-                                          </button>
                                         </div>
                                       </div>
                                     </div>
@@ -945,20 +925,36 @@ export default function DailyRecordsPage() {
                   </div>
 
                   {/* 저장 버튼 */}
-                  <div className="flex items-center justify-end space-x-3 pt-4 border-t">
-                    <button
-                      onClick={handleCancelEdit}
-                      className="px-6 py-2.5 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                    >
-                      취소
-                    </button>
-                    <button
-                      onClick={handleSaveRecord}
-                      disabled={addRecordMutation.isPending || updateRecordMutation.isPending}
-                      className="bg-purple-500 text-white px-6 py-2.5 rounded-lg hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
-                    >
-                      {editingRecord ? '수정하기' : '저장하기'}
-                    </button>
+                  <div className="flex items-center justify-between pt-4 border-t">
+                    {/* 삭제 버튼 (수정 모드일 때만 표시) */}
+                    <div>
+                      {editingRecord && (
+                        <button
+                          onClick={() => handleDeleteRecord(editingRecord.id)}
+                          className="px-6 py-2.5 text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors font-medium flex items-center space-x-2"
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                          <span>삭제하기</span>
+                        </button>
+                      )}
+                    </div>
+                    
+                    {/* 취소/저장 버튼 */}
+                    <div className="flex items-center space-x-3">
+                      <button
+                        onClick={handleCancelEdit}
+                        className="px-6 py-2.5 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        취소
+                      </button>
+                      <button
+                        onClick={handleSaveRecord}
+                        disabled={addRecordMutation.isPending || updateRecordMutation.isPending}
+                        className="bg-purple-500 text-white px-6 py-2.5 rounded-lg hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                      >
+                        {editingRecord ? '수정하기' : '저장하기'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

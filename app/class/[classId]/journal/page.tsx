@@ -425,6 +425,32 @@ async function fetchMonthlyAttendance(classId: string, year: number, month: numb
   return data || [];
 }
 
+// 월별 알림장 데이터 조회 함수
+async function fetchMonthlyAnnouncements(classId: string, year: number, month: number): Promise<any[]> {
+  const startDate = format(new Date(year, month - 1, 1), 'yyyy-MM-dd');
+  const endDate = format(new Date(year, month, 0), 'yyyy-MM-dd');
+
+  const { data, error } = await (supabase as any)
+    .from('journal_announcements')
+    .select(`
+      *,
+      class_journals!inner(
+        journal_date,
+        class_id
+      )
+    `)
+    .eq('class_journals.class_id', classId)
+    .gte('class_journals.journal_date', startDate)
+    .lte('class_journals.journal_date', endDate);
+
+  if (error) {
+    console.error('Error fetching announcements data:', error);
+    return [];
+  }
+
+  return data || [];
+}
+
 // 학급의 총 학생 수 조회 함수
 async function fetchClassStudentCount(classId: string): Promise<number> {
   const { data, error } = await (supabase as any)
@@ -557,6 +583,14 @@ export default function ClassJournalPage() {
     placeholderData: (previousData) => previousData,
   });
 
+  // 월별 알림장 데이터 조회
+  const { data: monthlyAnnouncements, isLoading: isAnnouncementsLoading } = useQuery<any[], Error>({
+    queryKey: ['monthly-announcements', classId, currentDate.getFullYear(), currentDate.getMonth() + 1],
+    queryFn: () => fetchMonthlyAnnouncements(classId, currentDate.getFullYear(), currentDate.getMonth() + 1),
+    enabled: !!classId,
+    placeholderData: (previousData) => previousData,
+  });
+
   // 학급 학생 수 조회
   const { data: classStudentCount } = useQuery<number, Error>({
     queryKey: ['class-student-count', classId],
@@ -590,6 +624,32 @@ export default function ClassJournalPage() {
     return map;
   }, [monthlyDailyRecords]);
 
+  // 날짜별 출석 데이터 맵
+  const attendanceMap = useMemo(() => {
+    const map = new Map<string, any[]>();
+    monthlyAttendance?.forEach(attendance => {
+      const dateKey = attendance.class_journals.journal_date;
+      if (!map.has(dateKey)) {
+        map.set(dateKey, []);
+      }
+      map.get(dateKey)!.push(attendance);
+    });
+    return map;
+  }, [monthlyAttendance]);
+
+  // 날짜별 알림장 맵
+  const announcementsMap = useMemo(() => {
+    const map = new Map<string, any[]>();
+    monthlyAnnouncements?.forEach(announcement => {
+      const dateKey = announcement.class_journals.journal_date;
+      if (!map.has(dateKey)) {
+        map.set(dateKey, []);
+      }
+      map.get(dateKey)!.push(announcement);
+    });
+    return map;
+  }, [monthlyAnnouncements]);
+
   // 기간 일정을 모든 해당 날짜에 매핑하는 함수
   const getScheduleDatesInRange = (schedule: ClassSchedule): string[] => {
     const dates: string[] = [];
@@ -619,19 +679,6 @@ export default function ClassJournalPage() {
     });
     return map;
   }, [monthlySchedules]);
-
-  // 날짜별 출석 데이터 맵
-  const attendanceMap = useMemo(() => {
-    const map = new Map<string, any[]>();
-    monthlyAttendance?.forEach(attendance => {
-      const dateKey = attendance.class_journals.journal_date;
-      if (!map.has(dateKey)) {
-        map.set(dateKey, []);
-      }
-      map.get(dateKey)!.push(attendance);
-    });
-    return map;
-  }, [monthlyAttendance]);
 
   // 출석 완료 여부 확인 함수
   const isAttendanceComplete = (dateStr: string): boolean => {
@@ -1009,7 +1056,7 @@ export default function ClassJournalPage() {
                   </button>
 
                   <button
-                    onClick={() => router.push(`/class/${classId}/journal/${format(new Date(), 'yyyy-MM-dd')}/announcement`)}
+                    onClick={() => router.push(`/class/${classId}/announcements`)}
                     className="w-full text-left p-3 rounded-lg bg-white hover:bg-blue-50 hover:text-blue-600 transition-colors border border-gray-200 flex items-center justify-between"
                   >
                     <div className="flex items-center space-x-3">
@@ -1054,7 +1101,7 @@ export default function ClassJournalPage() {
                     <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
                       <span className="text-green-600 text-sm font-semibold">📊</span>
                     </div>
-                    <span className="text-sm font-medium text-gray-900">출석 분석</span>
+                    <span className="text-sm font-medium text-gray-900">출석 통계</span>
                   </button>
                   
                   <button
@@ -1147,7 +1194,7 @@ export default function ClassJournalPage() {
 
               {/* 캘린더 그리드 */}
               <div className="grid grid-cols-7 gap-1 h-[720px]">
-                {(isJournalsLoading || isSchedulesLoading || isDailyRecordsLoading || isAttendanceLoading) ? (
+                {(isJournalsLoading || isSchedulesLoading || isDailyRecordsLoading || isAttendanceLoading || isAnnouncementsLoading) ? (
                   // 로딩 중일 때도 캘린더 구조 유지
                   Array.from({ length: 42 }, (_, index) => (
                     <div
@@ -1287,18 +1334,33 @@ export default function ClassJournalPage() {
                           </div>
                         )}
 
-                        {/* 교실관리 탭일 때 일일 기록 표시 */}
-                        {activeTab === 'classroom' && dayFeatures.hasDailyRecords && isCurrentMonth && (
-                          <div className="absolute bottom-1 left-1 right-1">
-                            <div 
-                              className="text-[10px] bg-teal-100 text-teal-800 px-1.5 py-0.5 rounded truncate cursor-pointer hover:bg-teal-200 transition-colors"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                router.push(`/class/${classId}/journal/${dateStr}/daily-records`);
-                              }}
-                            >
-                              누가 기록
-                            </div>
+                        {/* 교실관리 탭일 때 일일 기록과 알림장 표시 */}
+                        {activeTab === 'classroom' && isCurrentMonth && (
+                          <div className="absolute bottom-1 left-1 right-1 flex flex-col space-y-0.5">
+                            {/* 누가 기록 표시 */}
+                            {dayFeatures.hasDailyRecords && (
+                              <div 
+                                className="text-[10px] bg-teal-100 text-teal-800 px-1.5 py-0.5 rounded truncate cursor-pointer hover:bg-teal-200 transition-colors"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  router.push(`/class/${classId}/journal/${dateStr}/daily-records`);
+                                }}
+                              >
+                                누가 기록 생성됨
+                              </div>
+                            )}
+                            {/* 알림장 표시 */}
+                            {announcementsMap.get(dateStr) && announcementsMap.get(dateStr)!.length > 0 && (
+                              <div 
+                                className="text-[10px] bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded truncate cursor-pointer hover:bg-yellow-200 transition-colors"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  router.push(`/class/${classId}/announcements`);
+                                }}
+                              >
+                                알림장 생성됨
+                              </div>
+                            )}
                           </div>
                         )}
 

@@ -8,10 +8,10 @@ export async function POST(
   try {
     const { keywords, details, className, date } = await request.json();
 
-    // 입력값 검증
-    if (!keywords || !details || !className || !date) {
+    // 입력값 검증 - keywords는 선택사항으로 변경
+    if (!details || !className || !date) {
       return NextResponse.json(
-        { error: '필수 입력값이 누락되었습니다.' },
+        { error: '필수 입력값이 누락되었습니다. (상세 내용, 학급명, 날짜가 필요합니다)' },
         { status: 400 }
       );
     }
@@ -25,11 +25,11 @@ export async function POST(
       );
     }
 
-    console.log('알림장 생성 API 호출:', { keywords, details, className, date });
+    console.log('알림장 생성 API 호출:', { keywords: keywords || '(없음)', details, className, date });
 
-    // AI 알림장 생성
+    // AI 알림장 생성 - keywords가 없어도 정상 처리
     const generatedContent = await generateAnnouncementWithGemini({
-      keywords,
+      keywords: keywords || '', // 빈 문자열로 기본값 설정
       details,
       className,
       date
