@@ -253,8 +253,8 @@ export default function QuickMemosPage() {
                     type="text"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="메모 검색..."
-                    className="pl-8 pr-8 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs w-48"
+                    placeholder="메모 내용으로 검색하세요..."
+                    className="pl-8 pr-8 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs w-48 text-gray-900 placeholder-gray-400"
                   />
                   {searchTerm && (
                     <button
@@ -271,7 +271,7 @@ export default function QuickMemosPage() {
 
           {/* 메모 입력 영역 */}
           <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-            <div className="flex space-x-3">
+            <div className="flex space-x-3 mb-2">
               <textarea
                 value={quickMemoText}
                 onChange={(e) => setQuickMemoText(e.target.value)}
@@ -281,17 +281,17 @@ export default function QuickMemosPage() {
                 rows={2}
                 maxLength={500}
               />
-              <button
-                onClick={handleAddQuickMemo}
-                disabled={!quickMemoText.trim() || addMemoMutation.isPending}
-                className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center self-start"
-                title={addMemoMutation.isPending ? '추가 중...' : '메모 추가'}
-              >
-                <PaperAirplaneIcon className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="flex justify-end items-center mt-2">
-              <span className="text-xs text-gray-500">{quickMemoText.length}/500</span>
+              <div className="flex flex-col space-y-2">
+                <button
+                  onClick={handleAddQuickMemo}
+                  disabled={!quickMemoText.trim() || addMemoMutation.isPending}
+                  className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+                  title={addMemoMutation.isPending ? '추가 중...' : '메모 추가'}
+                >
+                  <PaperAirplaneIcon className="h-4 w-4" />
+                </button>
+                <span className="text-xs text-gray-500 text-center">{quickMemoText.length}/500</span>
+              </div>
             </div>
           </div>
 
