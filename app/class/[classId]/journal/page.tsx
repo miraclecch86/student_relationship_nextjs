@@ -1462,6 +1462,26 @@ export default function ClassJournalPage() {
                     </div>
                     <span className="text-sm font-medium text-gray-900">학생 정보</span>
                   </button>
+
+                  <button
+                    onClick={() => router.push(`/class/${classId}/assessments`)}
+                    className="w-full text-left p-2 rounded-lg bg-white hover:bg-blue-50 hover:text-blue-600 transition-colors border border-gray-200 flex items-center space-x-2.5"
+                  >
+                    <div className="w-7 h-7 bg-rose-100 rounded-full flex items-center justify-center">
+                      <span className="text-rose-600 text-xs font-semibold">📊</span>
+                    </div>
+                    <span className="text-sm font-medium text-gray-900">평가 기록</span>
+                  </button>
+
+                  <button
+                    onClick={() => router.push(`/class/${classId}/homework`)}
+                    className="w-full text-left p-2 rounded-lg bg-white hover:bg-blue-50 hover:text-blue-600 transition-colors border border-gray-200 flex items-center space-x-2.5"
+                  >
+                    <div className="w-7 h-7 bg-amber-100 rounded-full flex items-center justify-center">
+                      <span className="text-amber-600 text-xs font-semibold">✅</span>
+                    </div>
+                    <span className="text-sm font-medium text-gray-900">과제 체크</span>
+                  </button>
                 </div>
 
                 {/* 일정 목록 */}

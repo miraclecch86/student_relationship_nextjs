@@ -4,11 +4,11 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { classId: string } }
+  context: { params: Promise<{ classId: string }> }
 ) {
   try {
     console.log('=== Announcement Bulk Import API 호출됨 ===');
-    const { classId } = params;
+    const { classId } = await context.params;
     console.log('Class ID:', classId);
     
     const requestBody = await request.json();
