@@ -4,6 +4,18 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, Class, ClassJournal, ClassSchedule, ClassQuickMemo, Student } from '@/lib/supabase';
+
+// TODO 아이템 타입 정의
+interface TodoItem {
+  id: string;
+  class_id: string;
+  title: string;
+  start_date: string;
+  end_date: string;
+  is_completed: boolean;
+  created_at: string;
+  updated_at: string;
+}
 import StudentDetailForm from '@/components/StudentDetailForm';
 import { motion } from 'framer-motion';
 import { 
@@ -483,6 +495,70 @@ async function fetchStudentBirthdays(classId: string): Promise<Array<{id: string
   return data || [];
 }
 
+// TODO 아이템 조회
+async function fetchClassTodos(classId: string): Promise<TodoItem[]> {
+  const { data, error } = await (supabase as any)
+    .from('class_todos')
+    .select('*')
+    .eq('class_id', classId)
+    .order('start_date', { ascending: true })
+    .order('end_date', { ascending: true })
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching todos:', error);
+    return [];
+  }
+
+  return data || [];
+}
+
+// TODO 아이템 추가
+async function addClassTodo(todoData: { class_id: string; title: string; start_date: string; end_date: string }): Promise<TodoItem> {
+  const { data, error } = await (supabase as any)
+    .from('class_todos')
+    .insert({
+      ...todoData,
+      is_completed: false
+    })
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error('TODO 추가 중 오류가 발생했습니다.');
+  }
+
+  return data;
+}
+
+// TODO 완료 상태 토글
+async function toggleTodoComplete(todoId: string, isCompleted: boolean): Promise<TodoItem> {
+  const { data, error } = await (supabase as any)
+    .from('class_todos')
+    .update({ is_completed: isCompleted })
+    .eq('id', todoId)
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error('TODO 상태 변경 중 오류가 발생했습니다.');
+  }
+
+  return data;
+}
+
+// TODO 아이템 삭제
+async function deleteClassTodo(todoId: string): Promise<void> {
+  const { error } = await (supabase as any)
+    .from('class_todos')
+    .delete()
+    .eq('id', todoId);
+
+  if (error) {
+    throw new Error('TODO 삭제 중 오류가 발생했습니다.');
+  }
+}
+
 export default function ClassJournalPage() {
   const router = useRouter();
   const params = useParams();
@@ -522,6 +598,14 @@ export default function ClassJournalPage() {
   
   // 선택된 날짜 상태 (일정 목록 표시용)
   const [selectedDateForSchedule, setSelectedDateForSchedule] = useState<Date>(new Date());
+  
+  // TODO 모달 상태
+  const [isTodoModalOpen, setIsTodoModalOpen] = useState(false);
+  const [newTodo, setNewTodo] = useState({
+    title: '',
+    start_date: format(new Date(), 'yyyy-MM-dd'),
+    end_date: format(new Date(), 'yyyy-MM-dd')
+  });
 
   // 탭 옵션 정의
   const tabs = [
@@ -626,6 +710,13 @@ export default function ClassJournalPage() {
   const { data: studentBirthdays } = useQuery<Array<{id: string, name: string, birthday: string}>, Error>({
     queryKey: ['student-birthdays', classId],
     queryFn: () => fetchStudentBirthdays(classId),
+    enabled: !!classId,
+  });
+
+  // TODO 목록 조회
+  const { data: classTodos, isLoading: isTodosLoading } = useQuery<TodoItem[], Error>({
+    queryKey: ['class-todos', classId],
+    queryFn: () => fetchClassTodos(classId),
     enabled: !!classId,
   });
 
@@ -785,8 +876,13 @@ export default function ClassJournalPage() {
       studentId: student.id
     }));
     
-    // 통합하고 시간순 정렬
-    return [...scheduleItems, ...birthdayItems].sort((a, b) => {
+    // 통합하고 정렬 (생일을 맨 위에, 그 다음 시간순)
+    return [...birthdayItems, ...scheduleItems].sort((a, b) => {
+      // 생일을 항상 맨 위에
+      if (a.type === 'birthday' && b.type !== 'birthday') return -1;
+      if (a.type !== 'birthday' && b.type === 'birthday') return 1;
+      
+      // 같은 타입일 때는 시간순 정렬
       if (a.isAllDay && !b.isAllDay) return -1;
       if (!a.isAllDay && b.isAllDay) return 1;
       return a.sortTime.localeCompare(b.sortTime);
@@ -898,6 +994,48 @@ export default function ClassJournalPage() {
     onSuccess: () => {
       toast.success('빠른 메모가 삭제되었습니다.');
       queryClient.invalidateQueries({ queryKey: ['quick-memos'] });
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
+  // TODO 추가 뮤테이션
+  const addTodoMutation = useMutation({
+    mutationFn: addClassTodo,
+    onSuccess: () => {
+      toast.success('TODO가 추가되었습니다.');
+      queryClient.invalidateQueries({ queryKey: ['class-todos'] });
+      setIsTodoModalOpen(false);
+      setNewTodo({
+        title: '',
+        start_date: format(new Date(), 'yyyy-MM-dd'),
+        end_date: format(new Date(), 'yyyy-MM-dd')
+      });
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
+  // TODO 완료 상태 토글 뮤테이션
+  const toggleTodoMutation = useMutation({
+    mutationFn: ({ todoId, isCompleted }: { todoId: string; isCompleted: boolean }) =>
+      toggleTodoComplete(todoId, isCompleted),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['class-todos'] });
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
+  // TODO 삭제 뮤테이션
+  const deleteTodoMutation = useMutation({
+    mutationFn: deleteClassTodo,
+    onSuccess: () => {
+      toast.success('TODO가 삭제되었습니다.');
+      queryClient.invalidateQueries({ queryKey: ['class-todos'] });
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -1129,6 +1267,39 @@ export default function ClassJournalPage() {
     handleStudentDetailClose();
   };
 
+  // TODO 관련 핸들러
+  const handleAddTodo = () => {
+    if (!newTodo.title.trim()) {
+      toast.error('TODO 제목을 입력해주세요.');
+      return;
+    }
+
+    if (new Date(newTodo.start_date) > new Date(newTodo.end_date)) {
+      toast.error('시작일이 종료일보다 늦을 수 없습니다.');
+      return;
+    }
+
+    addTodoMutation.mutate({
+      class_id: classId,
+      title: newTodo.title.trim(),
+      start_date: newTodo.start_date,
+      end_date: newTodo.end_date
+    });
+  };
+
+  const handleToggleTodo = (todoId: string, currentCompleted: boolean) => {
+    toggleTodoMutation.mutate({
+      todoId,
+      isCompleted: !currentCompleted
+    });
+  };
+
+  const handleDeleteTodo = (todoId: string) => {
+    if (confirm('정말로 이 TODO를 삭제하시겠습니까?')) {
+      deleteTodoMutation.mutate(todoId);
+    }
+  };
+
   // 실시간 공휴일 데이터 가져오기
   useEffect(() => {
     const loadHolidays = async () => {
@@ -1212,82 +1383,82 @@ export default function ClassJournalPage() {
             <div className="col-span-3">
               <div className="bg-gray-50 rounded-lg p-4">
                 <h3 className="text-base font-semibold text-gray-800 mb-4">메뉴</h3>
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <button
                     onClick={() => router.push(`/class/${classId}/journal/${format(new Date(), 'yyyy-MM-dd')}/daily-records`)}
-                    className="w-full text-left p-3 rounded-lg bg-white hover:bg-blue-50 hover:text-blue-600 transition-colors border border-gray-200 flex items-center space-x-3"
+                    className="w-full text-left p-2 rounded-lg bg-white hover:bg-blue-50 hover:text-blue-600 transition-colors border border-gray-200 flex items-center space-x-2.5"
                   >
-                    <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                      <span className="text-purple-600 text-sm font-semibold">📝</span>
+                    <div className="w-7 h-7 bg-purple-100 rounded-full flex items-center justify-center">
+                      <span className="text-purple-600 text-xs font-semibold">📝</span>
                     </div>
                     <span className="text-sm font-medium text-gray-900">누가 기록</span>
                   </button>
 
                   <button
                     onClick={() => router.push(`/class/${classId}/survey`)}
-                    className="w-full text-left p-3 rounded-lg bg-white hover:bg-blue-50 hover:text-blue-600 transition-colors border border-gray-200 flex items-center space-x-3"
+                    className="w-full text-left p-2 rounded-lg bg-white hover:bg-blue-50 hover:text-blue-600 transition-colors border border-gray-200 flex items-center space-x-2.5"
                   >
-                    <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
-                      <span className="text-indigo-600 text-sm font-semibold">📋</span>
+                    <div className="w-7 h-7 bg-indigo-100 rounded-full flex items-center justify-center">
+                      <span className="text-indigo-600 text-xs font-semibold">📋</span>
                     </div>
                     <span className="text-sm font-medium text-gray-900">설문 작성</span>
                   </button>
 
                   <button
                     onClick={() => router.push(`/class/${classId}/announcements`)}
-                    className="w-full text-left p-3 rounded-lg bg-white hover:bg-blue-50 hover:text-blue-600 transition-colors border border-gray-200 flex items-center justify-between"
+                    className="w-full text-left p-2 rounded-lg bg-white hover:bg-blue-50 hover:text-blue-600 transition-colors border border-gray-200 flex items-center justify-between"
                   >
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
-                        <span className="text-orange-600 text-sm font-semibold">📢</span>
+                    <div className="flex items-center space-x-2.5">
+                      <div className="w-7 h-7 bg-orange-100 rounded-full flex items-center justify-center">
+                        <span className="text-orange-600 text-xs font-semibold">📢</span>
                       </div>
                       <span className="text-sm font-medium text-gray-900">알림장 생성</span>
                     </div>
-                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-medium border border-gray-200">AI</span>
+                    <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium border border-gray-200">AI</span>
                   </button>
 
                   <button
                     onClick={() => router.push(`/class/${classId}/analysis`)}
-                    className="w-full text-left p-3 rounded-lg bg-white hover:bg-blue-50 hover:text-blue-600 transition-colors border border-gray-200 flex items-center justify-between"
+                    className="w-full text-left p-2 rounded-lg bg-white hover:bg-blue-50 hover:text-blue-600 transition-colors border border-gray-200 flex items-center justify-between"
                   >
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                        <ChartBarIcon className="h-4 w-4 text-purple-600" />
+                    <div className="flex items-center space-x-2.5">
+                      <div className="w-7 h-7 bg-purple-100 rounded-full flex items-center justify-center">
+                        <ChartBarIcon className="h-3.5 w-3.5 text-purple-600" />
                       </div>
                       <span className="text-sm font-medium text-gray-900">학급 분석</span>
                     </div>
-                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-medium border border-gray-200">AI</span>
+                    <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium border border-gray-200">AI</span>
                   </button>
 
                   <button
                     onClick={() => router.push(`/class/${classId}/schoolrecord`)}
-                    className="w-full text-left p-3 rounded-lg bg-white hover:bg-blue-50 hover:text-blue-600 transition-colors border border-gray-200 flex items-center justify-between"
+                    className="w-full text-left p-2 rounded-lg bg-white hover:bg-blue-50 hover:text-blue-600 transition-colors border border-gray-200 flex items-center justify-between"
                   >
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center">
-                        <DocumentTextIcon className="h-4 w-4 text-amber-600" />
+                    <div className="flex items-center space-x-2.5">
+                      <div className="w-7 h-7 bg-amber-100 rounded-full flex items-center justify-center">
+                        <DocumentTextIcon className="h-3.5 w-3.5 text-amber-600" />
                       </div>
                       <span className="text-sm font-medium text-gray-900">쫑알쫑알</span>
                     </div>
-                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-medium border border-gray-200">AI</span>
+                    <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium border border-gray-200">AI</span>
                   </button>
 
                   <button
                     onClick={() => router.push(`/class/${classId}/attendance-analysis`)}
-                    className="w-full text-left p-3 rounded-lg bg-white hover:bg-blue-50 hover:text-blue-600 transition-colors border border-gray-200 flex items-center space-x-3"
+                    className="w-full text-left p-2 rounded-lg bg-white hover:bg-blue-50 hover:text-blue-600 transition-colors border border-gray-200 flex items-center space-x-2.5"
                   >
-                    <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                      <span className="text-green-600 text-sm font-semibold">📊</span>
+                    <div className="w-7 h-7 bg-green-100 rounded-full flex items-center justify-center">
+                      <span className="text-green-600 text-xs font-semibold">📊</span>
                     </div>
                     <span className="text-sm font-medium text-gray-900">출석 통계</span>
                   </button>
                   
                   <button
                     onClick={() => router.push(`/class/${classId}/students`)}
-                    className="w-full text-left p-3 rounded-lg bg-white hover:bg-blue-50 hover:text-blue-600 transition-colors border border-gray-200 flex items-center space-x-3"
+                    className="w-full text-left p-2 rounded-lg bg-white hover:bg-blue-50 hover:text-blue-600 transition-colors border border-gray-200 flex items-center space-x-2.5"
                   >
-                    <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
-                      <span className="text-emerald-600 text-sm font-semibold">👥</span>
+                    <div className="w-7 h-7 bg-emerald-100 rounded-full flex items-center justify-center">
+                      <span className="text-emerald-600 text-xs font-semibold">👥</span>
                     </div>
                     <span className="text-sm font-medium text-gray-900">학생 정보</span>
                   </button>
@@ -1318,27 +1489,22 @@ export default function ClassJournalPage() {
                               }
                             }
                           }}
-                          className={`flex items-start justify-between p-2 rounded-lg cursor-pointer transition-colors border ${
+                          className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors border ${
                             item.type === 'birthday' 
                               ? 'bg-blue-50 hover:bg-blue-100 border-blue-200' 
                               : 'bg-white hover:bg-gray-50 border-gray-200'
                           }`}
                         >
-                          <div className="flex items-start space-x-2 flex-1">
+                          <div className="flex items-center space-x-2 flex-1 min-w-0">
                             {item.type === 'birthday' ? (
-                              <span className="text-sm mt-0.5">🎂</span>
+                              <span className="text-sm">🎂</span>
                             ) : (
-                              <div className={`w-3 h-3 rounded-full mt-1 flex-shrink-0 ${getColorClasses(item.color).bg}`}></div>
+                              <div className={`w-3 h-3 rounded-full flex-shrink-0 ${getColorClasses(item.color).bg}`}></div>
                             )}
                             <div className="flex-1 min-w-0">
                               <div className="text-xs font-medium text-gray-800 truncate">
                                 {item.title}
                               </div>
-                              {item.description && item.type === 'schedule' && (
-                                <div className="text-xs text-gray-500 truncate mt-0.5">
-                                  {item.description}
-                                </div>
-                              )}
                             </div>
                           </div>
                           <div className={`text-xs font-medium ml-2 flex-shrink-0 ${
@@ -1367,73 +1533,158 @@ export default function ClassJournalPage() {
                     </div>
                   </div>
                 )}
+
+                {/* TODO 리스트 */}
+                <div className="mt-6 bg-green-50 rounded-xl p-4 border border-green-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 
+                      onClick={() => router.push(`/class/${classId}/todos`)}
+                      className="text-sm font-semibold text-green-800 flex items-center cursor-pointer hover:text-green-900 transition-colors"
+                    >
+                      <span className="mr-2">✅</span>
+                      TO-DO 리스트
+                    </h3>
+                    <button
+                      onClick={() => setIsTodoModalOpen(true)}
+                      className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700 transition-colors"
+                    >
+                      + 추가
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {isTodosLoading ? (
+                      <div className="text-center py-4">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600 mx-auto"></div>
+                      </div>
+                    ) : classTodos && classTodos.length > 0 ? (
+                      classTodos.map((todo) => (
+                        <div
+                          key={todo.id}
+                          className="flex items-start space-x-2 p-2 rounded-lg bg-white border border-green-200 hover:bg-green-50 transition-colors"
+                        >
+                          {/* 체크박스와 우선순위 점 */}
+                          <div className="flex flex-col items-center">
+                            <input
+                              type="checkbox"
+                              checked={todo.is_completed}
+                              onChange={() => handleToggleTodo(todo.id, todo.is_completed)}
+                              className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                            />
+                            
+                            {/* 우선순위 점 (체크박스 하단) */}
+                            <div className="mt-1">
+                              {(() => {
+                                const today = new Date();
+                                const startDate = new Date(todo.start_date);
+                                const diffDays = Math.ceil((startDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
+                                
+                                if (diffDays < 0) {
+                                  return <div className={`w-1.5 h-1.5 bg-red-500 rounded-full ${!todo.is_completed ? 'animate-pulse' : 'opacity-60'}`} title="지난 TODO"></div>;
+                                } else if (diffDays === 0) {
+                                  return <div className={`w-1.5 h-1.5 bg-orange-500 rounded-full ${!todo.is_completed ? 'animate-pulse' : 'opacity-60'}`} title="오늘 TODO"></div>;
+                                } else if (diffDays <= 3) {
+                                  return <div className={`w-1.5 h-1.5 bg-yellow-500 rounded-full ${todo.is_completed ? 'opacity-60' : ''}`} title="임박한 TODO"></div>;
+                                } else {
+                                  return <div className={`w-1.5 h-1.5 bg-green-500 rounded-full ${todo.is_completed ? 'opacity-60' : ''}`} title="여유있는 TODO"></div>;
+                                }
+                              })()}
+                            </div>
+                          </div>
+                          
+                          <div className="flex-1 min-w-0">
+                            <div className={`text-xs font-medium ${
+                              todo.is_completed 
+                                ? 'text-gray-500 line-through' 
+                                : 'text-gray-800'
+                            } truncate`}>
+                              {todo.title}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-0.5">
+                              {format(new Date(todo.start_date), 'M월 d일', { locale: ko })}
+                              {todo.start_date !== todo.end_date && (
+                                <span> ~ {format(new Date(todo.end_date), 'M월 d일', { locale: ko })}</span>
+                              )}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleDeleteTodo(todo.id)}
+                            className="p-1 text-gray-400 hover:text-red-600 rounded transition-colors"
+                            title="삭제"
+                          >
+                            <TrashIcon className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-xs text-gray-500 text-center py-4">
+                        등록된 TODO가 없습니다
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
 
             {/* 오른쪽 캘린더 */}
             <div className="col-span-9">
-              {/* 탭 헤더 - 캘린더 위 왼쪽으로 이동 */}
+              {/* 탭 헤더 - 생일 알림과 함께 한 줄로 배치 */}
               <div className="mb-4">
-                <div className="flex space-x-8">
-                  {tabs.map((tab) => (
-                    <button
-                      key={tab.key}
-                      onClick={() => setActiveTab(tab.key)}
-                      className={`px-4 py-3 text-sm font-medium transition-all duration-200 flex items-center space-x-2 border-b-2 ${
-                        activeTab === tab.key
-                          ? 'text-blue-600 border-blue-600'
-                          : 'text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300'
-                      }`}
-                    >
-                      <span>{tab.icon}</span>
-                      <span>{tab.label}</span>
-                    </button>
-                  ))}
+                <div className="flex items-center justify-between">
+                  <div className="flex space-x-8">
+                    {tabs.map((tab) => (
+                      <button
+                        key={tab.key}
+                        onClick={() => setActiveTab(tab.key)}
+                        className={`px-4 py-3 text-sm font-medium transition-all duration-200 flex items-center space-x-2 border-b-2 ${
+                          activeTab === tab.key
+                            ? 'text-blue-600 border-blue-600'
+                            : 'text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300'
+                        }`}
+                      >
+                        <span>{tab.icon}</span>
+                        <span>{tab.label}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* 오늘 생일 알림 - 탭 오른쪽으로 이동 */}
+                  {todayBirthdays.length > 0 && (
+                    <div className="flex items-center space-x-3 px-4 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg shadow-sm">
+                      <div className="flex-shrink-0">
+                        <span className="text-lg">🎉</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm font-semibold text-blue-800">
+                          오늘 생일이 있어요!
+                        </span>
+                        <div className="flex space-x-1">
+                          {todayBirthdays.map((student, index) => (
+                            <span
+                              key={student.id}
+                              className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full cursor-pointer hover:bg-blue-200 transition-colors"
+                              onClick={() => handleStudentClick(student.id)}
+                            >
+                              <span className="mr-1">🎂</span>
+                              {student.name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* 오늘 생일 알림 */}
-              {todayBirthdays.length > 0 && (
-                <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl shadow-sm">
-                  <div className="flex items-center space-x-3">
-                    <div className="flex-shrink-0">
-                      <span className="text-2xl">🎉</span>
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-sm font-semibold text-blue-800 mb-1">
-                        오늘 생일인 학생이 있어요! 🎂
-                      </h3>
-                      <div className="flex flex-wrap gap-2">
-                        {todayBirthdays.map((student, index) => (
-                          <span
-                            key={student.id}
-                            className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 text-sm font-medium rounded-full cursor-pointer hover:bg-blue-200 transition-colors"
-                            onClick={() => handleStudentClick(student.id)}
-                          >
-                            <span className="mr-1">🎈</span>
-                            {student.name}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {/* 캘린더 헤더 */}
               <div className="relative flex items-center justify-between mb-6">
-                <button
-                  onClick={goToPreviousMonth}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <ChevronLeftIcon className="h-6 w-6 text-gray-600" />
-                </button>
-                
-                <h2 className="absolute left-1/2 transform -translate-x-1/2 text-2xl font-bold text-gray-800">
-                  {format(currentDate, 'yyyy년 M월', { locale: ko })}
-                </h2>
-                
                 <div className="flex items-center space-x-2">
+                  <button
+                    onClick={goToPreviousMonth}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <ChevronLeftIcon className="h-6 w-6 text-gray-600" />
+                  </button>
                   <button
                     onClick={goToToday}
                     className="flex items-center space-x-2 bg-gray-100 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-200 transition-colors text-sm"
@@ -1441,6 +1692,13 @@ export default function ClassJournalPage() {
                     <span>📅</span>
                     <span>오늘로 이동</span>
                   </button>
+                </div>
+                
+                <h2 className="absolute left-1/2 transform -translate-x-1/2 text-2xl font-bold text-gray-800">
+                  {format(currentDate, 'yyyy년 M월', { locale: ko })}
+                </h2>
+                
+                <div className="flex items-center space-x-2">
                   {activeTab === 'schedule' && (
                     <button
                       onClick={handleAddScheduleClick}
@@ -1970,6 +2228,91 @@ export default function ClassJournalPage() {
                   {isEditMode ? '수정' : '추가'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TODO 추가 모달 */}
+      {isTodoModalOpen && (
+        <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 shadow-xl border border-gray-200">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">TODO 추가</h3>
+              <button
+                onClick={() => {
+                  setIsTodoModalOpen(false);
+                  setNewTodo({
+                    title: '',
+                    start_date: format(new Date(), 'yyyy-MM-dd'),
+                    end_date: format(new Date(), 'yyyy-MM-dd')
+                  });
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <XMarkIcon className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* 제목 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-1">내용</label>
+                <input
+                  type="text"
+                  value={newTodo.title}
+                  onChange={(e) => setNewTodo(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="할 일을 입력하세요"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
+                  maxLength={200}
+                />
+              </div>
+
+              {/* 날짜 */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-1">시작일</label>
+                  <input
+                    type="date"
+                    value={newTodo.start_date}
+                    onChange={(e) => setNewTodo(prev => ({ ...prev, start_date: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-1">종료일</label>
+                  <input
+                    type="date"
+                    value={newTodo.end_date}
+                    onChange={(e) => setNewTodo(prev => ({ ...prev, end_date: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 버튼 */}
+            <div className="flex items-center justify-end space-x-3 mt-6">
+              <button
+                onClick={() => {
+                  setIsTodoModalOpen(false);
+                  setNewTodo({
+                    title: '',
+                    start_date: format(new Date(), 'yyyy-MM-dd'),
+                    end_date: format(new Date(), 'yyyy-MM-dd')
+                  });
+                }}
+                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleAddTodo}
+                disabled={!newTodo.title.trim()}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                추가
+              </button>
             </div>
           </div>
         </div>

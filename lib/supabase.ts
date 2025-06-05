@@ -191,6 +191,7 @@ export interface ClassDailyRecord {
   actual_date: string; // YYYY-MM-DD 형식 (실제 사건 발생 날짜)
   title: string;
   content: string;
+  hashtags?: string[]; // 해시태그 배열 (상담, 싸움, 칭찬, 훈육 등)
   created_at: string;
   updated_at: string;
 } 

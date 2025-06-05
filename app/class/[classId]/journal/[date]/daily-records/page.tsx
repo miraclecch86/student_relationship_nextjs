@@ -20,6 +20,7 @@ import { format, parseISO } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 import StudentDetailForm from '@/components/StudentDetailForm';
+import * as XLSX from 'xlsx';
 
 // 학급 정보 조회
 async function fetchClassDetails(classId: string): Promise<any> {
@@ -43,7 +44,7 @@ async function fetchClassStudents(classId: string): Promise<any[]> {
     .from('students')
     .select('id, name')
     .eq('class_id', classId)
-    .order('name', { ascending: true });
+    .order('created_at', { ascending: true }); // 생성된 순서대로 정렬
   
   if (error) {
     console.error('Error fetching students:', error);
@@ -134,7 +135,7 @@ function convertStudentNamesToHashtags(text: string, students: any[]): string {
   return convertedText;
 }
 
-// 해시태그가 포함된 텍스트를 렌더링하는 함수
+// 학생 이름이 포함된 텍스트를 렌더링하는 함수 (해시태그 없이 표시)
 function renderTextWithHashtags(text: string, students: any[], onStudentClick?: (student: any) => void): React.ReactNode {
   if (!text) return text;
   
@@ -154,10 +155,10 @@ function renderTextWithHashtags(text: string, students: any[], onStudentClick?: 
     const studentName = match[1];
     const student = students.find(s => s.name === studentName);
     
-    // 해시태그 추가 (클릭 가능한 스타일링)
+    // 학생 이름을 해시태그 없이 스타일링하여 표시
     parts.push(
       <span 
-        key={`hashtag-${match.index}`}
+        key={`student-${match.index}`}
         className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mx-0.5 ${
           onStudentClick && student ? 'cursor-pointer hover:bg-blue-200 hover:text-blue-900 transition-colors' : ''
         }`}
@@ -168,7 +169,7 @@ function renderTextWithHashtags(text: string, students: any[], onStudentClick?: 
         }}
         title={student ? `${student.name} 상세정보 보기` : undefined}
       >
-        {match[0]}
+        {studentName}
       </span>
     );
     
@@ -193,8 +194,18 @@ export default function DailyRecordsPage() {
   const [editingRecord, setEditingRecord] = useState<ClassDailyRecord | null>(null);
   const [newRecord, setNewRecord] = useState({
     content: '',
-    actual_date: recordDate // 기본값은 현재 페이지 날짜
+    actual_date: recordDate, // 기본값은 현재 페이지 날짜
+    hashtags: [] as string[] // 해시태그 배열 추가
   });
+
+  // 해시태그 옵션 정의
+  const hashtagOptions = [
+    { id: 'counseling', label: '상담', color: 'bg-blue-100 text-blue-800 border-blue-200' },
+    { id: 'incident', label: '사건사고', color: 'bg-red-100 text-red-800 border-red-200' },
+    { id: 'praise', label: '칭찬', color: 'bg-green-100 text-green-800 border-green-200' },
+    { id: 'discipline', label: '훈육', color: 'bg-orange-100 text-orange-800 border-orange-200' },
+    { id: 'health', label: '건강', color: 'bg-purple-100 text-purple-800 border-purple-200' }
+  ];
 
   // 월별 접기/펼치기 상태 관리
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
@@ -208,6 +219,8 @@ export default function DailyRecordsPage() {
 
   // 검색 상태
   const [searchQuery, setSearchQuery] = useState('');
+  const [hashtagFilter, setHashtagFilter] = useState<string[]>([]);
+  const [studentFilter, setStudentFilter] = useState<string[]>([]);
 
   const queryClient = useQueryClient();
 
@@ -232,6 +245,24 @@ export default function DailyRecordsPage() {
     enabled: !!classId,
   });
 
+  // 해시태그 필터 토글 핸들러
+  const toggleHashtagFilter = (hashtagId: string) => {
+    setHashtagFilter(prev => 
+      prev.includes(hashtagId)
+        ? prev.filter(id => id !== hashtagId)
+        : [...prev, hashtagId]
+    );
+  };
+
+  // 학생 필터 토글 핸들러
+  const toggleStudentFilter = (studentId: string) => {
+    setStudentFilter(prev => 
+      prev.includes(studentId)
+        ? prev.filter(id => id !== studentId)
+        : [...prev, studentId]
+    );
+  };
+
   // 월별로 그룹화된 기록들 (actual_date 기준)
   const monthlyGroupedRecords = useMemo(() => {
     if (!dailyRecords) return new Map();
@@ -239,11 +270,40 @@ export default function DailyRecordsPage() {
     // 검색어가 있는 경우 필터링
     let filteredRecords = dailyRecords;
     if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim();
-      filteredRecords = dailyRecords.filter(record => 
-        record.title.toLowerCase().includes(query) || 
-        record.content.toLowerCase().includes(query)
-      );
+      // 검색어를 +로 분리하여 각각을 키워드로 처리 (AND 조건)
+      const keywords = searchQuery.toLowerCase().trim().split('+').map(keyword => keyword.trim()).filter(keyword => keyword.length > 0);
+      
+      filteredRecords = dailyRecords.filter(record => {
+        const titleContent = record.title.toLowerCase();
+        const bodyContent = record.content.toLowerCase();
+        
+        // 모든 키워드가 제목 또는 내용에 포함되어야 함 (AND 조건)
+        return keywords.every(keyword => 
+          titleContent.includes(keyword) || bodyContent.includes(keyword)
+        );
+      });
+    }
+
+    // 해시태그 필터링
+    if (hashtagFilter.length > 0) {
+      filteredRecords = filteredRecords.filter(record => {
+        // 선택된 해시태그가 모두 포함되어야 함
+        return hashtagFilter.every(filterTag => {
+          const tagLabel = hashtagOptions.find(option => option.id === filterTag)?.label;
+          return tagLabel && record.content.includes(`#${tagLabel}`);
+        });
+      });
+    }
+
+    // 학생 필터링 (AND 조건: 선택된 모든 학생이 언급되어야 함)
+    if (studentFilter.length > 0) {
+      filteredRecords = filteredRecords.filter(record => {
+        // 선택된 모든 학생이 언급되어야 함
+        return studentFilter.every(studentId => {
+          const student = students.find(s => s.id === studentId);
+          return student && record.content.includes(student.name);
+        });
+      });
     }
     
     const grouped = new Map<string, any[]>();
@@ -268,7 +328,7 @@ export default function DailyRecordsPage() {
     });
     
     return grouped;
-  }, [dailyRecords, searchQuery]);
+  }, [dailyRecords, searchQuery, hashtagFilter, studentFilter, hashtagOptions, students]);
 
   // 현재 월을 기본으로 확장
   useEffect(() => {
@@ -289,13 +349,32 @@ export default function DailyRecordsPage() {
     });
   };
 
+  // 학생 드롭다운 외부 클릭 감지
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const dropdown = document.getElementById('student-dropdown');
+      const button = document.getElementById('student-filter-button');
+      
+      if (dropdown && button && 
+          !dropdown.contains(event.target as Node) && 
+          !button.contains(event.target as Node)) {
+        dropdown.style.display = 'none';
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
   // 기록 추가 뮤테이션
   const addRecordMutation = useMutation({
     mutationFn: addDailyRecord,
     onSuccess: () => {
       toast.success('기록이 추가되었습니다.');
       queryClient.invalidateQueries({ queryKey: ['daily-records'] });
-      setNewRecord({ content: '', actual_date: recordDate });
+      setNewRecord({ content: '', actual_date: recordDate, hashtags: [] });
       setEditingRecord(null);
       setIsRecordModalOpen(false);
     },
@@ -311,7 +390,7 @@ export default function DailyRecordsPage() {
     onSuccess: () => {
       toast.success('기록이 수정되었습니다.');
       queryClient.invalidateQueries({ queryKey: ['daily-records'] });
-      setNewRecord({ content: '', actual_date: recordDate });
+      setNewRecord({ content: '', actual_date: recordDate, hashtags: [] });
       setEditingRecord(null);
       setIsRecordModalOpen(false);
     },
@@ -328,7 +407,7 @@ export default function DailyRecordsPage() {
       queryClient.invalidateQueries({ queryKey: ['daily-records'] });
       // 삭제된 기록이 현재 편집 중인 기록이면 폼 초기화
       if (editingRecord) {
-        setNewRecord({ content: '', actual_date: recordDate });
+        setNewRecord({ content: '', actual_date: recordDate, hashtags: [] });
         setEditingRecord(null);
       }
     },
@@ -338,9 +417,19 @@ export default function DailyRecordsPage() {
   });
 
   // 새 기록 작성 모드로 전환
+  // 해시태그 토글 핸들러
+  const toggleHashtag = (hashtagId: string) => {
+    setNewRecord(prev => ({
+      ...prev,
+      hashtags: prev.hashtags.includes(hashtagId)
+        ? prev.hashtags.filter(id => id !== hashtagId)
+        : [...prev.hashtags, hashtagId]
+    }));
+  };
+
   const handleNewRecord = () => {
     setEditingRecord(null);
-    setNewRecord({ content: '', actual_date: recordDate });
+    setNewRecord({ content: '', actual_date: recordDate, hashtags: [] });
     setIsRecordModalOpen(true);
   };
 
@@ -349,7 +438,8 @@ export default function DailyRecordsPage() {
     setEditingRecord(record);
     setNewRecord({
       content: record.content,
-      actual_date: record.actual_date || record.record_date // 실제 날짜가 없으면 기록 날짜 사용
+      actual_date: record.actual_date || record.record_date, // 실제 날짜가 없으면 기록 날짜 사용
+      hashtags: record.hashtags || [] // 기존 해시태그 로드
     });
     setIsRecordModalOpen(true);
   };
@@ -362,7 +452,19 @@ export default function DailyRecordsPage() {
     }
 
     // 저장하기 전에 학생 이름을 해시태그로 변환
-    const convertedContent = convertStudentNamesToHashtags(newRecord.content, students);
+    let convertedContent = convertStudentNamesToHashtags(newRecord.content, students);
+    
+    // 선택된 해시태그들을 본문 끝에 추가
+    if (newRecord.hashtags.length > 0) {
+      const selectedHashtags = newRecord.hashtags
+        .map(id => hashtagOptions.find(option => option.id === id)?.label)
+        .filter(Boolean)
+        .map(label => `#${label}`)
+        .join(' ');
+      
+      // 본문 끝에 해시태그 추가 (줄바꿈 후)
+      convertedContent = `${convertedContent}\n\n${selectedHashtags}`;
+    }
     
     // 내용의 앞부분을 제목으로 사용 (50자 제한)
     const autoTitle = convertedContent.slice(0, 50).replace(/\n/g, ' ').trim();
@@ -372,7 +474,8 @@ export default function DailyRecordsPage() {
       record_date: recordDate,
       title: autoTitle,
       content: convertedContent,
-      actual_date: newRecord.actual_date
+      actual_date: newRecord.actual_date,
+      hashtags: newRecord.hashtags // 해시태그 저장
     };
 
     if (editingRecord) {
@@ -480,14 +583,14 @@ export default function DailyRecordsPage() {
       // 삭제 후 모달 닫기
       setIsRecordModalOpen(false);
       setEditingRecord(null);
-      setNewRecord({ content: '', actual_date: recordDate });
+      setNewRecord({ content: '', actual_date: recordDate, hashtags: [] });
     }
   };
 
   // 폼 취소 핸들러
   const handleCancelEdit = () => {
     setEditingRecord(null);
-    setNewRecord({ content: '', actual_date: recordDate });
+    setNewRecord({ content: '', actual_date: recordDate, hashtags: [] });
     setIsRecordModalOpen(false);
   };
 
@@ -501,6 +604,176 @@ export default function DailyRecordsPage() {
   const closeStudentModal = () => {
     setIsStudentModalOpen(false);
     setSelectedStudent(null);
+  };
+
+  // 엑셀 추출 함수
+  const exportToExcel = () => {
+    try {
+      // 현재 필터링된 기록들을 가져옴
+      const recordsToExport = Array.from(monthlyGroupedRecords.values()).flat();
+      
+      if (recordsToExport.length === 0) {
+        toast.error('내보낼 기록이 없습니다.');
+        return;
+      }
+
+      // 엑셀 데이터 준비
+      const excelData = recordsToExport.map((record: any, index) => {
+        // 학생 이름의 해시태그만 제거하고 다른 해시태그는 유지
+        const studentNames = students.map((s: any) => s.name);
+        const studentHashtagPattern = new RegExp(`#(${studentNames.map(name => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'g');
+        
+        const cleanContent = record.content
+          .replace(studentHashtagPattern, '$1') // 학생 해시태그만 # 제거
+          .replace(/\n+/g, ' ') // 줄바꿈을 공백으로 변경
+          .trim();
+
+        // 상황 해시태그만 추출 (학생 이름이 포함된 모든 해시태그 제외)
+        const allHashtags = record.content.match(/#[^\s#]+/g) || [];
+        const situationHashtags = allHashtags.filter((tag: string) => {
+          const tagName = tag.substring(1); // # 제거
+          // 학생 이름이 포함된 해시태그는 모두 제외 (조사 등이 붙어도 제외)
+          return !studentNames.some(studentName => tagName.includes(studentName));
+        }).join(' ');
+
+        return {
+          '번호': index + 1,
+          '날짜': format(parseISO(record.actual_date || record.record_date), 'yyyy-MM-dd (E)', { locale: ko }),
+          '내용': cleanContent,
+          '상황 해시태그': situationHashtags,
+          '작성일': format(parseISO(record.created_at), 'yyyy-MM-dd HH:mm', { locale: ko }),
+        };
+      });
+
+      // 워크북 생성
+      const workbook = XLSX.utils.book_new();
+      
+      // 워크시트 생성
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+      
+      // 열 너비 조정
+      const columnWidths = [
+        { wch: 8 },   // 번호
+        { wch: 15 },  // 날짜  
+        { wch: 25 },  // 제목
+        { wch: 50 },  // 내용
+        { wch: 20 },  // 해시태그
+        { wch: 18 },  // 작성일
+      ];
+      worksheet['!cols'] = columnWidths;
+
+      // 워크북에 워크시트 추가
+      XLSX.utils.book_append_sheet(workbook, worksheet, '누가기록');
+
+      // 파일명 생성
+      const currentDate = format(new Date(), 'yyyy-MM-dd');
+      const className = classDetails?.name || '학급';
+      const filterInfo = searchQuery || hashtagFilter.length > 0 || studentFilter.length > 0 ? '_검색결과' : '';
+      const filename = `${className}_누가기록_${currentDate}${filterInfo}.xlsx`;
+
+      // 파일 다운로드
+      XLSX.writeFile(workbook, filename);
+      
+      toast.success(`엑셀 파일이 다운로드되었습니다: ${filename}`);
+    } catch (error) {
+      console.error('Excel export error:', error);
+      toast.error('엑셀 파일 생성 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handleExcelUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      toast.success('엑셀 파일을 처리 중입니다...');
+
+      // 파일 읽기
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const worksheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[worksheetName];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+      if (jsonData.length === 0) {
+        toast.error('엑셀 파일에 데이터가 없습니다.');
+        return;
+      }
+
+      // 데이터 검증 및 변환
+      const recordsToImport = [];
+      for (let i = 0; i < jsonData.length; i++) {
+        const row = jsonData[i];
+        
+        // 필수 필드 확인
+        if (!row['날짜'] || !row['내용']) {
+          toast.error(`${i + 2}번째 행에 필수 데이터가 누락되었습니다. (날짜, 내용 필수)`);
+          return;
+        }
+
+        // 날짜 파싱
+        let recordDate;
+        try {
+          // 엑셀 날짜 형식 파싱 (yyyy-MM-dd (요일) 형식)
+          const dateStr = row['날짜'].toString();
+          const dateMatch = dateStr.match(/(\d{4}-\d{2}-\d{2})/);
+          if (dateMatch) {
+            recordDate = dateMatch[1];
+          } else {
+            throw new Error('날짜 형식 오류');
+          }
+        } catch (error) {
+          toast.error(`${i + 2}번째 행의 날짜 형식이 올바르지 않습니다. (yyyy-MM-dd 형식 필요)`);
+          return;
+        }
+
+        // 내용 처리 - 상황 해시태그를 내용에 포함
+        let content = row['내용'].toString().trim();
+        if (row['상황 해시태그']) {
+          const hashtags = row['상황 해시태그'].toString().trim();
+          if (hashtags) {
+            content += ' ' + hashtags;
+          }
+        }
+
+                 recordsToImport.push({
+           class_id: classId,
+           record_date: recordDate,
+           actual_date: recordDate,
+           title: content.slice(0, 50) + (content.length > 50 ? '...' : ''), // 내용의 첫 50자를 제목으로 사용
+           content: content,
+           created_at: new Date().toISOString(),
+           updated_at: new Date().toISOString()
+         });
+      }
+
+      // 서버에 데이터 전송
+      const response = await fetch(`/api/class/${classId}/journal/bulk-import`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ records: recordsToImport }),
+      });
+
+      if (!response.ok) {
+        throw new Error('데이터 저장 실패');
+      }
+
+      const result = await response.json();
+      
+      toast.success(`${result.count}개의 기록이 성공적으로 가져와졌습니다.`);
+      
+      // 데이터 즉시 새로고침 - React Query 캐시 무효화
+      queryClient.invalidateQueries({ queryKey: ['daily-records'] });
+      
+      // 파일 입력 초기화
+      event.target.value = '';
+      
+    } catch (error) {
+      console.error('Excel import error:', error);
+      toast.error('엑셀 파일 가져오기 중 오류가 발생했습니다.');
+    }
   };
 
   if (isClassLoading || isStudentsLoading || isRecordsLoading) {
@@ -573,28 +846,180 @@ export default function DailyRecordsPage() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm text-gray-900 placeholder-gray-500"
-                  placeholder="제목이나 내용으로 검색..."
+                  placeholder="검색어를 입력하세요 (여러 단어는 +로 구분)"
                 />
               </div>
               {searchQuery && (
                 <p className="text-xs text-gray-500 mt-1">
-                  "{searchQuery}" 검색 결과
+                  "{searchQuery}" 검색 결과 (+ 구분, 모든 단어 포함)
                 </p>
               )}
+              
+              {/* 해시태그 필터 */}
+              <div className="mt-3">
+                <div className="flex gap-1 items-center overflow-x-auto whitespace-nowrap">
+                  {hashtagOptions.map((hashtag) => (
+                    <button
+                      key={hashtag.id}
+                      onClick={() => toggleHashtagFilter(hashtag.id)}
+                      className={`px-2 py-1 rounded text-xs font-medium border transition-colors whitespace-nowrap flex-shrink-0 ${
+                        hashtagFilter.includes(hashtag.id)
+                          ? `${hashtag.color} border-current`
+                          : 'bg-gray-50 text-gray-600 border-gray-300 hover:bg-gray-100'
+                      }`}
+                    >
+                      #{hashtag.label}
+                    </button>
+                  ))}
+                  {hashtagFilter.length > 0 && (
+                    <button
+                      onClick={() => setHashtagFilter([])}
+                      className="px-2 py-1 text-xs text-gray-500 hover:text-gray-700 transition-colors whitespace-nowrap flex-shrink-0"
+                    >
+                      해시태그 지우기
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* 학생 필터 */}
+              <div className="mt-3">
+                <div className="relative">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-700 whitespace-nowrap">학생:</span>
+                    <div className="relative">
+                      <select
+                        multiple
+                        value={studentFilter}
+                        onChange={(e) => {
+                          const selectedValues = Array.from(e.target.selectedOptions, option => option.value);
+                          setStudentFilter(selectedValues);
+                        }}
+                        className="hidden"
+                        id="student-filter-select"
+                      >
+                        {students.map((student) => (
+                          <option key={student.id} value={student.id}>
+                            {student.name}
+                          </option>
+                        ))}
+                      </select>
+                      
+                      {/* 커스텀 드롭다운 */}
+                      <div className="relative inline-block">
+                        <button
+                          type="button"
+                          id="student-filter-button"
+                          onClick={() => {
+                            const dropdown = document.getElementById('student-dropdown');
+                            if (dropdown) {
+                              dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+                            }
+                          }}
+                          className="px-2 py-1 text-sm font-medium text-gray-700 border border-gray-300 rounded bg-white hover:bg-gray-50 transition-colors flex items-center space-x-1 whitespace-nowrap"
+                        >
+                          <span>
+                            {studentFilter.length > 0 
+                              ? `${studentFilter.length}명 선택됨`
+                              : '학생 선택'
+                            }
+                          </span>
+                          <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                        
+                        <div
+                          id="student-dropdown"
+                          style={{ display: 'none' }}
+                          className="absolute z-10 mt-1 w-48 bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto"
+                        >
+                          {students.map((student) => (
+                            <label
+                              key={student.id}
+                              className="flex items-center px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm font-medium text-gray-800"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={studentFilter.includes(student.id)}
+                                onChange={() => toggleStudentFilter(student.id)}
+                                className="mr-3 w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                              />
+                              <span className="text-gray-800 font-medium">{student.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* 선택된 학생들 표시 (한 줄로 표시) */}
+                    {studentFilter.length > 0 && (
+                      <div className="flex gap-1 items-center overflow-x-auto whitespace-nowrap">
+                        {studentFilter.map(studentId => {
+                          const student = students.find(s => s.id === studentId);
+                          return student ? (
+                            <span
+                              key={studentId}
+                              className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded border border-blue-200 whitespace-nowrap flex-shrink-0"
+                            >
+                              {student.name}
+                              <button
+                                onClick={() => toggleStudentFilter(studentId)}
+                                className="ml-1 text-blue-600 hover:text-blue-800"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ) : null;
+                        })}
+                        <button
+                          onClick={() => setStudentFilter([])}
+                          className="px-2 py-1 text-xs text-gray-500 hover:text-gray-700 transition-colors whitespace-nowrap flex-shrink-0"
+                        >
+                          학생 지우기
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="flex items-center space-x-3">
               <h3 className="text-lg font-semibold text-gray-800">
-                {searchQuery ? `검색 결과` : '기록 목록'}
+                {(searchQuery || hashtagFilter.length > 0 || studentFilter.length > 0) ? `검색 결과` : '기록 목록'}
                 {dailyRecords && (
                   <span className="text-sm font-normal text-gray-500 ml-2">
-                    ({searchQuery ? 
+                    ({(searchQuery || hashtagFilter.length > 0 || studentFilter.length > 0) ? 
                       Array.from(monthlyGroupedRecords.values()).reduce((sum, records) => sum + records.length, 0) :
                       dailyRecords.length
                     }개)
                   </span>
                 )}
               </h3>
+              
+              <button
+                onClick={exportToExcel}
+                className="flex items-center space-x-2 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span>엑셀 다운로드</span>
+              </button>
+              
+              <label className="flex items-center space-x-2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors cursor-pointer">
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                </svg>
+                <span>엑셀 업로드</span>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handleExcelUpload}
+                  className="hidden"
+                />
+              </label>
               
               <button
                 onClick={handleNewRecord}
@@ -604,9 +1029,13 @@ export default function DailyRecordsPage() {
                 <span>새 기록</span>
               </button>
               
-              {searchQuery && (
+              {(searchQuery || hashtagFilter.length > 0 || studentFilter.length > 0) && (
                 <button
-                  onClick={() => setSearchQuery('')}
+                  onClick={() => {
+                    setSearchQuery('');
+                    setHashtagFilter([]);
+                    setStudentFilter([]);
+                  }}
                   className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors border border-gray-300 rounded-lg"
                 >
                   초기화
@@ -708,13 +1137,21 @@ export default function DailyRecordsPage() {
                       <CalendarDaysIcon className="h-8 w-8 text-purple-600" />
                     )}
                   </div>
-                  {searchQuery ? (
+                  {(searchQuery || hashtagFilter.length > 0) ? (
                     <>
                       <p className="text-gray-600 mb-4">
-                        "{searchQuery}"에 대한 검색 결과가 없습니다
+                        {searchQuery && hashtagFilter.length > 0 
+                          ? `"${searchQuery}" 및 선택된 해시태그에 대한 검색 결과가 없습니다`
+                          : searchQuery 
+                            ? `"${searchQuery}"에 대한 검색 결과가 없습니다`
+                            : `선택된 해시태그에 대한 검색 결과가 없습니다`
+                        }
                       </p>
                       <button
-                        onClick={() => setSearchQuery('')}
+                        onClick={() => {
+                          setSearchQuery('');
+                          setHashtagFilter([]);
+                        }}
                         className="text-purple-600 hover:text-purple-800 font-medium"
                       >
                         모든 기록 보기
@@ -782,6 +1219,30 @@ export default function DailyRecordsPage() {
                     />
                     <p className="text-xs text-gray-500 mt-1">
                       언제 일어난 일인지 날짜를 선택하세요. (오늘 입력하지만 어제 일어난 일일 수도 있어요)
+                    </p>
+                  </div>
+
+                  {/* 해시태그 선택 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-3">상황 분류 (해시태그)</label>
+                    <div className="flex flex-wrap gap-2">
+                      {hashtagOptions.map((hashtag) => (
+                        <button
+                          key={hashtag.id}
+                          type="button"
+                          onClick={() => toggleHashtag(hashtag.id)}
+                          className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                            newRecord.hashtags.includes(hashtag.id)
+                              ? `${hashtag.color} border-current`
+                              : 'bg-gray-50 text-gray-600 border-gray-300 hover:bg-gray-100'
+                          }`}
+                        >
+                          #{hashtag.label}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      💡 선택한 해시태그는 저장 시 본문 맨 아래에 자동으로 추가됩니다. 검색 시 해시태그로 필터링할 수 있어요.
                     </p>
                   </div>
 

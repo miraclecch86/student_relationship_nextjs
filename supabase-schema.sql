@@ -895,3 +895,59 @@ CREATE TRIGGER trigger_update_class_schedules_updated_at
 -- 컬럼 주석 추가
 COMMENT ON COLUMN public.class_schedules.end_date IS '일정 종료일 (단일일 일정인 경우 NULL)';
 COMMENT ON COLUMN public.class_schedules.is_all_day IS '하루종일 일정 여부';
+
+-- TODO 아이템 테이블
+CREATE TABLE IF NOT EXISTS class_todos (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  class_id UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+  title VARCHAR(200) NOT NULL,
+  start_date DATE NOT NULL,
+  end_date DATE NOT NULL,
+  is_completed BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- class_todos 테이블 인덱스
+CREATE INDEX IF NOT EXISTS idx_class_todos_class_id ON class_todos(class_id);
+CREATE INDEX IF NOT EXISTS idx_class_todos_start_date ON class_todos(start_date);
+CREATE INDEX IF NOT EXISTS idx_class_todos_end_date ON class_todos(end_date);
+
+-- class_todos 테이블 RLS 정책
+ALTER TABLE class_todos ENABLE ROW LEVEL SECURITY;
+
+-- TODO 조회 정책 (해당 학급 교사만)
+CREATE POLICY "class_todos_select_policy" ON class_todos
+  FOR SELECT USING (
+    class_id IN (
+      SELECT id FROM classes 
+      WHERE user_id = auth.uid()
+    )
+  );
+
+-- TODO 추가 정책 (해당 학급 교사만)
+CREATE POLICY "class_todos_insert_policy" ON class_todos
+  FOR INSERT WITH CHECK (
+    class_id IN (
+      SELECT id FROM classes 
+      WHERE user_id = auth.uid()
+    )
+  );
+
+-- TODO 수정 정책 (해당 학급 교사만)
+CREATE POLICY "class_todos_update_policy" ON class_todos
+  FOR UPDATE USING (
+    class_id IN (
+      SELECT id FROM classes 
+      WHERE user_id = auth.uid()
+    )
+  );
+
+-- TODO 삭제 정책 (해당 학급 교사만)
+CREATE POLICY "class_todos_delete_policy" ON class_todos
+  FOR DELETE USING (
+    class_id IN (
+      SELECT id FROM classes 
+      WHERE user_id = auth.uid()
+    )
+  );

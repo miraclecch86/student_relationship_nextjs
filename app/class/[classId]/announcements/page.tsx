@@ -24,6 +24,7 @@ import { ko } from 'date-fns/locale';
 import { supabase } from '@/lib/supabase';
 import type { Class, JournalAnnouncement } from '@/lib/supabase';
 import toast from 'react-hot-toast';
+import * as XLSX from 'xlsx';
 
 // 학급 정보 조회
 async function fetchClassDetails(classId: string): Promise<any> {
@@ -305,21 +306,28 @@ export default function AnnouncementsPage() {
     enabled: !!classId,
   });
 
-  // 월별로 그룹화된 알림장들
+  // 월별로 그룹화된 알림장들 (+ 구분 AND 조건)
   const monthlyGroupedAnnouncements = useMemo(() => {
     if (!announcements) return new Map();
     
-    // 검색어가 있는 경우 필터링
+    // 검색어가 있는 경우 필터링 (+ 구분 AND 조건)
     let filteredAnnouncements = announcements;
     if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim();
-      filteredAnnouncements = announcements.filter(announcement => 
-        announcement.ai_generated_content?.toLowerCase().includes(query) || 
-        announcement.teacher_input_content?.toLowerCase().includes(query) ||
-        (Array.isArray(announcement.keywords) ? announcement.keywords : []).some((keyword: string) => 
-          keyword.toLowerCase().includes(query)
-        )
-      );
+      const keywords = searchQuery.toLowerCase().trim().split('+').map(keyword => keyword.trim()).filter(keyword => keyword.length > 0);
+      
+      filteredAnnouncements = announcements.filter(announcement => {
+        const aiContent = announcement.ai_generated_content?.toLowerCase() || '';
+        const teacherContent = announcement.teacher_input_content?.toLowerCase() || '';
+        const keywordContent = (Array.isArray(announcement.keywords) ? announcement.keywords : [])
+          .join(' ').toLowerCase();
+        
+        // 모든 키워드가 어느 한 내용에라도 포함되어야 함 (AND 조건)
+        return keywords.every(keyword => 
+          aiContent.includes(keyword) || 
+          teacherContent.includes(keyword) ||
+          keywordContent.includes(keyword)
+        );
+      });
     }
     
     const grouped = new Map<string, any[]>();
@@ -557,6 +565,153 @@ export default function AnnouncementsPage() {
     setIsFullscreenOpen(false);
   };
 
+  // 엑셀 다운로드 함수
+  const exportToExcel = () => {
+    try {
+      // 현재 필터링된 알림장들을 가져옴
+      const announcementsToExport = Array.from(monthlyGroupedAnnouncements.values()).flat();
+      
+      if (announcementsToExport.length === 0) {
+        toast.error('내보낼 알림장이 없습니다.');
+        return;
+      }
+
+      // 엑셀 데이터 준비
+      const excelData = announcementsToExport.map((announcement: any, index) => {
+        const cleanContent = (announcement.ai_generated_content || announcement.teacher_input_content || '')
+          .replace(/\n+/g, ' ') // 줄바꿈을 공백으로 변경
+          .trim();
+
+        return {
+          '번호': index + 1,
+          '날짜': format(parseISO(announcement.class_journals.journal_date), 'yyyy-MM-dd (E)', { locale: ko }),
+          '내용': cleanContent,
+          '키워드': announcement.keywords ? announcement.keywords.join(', ') : '',
+          '작성일': format(parseISO(announcement.created_at), 'yyyy-MM-dd HH:mm', { locale: ko }),
+        };
+      });
+
+      // 워크북 생성
+      const workbook = XLSX.utils.book_new();
+      
+      // 워크시트 생성
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+      
+      // 열 너비 조정
+      const columnWidths = [
+        { wch: 8 },   // 번호
+        { wch: 15 },  // 날짜  
+        { wch: 60 },  // 내용
+        { wch: 20 },  // 키워드
+        { wch: 18 },  // 작성일
+      ];
+      worksheet['!cols'] = columnWidths;
+
+      // 워크북에 워크시트 추가
+      XLSX.utils.book_append_sheet(workbook, worksheet, '알림장');
+
+      // 파일명 생성
+      const currentDate = format(new Date(), 'yyyy-MM-dd');
+      const className = classDetails?.name || '학급';
+      const filterInfo = searchQuery ? '_검색결과' : '';
+      const filename = `${className}_알림장_${currentDate}${filterInfo}.xlsx`;
+
+      // 파일 다운로드
+      XLSX.writeFile(workbook, filename);
+      
+      toast.success(`엑셀 파일이 다운로드되었습니다: ${filename}`);
+    } catch (error) {
+      console.error('Excel export error:', error);
+      toast.error('엑셀 파일 생성 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 엑셀 업로드 함수
+  const handleExcelUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      toast.success('엑셀 파일을 처리 중입니다...');
+
+      // 파일 읽기
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const worksheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[worksheetName];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+      if (jsonData.length === 0) {
+        toast.error('엑셀 파일에 데이터가 없습니다.');
+        return;
+      }
+
+      // 데이터 검증 및 변환
+      const announcementsToImport = [];
+      for (let i = 0; i < jsonData.length; i++) {
+        const row = jsonData[i];
+        
+        // 필수 필드 확인
+        if (!row['날짜'] || !row['내용']) {
+          toast.error(`${i + 2}번째 행에 필수 데이터가 누락되었습니다. (날짜, 내용 필수)`);
+          return;
+        }
+
+        // 날짜 파싱
+        let journalDate;
+        try {
+          // 엑셀 날짜 형식 파싱 (yyyy-MM-dd (요일) 형식)
+          const dateStr = row['날짜'].toString();
+          const dateMatch = dateStr.match(/(\d{4}-\d{2}-\d{2})/);
+          if (dateMatch) {
+            journalDate = dateMatch[1];
+          } else {
+            throw new Error('날짜 형식 오류');
+          }
+        } catch (error) {
+          toast.error(`${i + 2}번째 행의 날짜 형식이 올바르지 않습니다. (yyyy-MM-dd 형식 필요)`);
+          return;
+        }
+
+        // 키워드 처리
+        const keywords = row['키워드'] ? row['키워드'].toString().split(',').map((k: string) => k.trim()).filter((k: string) => k.length > 0) : [];
+
+        announcementsToImport.push({
+          journal_date: journalDate,
+          content: row['내용'].toString().trim(),
+          keywords: keywords
+        });
+      }
+
+      // 서버에 데이터 전송
+      const response = await fetch(`/api/class/${classId}/announcements/bulk-import`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ announcements: announcementsToImport }),
+      });
+
+      if (!response.ok) {
+        throw new Error('데이터 저장 실패');
+      }
+
+      const result = await response.json();
+      
+      toast.success(`${result.count}개의 알림장이 성공적으로 가져와졌습니다.`);
+      
+      // 데이터 즉시 새로고침 - React Query 캐시 무효화
+      queryClient.invalidateQueries({ queryKey: ['announcements'] });
+      
+      // 파일 입력 초기화
+      event.target.value = '';
+      
+    } catch (error) {
+      console.error('Excel import error:', error);
+      toast.error('엑셀 파일 가져오기 중 오류가 발생했습니다.');
+    }
+  };
+
   // 글씨 크기 증가/감소 함수
   const increaseFontSize = () => {
     setFontSize(prev => Math.min(prev + 0.2, 6)); // 최대 6배
@@ -691,7 +846,7 @@ export default function AnnouncementsPage() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 text-sm text-gray-900 placeholder-gray-500"
-                  placeholder="내용이나 키워드로 검색..."
+                  placeholder="내용이나 키워드로 검색 (여러 단어는 +로 구분)"
                 />
               </div>
               {searchQuery && (
@@ -714,6 +869,29 @@ export default function AnnouncementsPage() {
                 )}
               </h3>
               
+              <button
+                onClick={exportToExcel}
+                className="flex items-center space-x-2 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span>엑셀 다운로드</span>
+              </button>
+              
+              <label className="flex items-center space-x-2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors cursor-pointer">
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                </svg>
+                <span>엑셀 업로드</span>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handleExcelUpload}
+                  className="hidden"
+                />
+              </label>
+
               <button
                 onClick={handleNewAnnouncement}
                 className="flex items-center space-x-2 bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600 transition-colors"

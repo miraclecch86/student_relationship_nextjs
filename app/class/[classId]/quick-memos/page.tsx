@@ -127,14 +127,19 @@ export default function QuickMemosPage() {
     },
   });
 
-  // 검색된 메모 필터링
+  // 검색된 메모 필터링 (+ 구분 AND 조건)
   const filteredMemos = useMemo(() => {
     if (!quickMemos) return [];
     if (!searchTerm.trim()) return quickMemos;
     
-    return quickMemos.filter(memo => 
-      memo.content.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    // 검색어를 +로 분리하여 각각을 키워드로 처리 (AND 조건)
+    const keywords = searchTerm.toLowerCase().trim().split('+').map(keyword => keyword.trim()).filter(keyword => keyword.length > 0);
+    
+    return quickMemos.filter(memo => {
+      const content = memo.content.toLowerCase();
+      // 모든 키워드가 내용에 포함되어야 함 (AND 조건)
+      return keywords.every(keyword => content.includes(keyword));
+    });
   }, [quickMemos, searchTerm]);
 
   // 빠른 메모 추가 핸들러
@@ -253,7 +258,7 @@ export default function QuickMemosPage() {
                     type="text"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="메모 내용으로 검색하세요..."
+                    placeholder="메모 내용으로 검색하세요 (여러 단어는 +로 구분)"
                     className="pl-8 pr-8 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs w-48 text-gray-900 placeholder-gray-400"
                   />
                   {searchTerm && (
