@@ -3,10 +3,11 @@ import { generateSafetyNoticeWithGemini } from '@/lib/gemini';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { classId: string } }
+  { params }: { params: Promise<{ classId: string }> }
 ) {
   try {
-    console.log('안전 수칙 API 호출됨, classId:', params.classId);
+    const { classId } = await params;
+    console.log('안전 수칙 API 호출됨, classId:', classId);
     
     const body = await request.json();
     console.log('요청 본문:', body);

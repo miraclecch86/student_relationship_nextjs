@@ -882,11 +882,11 @@ export default function AnalysisDetailPage() {
         <header className="mb-8 bg-white p-4 rounded-lg shadow-md">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => router.push(`/class/${classId}/analysis`)}
-              className="px-4 py-2 text-sm bg-indigo-500 text-white rounded-md hover:bg-indigo-600 shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:ring-offset-1 transition-all duration-200 flex items-center"
+              onClick={() => router.back()}
+              className="flex items-center px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors shadow-sm"
             >
               <ArrowLeftIcon className="w-4 h-4 mr-2" />
-              분석 목록
+              돌아가기
             </button>
             <h1 className="text-2xl font-bold text-black">{classDetails.name} 분석 결과</h1>
           </div>

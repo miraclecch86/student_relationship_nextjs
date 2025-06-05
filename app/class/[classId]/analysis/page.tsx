@@ -1170,10 +1170,11 @@ export default function ClassAnalysisPage() {
           {resultsError instanceof Error ? resultsError.message : '분석 결과를 불러올 수 없습니다.'}
         </p>
         <button
-          onClick={() => router.push(`/class/${classId}/dashboard`)}
-          className="px-4 py-2 bg-indigo-500 text-white rounded-md hover:bg-indigo-600"
+          onClick={() => router.back()}
+          className="flex items-center px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors shadow-sm"
         >
-          대시보드로 돌아가기
+          <ArrowLeftIcon className="w-4 h-4 mr-2" />
+          돌아가기
         </button>
       </div>
     );
@@ -1184,10 +1185,11 @@ export default function ClassAnalysisPage() {
       <div className="flex flex-col justify-center items-center min-h-screen bg-gray-100">
         <div className="text-2xl text-red-500 mb-4">학급 정보를 찾을 수 없습니다</div>
         <button
-          onClick={() => router.push('/teacher')}
-          className="px-4 py-2 bg-indigo-500 text-white rounded-md hover:bg-indigo-600"
+          onClick={() => router.back()}
+          className="flex items-center px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors shadow-sm"
         >
-          학급 목록으로 돌아가기
+          <ArrowLeftIcon className="w-4 h-4 mr-2" />
+          돌아가기
         </button>
       </div>
     );
@@ -1224,11 +1226,11 @@ export default function ClassAnalysisPage() {
         <header className="mb-10 flex justify-between items-center bg-white p-5 rounded-lg shadow-md">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => router.push(`/class/${classId}/dashboard`)}
-              className="px-4 py-2 text-sm bg-indigo-500 text-white rounded-md hover:bg-indigo-600 shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:ring-offset-1 transition-all duration-200 flex items-center"
+              onClick={() => router.back()}
+              className="flex items-center px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors shadow-sm"
             >
               <ArrowLeftIcon className="w-4 h-4 mr-2" />
-              대시보드
+              돌아가기
             </button>
             <h1 className="text-2xl font-bold text-black">{classDetails.name} 학급 분석</h1>
           </div>

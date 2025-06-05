@@ -726,10 +726,11 @@ export default function ClassStudentsPage() {
       <div className="flex flex-col justify-center items-center min-h-screen bg-gray-100">
         <div className="text-2xl text-red-500 mb-4">학급 정보를 찾을 수 없습니다</div>
         <button
-          onClick={() => router.push('/teacher')}
-          className="px-4 py-2 bg-indigo-500 text-white rounded-md hover:bg-indigo-600"
+          onClick={() => router.back()}
+          className="flex items-center px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors shadow-sm"
         >
-          학급 정보로 돌아가기
+          <ArrowLeftIcon className="w-4 h-4 mr-2" />
+          돌아가기
         </button>
       </div>
     );
@@ -743,11 +744,11 @@ export default function ClassStudentsPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 flex-shrink-0">
               <button
-                onClick={() => router.push(`/class/${classId}/dashboard`)}
-                className="inline-flex items-center px-3 py-2 text-sm bg-indigo-500 text-white rounded-md hover:bg-indigo-600 shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all duration-200"
+                onClick={() => router.back()}
+                className="flex items-center px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors shadow-sm"
               >
-                <ArrowLeftIcon className="w-4 h-4 sm:mr-2" />
-                <span className="hidden sm:inline">대시보드</span>
+                <ArrowLeftIcon className="w-4 h-4 mr-2" />
+                돌아가기
               </button>
             </div>
             <div className="flex-1 ml-3">
