@@ -123,15 +123,18 @@ export default function HomeworkPage() {
 
   // 월 추가 핸들러
   const handleAddMonth = () => {
-    if (!newMonthYear.trim() || !newMonthName.trim()) {
-      toast.error('년월과 이름을 모두 입력해주세요.');
+    if (!newMonthYear.trim()) {
+      toast.error('년월을 선택해주세요.');
       return;
     }
+
+    // 설명이 비어있으면 기본값 설정
+    const description = newMonthName.trim() || `${newMonthYear.split('-')[0]}년 ${parseInt(newMonthYear.split('-')[1])}월 과제`;
 
     addMonthMutation.mutate({ 
       classId, 
       monthYear: newMonthYear, 
-      name: newMonthName 
+      name: description 
     });
   };
 
@@ -147,9 +150,9 @@ export default function HomeworkPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         {/* 헤더 */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-4">
             <button
               onClick={() => router.back()}
@@ -159,85 +162,126 @@ export default function HomeworkPage() {
               <span>돌아가기</span>
             </button>
             <div className="h-6 w-px bg-gray-300" />
-            <h1 className="text-3xl font-bold text-gray-800 flex items-center space-x-2">
-              <ClipboardDocumentCheckIcon className="h-8 w-8 text-amber-600" />
-              <span>{classDetails.name} 과제 체크</span>
+            <h1 className="text-2xl font-bold text-gray-800 flex items-center space-x-2">
+              <ClipboardDocumentCheckIcon className="h-6 w-6 text-amber-600" />
+              <span>과제 체크</span>
             </h1>
           </div>
-          <button
-            onClick={() => {
-              setNewMonthYear(getCurrentMonthYear());
-              setNewMonthName('');
-              setIsMonthModalOpen(true);
-            }}
-            className="flex items-center px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors shadow-sm"
-          >
-            <PlusIcon className="h-5 w-5 mr-2" />
-            <span>월 추가</span>
-          </button>
         </div>
 
-        {/* 월 카드 그리드 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {homeworkMonths.map((month) => (
-            <motion.div
-              key={month.id}
-              onClick={() => router.push(`/class/${classId}/homework/${month.id}`)}
-              className="bg-white rounded-xl shadow-sm p-6 cursor-pointer hover:shadow-md transition-all duration-200 hover:-translate-y-1 border border-gray-200"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <div className="text-center">
-                <div className="bg-amber-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <CalendarDaysIcon className="h-8 w-8 text-amber-600" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-800 mb-2">{month.name}</h3>
-                <p className="text-sm text-gray-600 mb-4">
-                  {month.month_year}
-                </p>
-                <div className="bg-amber-50 text-amber-700 text-xs px-3 py-1 rounded-full inline-block">
-                  과제 목록 보기
-                </div>
-              </div>
-            </motion.div>
-          ))}
+        {/* 학급 정보 */}
+        <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+              <ClipboardDocumentCheckIcon className="h-5 w-5 text-amber-600" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-800">{classDetails.name} 과제 체크</h2>
+              <p className="text-sm text-gray-600">월별 과제를 관리하고 학생들의 제출 현황을 확인할 수 있습니다</p>
+            </div>
+          </div>
         </div>
 
-        {/* 빈 상태 */}
-        {homeworkMonths.length === 0 && (
-          <div className="text-center py-12">
-            <ClipboardDocumentCheckIcon className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-800 mb-2">아직 과제 월이 없습니다</h3>
-            <p className="text-gray-600 mb-6">
-              첫 번째 과제 월을 추가해보세요.
-            </p>
+        {/* 과제 월 목록 */}
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-semibold text-gray-800">
+              과제 월 목록 ({homeworkMonths.length}개)
+            </h3>
             <button
               onClick={() => {
                 setNewMonthYear(getCurrentMonthYear());
                 setNewMonthName('');
                 setIsMonthModalOpen(true);
               }}
-              className="flex items-center mx-auto px-6 py-3 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors shadow-sm"
+              className="flex items-center space-x-2 bg-amber-500 text-white px-4 py-2 rounded-lg hover:bg-amber-600 transition-colors"
             >
-              <PlusIcon className="h-5 w-5 mr-2" />
-              <span>첫 번째 월 추가</span>
+              <PlusIcon className="h-5 w-5" />
+              <span>월 추가</span>
             </button>
           </div>
-        )}
+
+          {/* 월 카드 그리드 */}
+          {homeworkMonths.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <AnimatePresence>
+          {homeworkMonths.map((month) => {
+            // 년월을 한국어 형식으로 변환
+            const formatMonthYear = (monthYear: string) => {
+              const [year, monthNum] = monthYear.split('-');
+              return `${year}년 ${parseInt(monthNum)}월`;
+            };
+            
+            return (
+              <motion.div
+                key={month.id}
+                layout
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-lg p-4 hover:shadow-md transition-all cursor-pointer group"
+                onClick={() => router.push(`/class/${classId}/homework/${month.id}`)}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+                    <CalendarDaysIcon className="h-5 w-5 text-amber-600" />
+                  </div>
+                </div>
+                <h4 className="text-lg font-semibold text-gray-800 mb-2">
+                  {formatMonthYear(month.month_year)}
+                </h4>
+                <p className="text-sm text-gray-600 mb-3 min-h-[2.5rem] leading-relaxed">
+                  {month.name || '과제 설명이 없습니다.'}
+                </p>
+                <div className="mt-3 flex items-center text-xs text-amber-600">
+                  <ClipboardDocumentCheckIcon className="h-3 w-3 mr-1" />
+                  <span>과제 목록 보기</span>
+                </div>
+              </motion.div>
+            );
+          })}
+              </AnimatePresence>
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <ClipboardDocumentCheckIcon className="h-8 w-8 text-amber-600" />
+              </div>
+              <p className="text-gray-600 mb-4">아직 생성된 과제 월이 없습니다</p>
+              <button
+                onClick={() => {
+                  setNewMonthYear(getCurrentMonthYear());
+                  setNewMonthName('');
+                  setIsMonthModalOpen(true);
+                }}
+                className="text-amber-600 hover:text-amber-800 font-medium"
+              >
+                첫 번째 과제 월 생성하기
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 월 추가 모달 */}
       <AnimatePresence>
         {isMonthModalOpen && (
-          <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 flex items-center justify-center z-50 p-4"
+            style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+            onClick={() => setIsMonthModalOpen(false)}
+          >
             <motion.div
-              className="bg-white rounded-lg p-6 w-full max-w-md mx-4 shadow-2xl border border-gray-200"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-xl shadow-xl max-w-md w-full"
+              onClick={(e) => e.stopPropagation()}
             >
+              <div className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">새 과제 월 추가</h3>
                 <button
@@ -251,48 +295,50 @@ export default function HomeworkPage() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-900 mb-2">
-                    년월 (YYYY-MM)
+                    년월 선택 <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="month"
                     value={newMonthYear}
                     onChange={(e) => setNewMonthYear(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-gray-900 placeholder-gray-500"
-                    placeholder="2024-03"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-gray-900"
                   />
+                  <p className="text-xs text-gray-500 mt-1">선택한 월이 카드 제목으로 표시됩니다</p>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-900 mb-2">
-                    이름
+                    설명 (선택사항)
                   </label>
-                  <input
-                    type="text"
+                  <textarea
                     value={newMonthName}
                     onChange={(e) => setNewMonthName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-gray-900 placeholder-gray-500"
-                    placeholder="예: 3월 과제, 중간고사 대비 과제"
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-gray-900 placeholder-gray-500 resize-none"
+                    placeholder="예: 중간고사 대비 과제, 여름방학 특별과제, 단원 정리 과제"
                   />
+                  <p className="text-xs text-gray-500 mt-1">비워두면 기본 설명이 자동으로 생성됩니다</p>
                 </div>
               </div>
 
-              <div className="flex space-x-3 mt-6">
-                <button
-                  onClick={() => setIsMonthModalOpen(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-900 rounded-md hover:bg-gray-50 transition-colors"
-                >
-                  취소
-                </button>
-                <button
-                  onClick={handleAddMonth}
-                  disabled={addMonthMutation.isPending}
-                  className="flex-1 px-4 py-2 bg-amber-500 text-white rounded-md hover:bg-amber-600 transition-colors disabled:opacity-50"
-                >
-                  {addMonthMutation.isPending ? '추가 중...' : '추가'}
-                </button>
+                              <div className="flex items-center justify-end space-x-3 mt-6">
+                  <button
+                    onClick={() => setIsMonthModalOpen(false)}
+                    className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  >
+                    취소
+                  </button>
+                  <button
+                    onClick={handleAddMonth}
+                    disabled={!newMonthYear.trim() || addMonthMutation.isPending}
+                    className="bg-amber-500 text-white px-4 py-2 rounded-lg hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {addMonthMutation.isPending ? '추가 중...' : '추가하기'}
+                  </button>
+                </div>
               </div>
             </motion.div>
-          </div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

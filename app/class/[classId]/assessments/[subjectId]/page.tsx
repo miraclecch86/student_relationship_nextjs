@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
@@ -151,34 +151,50 @@ async function addAssessmentItem(subjectId: string, name: string, assessmentDate
 }
 
 async function updateAssessmentRecord(studentId: string, assessmentItemId: string, score: string): Promise<void> {
-  const { data: existingRecord } = await (supabase as any)
+  console.log('updateAssessmentRecord 호출:', { studentId, assessmentItemId, score });
+  
+  const { data: existingRecord, error: selectError } = await (supabase as any)
     .from('assessment_records')
     .select('id')
     .eq('student_id', studentId)
     .eq('assessment_item_id', assessmentItemId)
     .single();
 
+  console.log('기존 레코드 검색 결과:', { existingRecord, selectError });
+
   if (existingRecord) {
     // 기존 레코드 업데이트
-    const { error } = await (supabase as any)
+    console.log('기존 레코드 업데이트 중...');
+    const { data, error } = await (supabase as any)
       .from('assessment_records')
       .update({ score: score })
-      .eq('id', existingRecord.id);
+      .eq('id', existingRecord.id)
+      .select()
+      .single();
+
+    console.log('업데이트 결과:', { data, error });
 
     if (error) {
+      console.error('업데이트 오류:', error);
       throw new Error('평가 기록 수정 중 오류가 발생했습니다.');
     }
   } else {
     // 새 레코드 생성
-    const { error } = await (supabase as any)
+    console.log('새 레코드 생성 중...');
+    const { data, error } = await (supabase as any)
       .from('assessment_records')
       .insert({
         student_id: studentId,
         assessment_item_id: assessmentItemId,
         score: score
-      });
+      })
+      .select()
+      .single();
+
+    console.log('삽입 결과:', { data, error });
 
     if (error) {
+      console.error('삽입 오류:', error);
       throw new Error('평가 기록 생성 중 오류가 발생했습니다.');
     }
   }
@@ -239,12 +255,26 @@ export default function SubjectAssessmentPage() {
   const [newItemDate, setNewItemDate] = useState('');
   const [editingCell, setEditingCell] = useState<{studentId: string, itemId: string} | null>(null);
   const [editingValues, setEditingValues] = useState<{score: string}>({score: ''});
+  const [originalValue, setOriginalValue] = useState<string>(''); // ESC 키로 취소할 때 복원할 원래 값
   
   // 평가 항목 편집 관련 상태
   const [isEditItemModalOpen, setIsEditItemModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<AssessmentItem | null>(null);
   const [editItemName, setEditItemName] = useState('');
   const [editItemDate, setEditItemDate] = useState('');
+
+  // 입력 필드 자동 포커스를 위한 ref
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // 편집 모드가 바뀔 때마다 자동 포커스
+  useEffect(() => {
+    if (editingCell && inputRef.current) {
+      setTimeout(() => {
+        inputRef.current?.focus();
+        inputRef.current?.select(); // 기존 텍스트 선택
+      }, 100); // 약간의 지연을 둬서 DOM이 완전히 렌더링된 후 포커스
+    }
+  }, [editingCell]);
 
   // 데이터 조회
   const { data: subject } = useQuery({
@@ -296,7 +326,7 @@ export default function SubjectAssessmentPage() {
     }) => updateAssessmentRecord(studentId, assessmentItemId, score),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['assessmentRecords'] });
-      setEditingCell(null);
+      // 편집 모드 종료는 개별 함수에서 처리
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -341,21 +371,28 @@ export default function SubjectAssessmentPage() {
       r => r.student_id === studentId && r.assessment_item_id === itemId
     );
     
+    console.log('getScoreData 호출:', { studentId, itemId, record });
+    
     if (!record?.score) {
       return { score: '' };
     }
     
-    // JSON 형태로 저장된 경우
-    try {
-      const parsed = JSON.parse(record.score);
-      return {
-        score: parsed.score || ''
-      };
-    } catch {
-      // 기존 단순 텍스트 형태인 경우
-      return { score: record.score };
-    }
+    // 단순 텍스트 형태로 저장되어 있으므로 그대로 반환
+    return { score: record.score };
   }, [assessmentRecords]);
+
+  // 컬럼(평가 항목) 완료 여부 확인
+  const isColumnComplete = useCallback((itemId: string): boolean => {
+    if (students.length === 0) return false;
+    
+    // 해당 평가 항목에 대해 모든 학생의 점수가 입력되었는지 확인
+    const completedCount = students.filter(student => {
+      const scoreData = getScoreData(student.id, itemId);
+      return scoreData.score.trim() !== '';
+    }).length;
+    
+    return completedCount === students.length;
+  }, [students, getScoreData]);
 
   // 평가 항목 추가
   const handleAddItem = () => {
@@ -371,9 +408,86 @@ export default function SubjectAssessmentPage() {
     });
   };
 
-  // 점수 업데이트
-  const handleScoreUpdate = (studentId: string, itemId: string, scoreData: {score: string}) => {
-    updateRecordMutation.mutate({ studentId, assessmentItemId: itemId, score: scoreData.score });
+
+
+  // 다음 셀로 이동 (엔터 키 사용 시)
+  const moveToNextCell = (currentStudentId: string, currentItemId: string) => {
+    const currentStudentIndex = students.findIndex(s => s.id === currentStudentId);
+    const currentItemIndex = assessmentItems.findIndex(i => i.id === currentItemId);
+    
+    if (currentStudentIndex === -1 || currentItemIndex === -1) return;
+    
+    // 같은 컬럼의 다음 학생으로 이동
+    if (currentStudentIndex < students.length - 1) {
+      const nextStudent = students[currentStudentIndex + 1];
+      const currentItem = assessmentItems[currentItemIndex];
+      
+      setEditingCell({ studentId: nextStudent.id, itemId: currentItem.id });
+      const scoreData = getScoreData(nextStudent.id, currentItem.id);
+      setEditingValues({ score: scoreData.score });
+    } 
+    // 마지막 학생이면 다음 컬럼의 첫 번째 학생으로 이동
+    else if (currentItemIndex < assessmentItems.length - 1) {
+      const nextItem = assessmentItems[currentItemIndex + 1];
+      const firstStudent = students[0];
+      
+      setEditingCell({ studentId: firstStudent.id, itemId: nextItem.id });
+      const scoreData = getScoreData(firstStudent.id, nextItem.id);
+      setEditingValues({ score: scoreData.score });
+    }
+    // 마지막 셀이면 편집 종료
+    else {
+      setEditingCell(null);
+    }
+  };
+
+  // 점수 업데이트 및 다음 셀로 이동
+  const handleScoreUpdateAndMove = (studentId: string, itemId: string, scoreData: {score: string}) => {
+    console.log('점수 저장 후 이동 시작:', { studentId, itemId, score: scoreData.score });
+    
+    updateRecordMutation.mutate(
+      { studentId, assessmentItemId: itemId, score: scoreData.score },
+      {
+        onSuccess: () => {
+          console.log('점수 저장 성공, 다음 셀로 이동');
+          toast.success('점수가 저장되었습니다.');
+          moveToNextCell(studentId, itemId);
+        },
+        onError: (error) => {
+          console.error('점수 저장 실패:', error);
+        }
+      }
+    );
+  };
+
+  // 자동 저장 (onBlur 시)
+  const handleAutoSave = (studentId: string, itemId: string, scoreData: {score: string}) => {
+    // 값이 변경된 경우에만 저장
+    if (scoreData.score !== originalValue) {
+      console.log('자동 저장 시작:', { studentId, itemId, score: scoreData.score });
+      
+      updateRecordMutation.mutate(
+        { studentId, assessmentItemId: itemId, score: scoreData.score },
+        {
+          onSuccess: () => {
+            console.log('자동 저장 성공');
+            setEditingCell(null);
+          },
+          onError: (error) => {
+            console.error('자동 저장 실패:', error);
+          }
+        }
+      );
+    } else {
+      // 값이 변경되지 않았으면 그냥 편집 모드 종료
+      setEditingCell(null);
+    }
+  };
+
+  // 취소 (ESC 키)
+  const handleCancel = () => {
+    setEditingValues({ score: originalValue });
+    setEditingCell(null);
   };
 
   // 평가 항목 편집
@@ -543,11 +657,26 @@ export default function SubjectAssessmentPage() {
                     <span className="text-xs">👤</span>
                     <span className="ml-1">학생명</span>
                   </div>
-                  {assessmentItems.map((item) => (
+                  {assessmentItems.map((item) => {
+                    const isComplete = isColumnComplete(item.id);
+                    return (
                     <div key={item.id} className="text-center">
-                      <div className="bg-white rounded-md p-1.5 shadow-sm border border-rose-200 group hover:shadow-md transition-all">
-                        <div className="mb-0.5">
-                          <span className="font-medium text-gray-900 text-xs">{item.name}</span>
+                      <div className={`
+                        rounded-md p-1.5 shadow-sm border group hover:shadow-md transition-all
+                        ${isComplete 
+                          ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-200' 
+                          : 'bg-white border-rose-200'
+                        }
+                      `}>
+                        <div className="mb-0.5 flex items-center justify-center space-x-1">
+                          {isComplete && (
+                            <svg className="w-3 h-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                          <span className={`font-medium text-xs ${isComplete ? 'text-green-800' : 'text-gray-900'}`}>
+                            {item.name}
+                          </span>
                         </div>
                         {item.assessment_date ? (
                           <div className="relative flex items-center justify-center">
@@ -596,7 +725,8 @@ export default function SubjectAssessmentPage() {
                         )}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
@@ -641,41 +771,22 @@ export default function SubjectAssessmentPage() {
                          <div key={cellKey} className="flex justify-center">
                            {isEditing ? (
                              <div className="bg-white border-2 border-rose-400 rounded-md p-1.5 shadow-lg">
-                               <div className="space-y-1.5">
-                                 {/* 점수 입력 */}
-                                 <div>
-                                   <input
-                                     type="text"
-                                     value={editingValues.score}
-                                     onChange={(e) => setEditingValues({score: e.target.value})}
-                                     placeholder="90, A, 우수"
-                                     className="w-20 px-1.5 py-0.5 text-center border border-rose-200 rounded bg-white text-gray-900 focus:ring-2 focus:ring-rose-500 focus:border-rose-500 font-medium text-xs"
-                                     onKeyDown={(e) => {
-                                       if (e.key === 'Enter') {
-                                         handleScoreUpdate(student.id, item.id, editingValues);
-                                       } else if (e.key === 'Escape') {
-                                         setEditingCell(null);
-                                       }
-                                     }}
-                                   />
-                                 </div>
-                                 
-                                 {/* 저장/취소 버튼 */}
-                                 <div className="flex justify-center space-x-1">
-                                   <button
-                                     onClick={() => handleScoreUpdate(student.id, item.id, editingValues)}
-                                     className="px-1 py-0.5 bg-green-500 text-white text-xs rounded hover:bg-green-600"
-                                   >
-                                     저장
-                                   </button>
-                                   <button
-                                     onClick={() => setEditingCell(null)}
-                                     className="px-1 py-0.5 bg-gray-500 text-white text-xs rounded hover:bg-gray-600"
-                                   >
-                                     취소
-                                   </button>
-                                 </div>
-                               </div>
+                               <input
+                                 ref={inputRef}
+                                 type="text"
+                                 value={editingValues.score}
+                                 onChange={(e) => setEditingValues({score: e.target.value})}
+                                 onBlur={() => handleAutoSave(student.id, item.id, editingValues)}
+                                 placeholder="90, A, 우수"
+                                 className="w-20 px-1.5 py-0.5 text-center border border-rose-200 rounded bg-white text-gray-900 focus:ring-2 focus:ring-rose-500 focus:border-rose-500 font-medium text-xs"
+                                 onKeyDown={(e) => {
+                                   if (e.key === 'Enter') {
+                                     handleScoreUpdateAndMove(student.id, item.id, editingValues);
+                                   } else if (e.key === 'Escape') {
+                                     handleCancel();
+                                   }
+                                 }}
+                               />
                              </div>
                            ) : (
                              <div className="flex justify-center">
@@ -684,6 +795,7 @@ export default function SubjectAssessmentPage() {
                                  onClick={() => {
                                    setEditingCell({ studentId: student.id, itemId: item.id });
                                    setEditingValues({ score: scoreData.score });
+                                   setOriginalValue(scoreData.score); // 원래 값 저장
                                  }}
                                  className={`
                                    w-10 h-5 rounded-md font-medium text-xs border transition-all
@@ -733,7 +845,7 @@ export default function SubjectAssessmentPage() {
                   <li>• 점수 버튼을 클릭하여 점수를 입력하세요</li>
                   <li>• 점수: 숫자(0-100) 또는 문자(A, B, C, 우수, 보통, 미흡) 모두 가능</li>
                   <li>• 색상으로 성취도를 한눈에 확인 (🟢우수 🔵보통 🟡미흡 🔴부족)</li>
-                  <li>• Enter로 저장, Esc로 취소할 수 있습니다</li>
+                  <li>• <strong>입력 후 다른 곳 클릭하면 자동 저장</strong>, Enter로 다음 학생 이동, Esc로 취소</li>
                   <li>• 열이 많을 때는 가로 스크롤로 확인하세요</li>
                 </ul>
               </div>

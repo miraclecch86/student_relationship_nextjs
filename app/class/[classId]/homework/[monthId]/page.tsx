@@ -345,6 +345,29 @@ export default function MonthHomeworkPage() {
     return Math.round((submittedCount / homeworkItems.length) * 100);
   }, [homeworkItems, getSubmissionStatus]);
 
+  // 컬럼(과제 항목) 완료 여부 확인
+  const isColumnComplete = useCallback((itemId: string): boolean => {
+    if (students.length === 0) return false;
+    
+    // 해당 과제 항목에 대해 모든 학생이 제출했는지 확인
+    const submittedCount = students.filter(student => 
+      getSubmissionStatus(student.id, itemId)
+    ).length;
+    
+    return submittedCount === students.length;
+  }, [students, getSubmissionStatus]);
+
+  // 과제별(컬럼별) 제출율 계산
+  const getColumnSubmissionRate = useCallback((itemId: string): number => {
+    if (students.length === 0) return 0;
+    
+    const submittedCount = students.filter(student => 
+      getSubmissionStatus(student.id, itemId)
+    ).length;
+    
+    return Math.round((submittedCount / students.length) * 100);
+  }, [students, getSubmissionStatus]);
+
   // 과제 항목 추가
   const handleAddItem = () => {
     if (!newItemName.trim()) {
@@ -506,11 +529,24 @@ export default function MonthHomeworkPage() {
                     <div className="text-center">
                       <span className="font-medium text-gray-900 text-xs">학생명</span>
                     </div>
-                    {homeworkItems.map((item) => (
+                    {homeworkItems.map((item) => {
+                      const isComplete = isColumnComplete(item.id);
+                      return (
                       <div key={item.id} className="text-center">
-                        <div className="bg-white rounded-md p-1.5 shadow-sm border border-amber-200 group hover:shadow-md transition-all">
-                          <div className="mb-1">
-                            <span className="font-medium text-gray-900 text-xs">{item.name}</span>
+                        <div className={`
+                          rounded-md p-1.5 shadow-sm border group hover:shadow-md transition-all
+                          ${isComplete 
+                            ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-200' 
+                            : 'bg-white border-amber-200'
+                          }
+                        `}>
+                          <div className="mb-1 flex items-center justify-center space-x-1">
+                            {isComplete && (
+                              <CheckIcon className="w-3 h-3 text-green-600" />
+                            )}
+                            <span className={`font-medium text-xs ${isComplete ? 'text-green-800' : 'text-gray-900'}`}>
+                              {item.name}
+                            </span>
                           </div>
                           {item.due_date ? (
                             <div className="relative flex items-center justify-center">
@@ -559,7 +595,8 @@ export default function MonthHomeworkPage() {
                           )}
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -600,6 +637,43 @@ export default function MonthHomeworkPage() {
                       </div>
                     </div>
                   ))}
+                  
+                  {/* 과제별 제출 완료율 표시 행 */}
+                  {homeworkItems.length > 0 && (
+                    <div className="border-t-2 border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-1.5">
+                      <div className="grid gap-1.5" style={{ gridTemplateColumns: `120px repeat(${homeworkItems.length}, 100px)` }}>
+                        <div className="flex items-center px-1">
+                          <div className="flex items-center space-x-1">
+                            <svg className="w-3 h-3 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                            <span className="font-medium text-amber-800 text-xs">과제별 완료율</span>
+                          </div>
+                        </div>
+                        {homeworkItems.map((item) => {
+                          const rate = getColumnSubmissionRate(item.id);
+                          const isComplete = isColumnComplete(item.id);
+                          return (
+                            <div key={`rate-${item.id}`} className="flex items-center justify-center">
+                              <div className={`
+                                px-2 py-1 rounded-md text-xs font-medium
+                                ${isComplete 
+                                  ? 'bg-green-100 text-green-800 border border-green-200' 
+                                  : rate >= 80 
+                                    ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                                    : rate >= 60
+                                      ? 'bg-yellow-100 text-yellow-800 border border-yellow-200'
+                                      : 'bg-red-100 text-red-800 border border-red-200'
+                                }
+                              `}>
+                                {rate}%
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
