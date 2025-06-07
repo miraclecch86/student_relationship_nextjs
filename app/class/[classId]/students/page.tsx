@@ -158,12 +158,51 @@ function StudentItem({
   const [editName, setEditName] = useState(student.name);
   const [isDeleting, setIsDeleting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus();
+      inputRef.current.select();
     }
   }, [isEditing]);
+
+  // 외부 클릭 시 자동저장 처리
+  useEffect(() => {
+    if (!isEditing) return;
+
+    const handleClickOutside = async (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        // 이름이 변경되었고 유효한 경우에만 저장
+        if (editName.trim() && editName.trim() !== student.name) {
+          try {
+            await onUpdateStudent(student.id, editName.trim());
+            setIsEditing(false);
+          } catch (error) {
+            // 저장 실패 시 원래 이름으로 되돌리기
+            setEditName(student.name);
+          }
+        } else if (editName.trim() === '') {
+          // 빈 이름인 경우 원래 이름으로 되돌리기
+          setEditName(student.name);
+          setIsEditing(false);
+        } else {
+          // 변경사항이 없는 경우 그냥 편집모드 종료
+          setIsEditing(false);
+        }
+      }
+    };
+
+    // 짧은 지연 후 이벤트 리스너 추가 (편집 버튼 클릭과 충돌 방지)
+    const timer = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 100);
+
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isEditing, editName, student.name, student.id, onUpdateStudent]);
 
   const handleUpdateClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -178,7 +217,7 @@ function StudentItem({
     }
 
     try {
-      await onUpdateStudent(student.id, editName);
+      await onUpdateStudent(student.id, editName.trim());
       setIsEditing(false);
     } catch (error) {
       // Error is handled by the mutation
@@ -191,15 +230,25 @@ function StudentItem({
     setIsEditing(false);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     e.stopPropagation();
     
     if (e.key === 'Enter') {
       e.preventDefault();
-      handleSaveClick(e as any);
+      if (editName.trim() === '') {
+        toast.error('학생 이름을 입력해주세요.');
+        return;
+      }
+      try {
+        await onUpdateStudent(student.id, editName.trim());
+        setIsEditing(false);
+      } catch (error) {
+        // Error is handled by the mutation
+      }
     } else if (e.key === 'Escape') {
       e.preventDefault();
-      handleCancelClick(e as any);
+      setEditName(student.name);
+      setIsEditing(false);
     }
   };
 
@@ -225,17 +274,18 @@ function StudentItem({
   return (
     <>
       <motion.div 
+        ref={containerRef}
         layout
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -20 }}
         transition={{ type: "tween", duration: 0.2 }}
-        className={`bg-white rounded-lg shadow-sm border border-gray-200 p-3 hover:shadow-md transition-all duration-200 ${
+        className={`bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 hover:shadow-md transition-all duration-200 group ${
           isDragging ? 'opacity-30' : ''
         } ${disabled ? 'pointer-events-none' : ''}`}
         style={{ 
           transformOrigin: '0 0',
-          touchAction: 'auto' // 카드는 자유로운 터치 허용
+          touchAction: 'auto'
         }}
       >
         <div className="flex items-center justify-between">
@@ -243,16 +293,16 @@ function StudentItem({
           <div className="flex items-center gap-3 flex-grow">
             {/* 드래그 핸들 */}
             <div 
-              className={`p-2 sm:p-3 hover:bg-gray-100 rounded-md cursor-grab active:cursor-grabbing flex-shrink-0 drag-handle transition-colors ${
+              className={`p-2 hover:bg-blue-100 rounded-lg cursor-grab active:cursor-grabbing flex-shrink-0 drag-handle transition-colors ${
                 disabled ? 'opacity-50' : ''
               } ${
-                activeId === student.id ? 'bg-blue-100 border-2 border-blue-300' : ''
+                activeId === student.id ? 'bg-blue-200 border-2 border-blue-400' : 'bg-blue-50'
               }`} 
-              title="0.5초 길게 눌러서 드래그하여 순서 변경"
-              {...listeners} // 🎯 드래그 핸들에만 listeners 적용!
+              title="드래그하여 순서 변경"
+              {...listeners}
             >
-              <Bars3Icon className={`w-5 h-5 sm:w-6 sm:h-6 transition-colors ${
-                activeId === student.id ? 'text-blue-600' : 'text-gray-400'
+              <Bars3Icon className={`w-5 h-5 transition-colors ${
+                activeId === student.id ? 'text-blue-700' : 'text-blue-500'
               }`} />
             </div>
             
@@ -264,7 +314,7 @@ function StudentItem({
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  className="flex-grow p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-300 text-gray-900 font-medium"
+                  className="flex-grow p-2 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 font-medium bg-white"
                   onClick={(e) => e.stopPropagation()}
                 />
               ) : (
@@ -295,50 +345,39 @@ function StudentItem({
               <>
                 <button
                   onClick={handleSaveClick}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 text-white text-sm font-medium rounded-md hover:bg-emerald-600 transition-colors shadow-sm"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 text-white text-sm font-medium rounded-lg hover:bg-emerald-600 transition-colors shadow-sm"
                 >
-                  <CheckIcon className="w-3.5 h-3.5" />
+                  <CheckIcon className="w-4 h-4" />
                   <span className="hidden sm:inline">저장</span>
                 </button>
                 <button
                   onClick={handleCancelClick}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-400 text-white text-sm font-medium rounded-md hover:bg-slate-500 transition-colors shadow-sm"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-500 text-white text-sm font-medium rounded-lg hover:bg-gray-600 transition-colors shadow-sm"
                 >
-                  <XMarkIcon className="w-3.5 h-3.5" />
+                  <XMarkIcon className="w-4 h-4" />
                   <span className="hidden sm:inline">취소</span>
                 </button>
               </>
             ) : (
               <>
-                {(!student.student_login_id && !student.tablet_number && !student.student_phone_number && !student.birthday) ? (
-                  <button
-                    onClick={handleDetailClick}
-                    className="inline-flex items-center justify-center w-8 h-8 sm:w-auto sm:h-auto sm:gap-1.5 sm:px-3 sm:py-1.5 bg-indigo-500 text-white text-sm font-medium rounded-md hover:bg-indigo-600 transition-colors shadow-sm"
-                    title="학생 정보 입력"
-                  >
-                    <InformationCircleIcon className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
-                    <span className="hidden sm:inline">상세정보입력</span>
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleDetailClick}
-                    className="inline-flex items-center justify-center w-8 h-8 sm:w-auto sm:h-auto sm:gap-1.5 sm:px-3 sm:py-1.5 bg-indigo-500 text-white text-sm font-medium rounded-md hover:bg-indigo-600 transition-colors shadow-sm"
-                    title="상세 정보 입력"
-                  >
-                    <InformationCircleIcon className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
-                    <span className="hidden sm:inline">상세정보입력</span>
-                  </button>
-                )}
+                <button
+                  onClick={handleDetailClick}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 transition-colors shadow-sm"
+                  title="상세정보보기"
+                >
+                  <InformationCircleIcon className="w-4 h-4" />
+                  <span className="hidden sm:inline">상세정보보기</span>
+                </button>
                 <button
                   onClick={handleUpdateClick}
-                  className="inline-flex items-center justify-center w-8 h-8 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors shadow-sm"
+                  className="inline-flex items-center justify-center w-8 h-8 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors shadow-sm opacity-0 group-hover:opacity-100"
                   title="수정"
                 >
                   <PencilIcon className="w-4 h-4" />
                 </button>
                 <button
                   onClick={handleDeleteClick}
-                  className="inline-flex items-center justify-center w-8 h-8 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors shadow-sm"
+                  className="inline-flex items-center justify-center w-8 h-8 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors shadow-sm opacity-0 group-hover:opacity-100"
                   title="삭제"
                 >
                   <TrashIcon className="w-4 h-4" />
@@ -713,31 +752,63 @@ export default function ClassStudentsPage() {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-gray-100">
-        <ArrowPathIcon className="w-8 h-8 animate-spin text-indigo-500" />
-        <div className="text-xl text-indigo-500 ml-3">로딩 중...</div>
+      <div className="min-h-screen bg-gray-50 flex justify-center items-center">
+        <div className="text-center">
+          <ArrowPathIcon className="w-16 h-16 text-blue-500 mx-auto mb-4 animate-spin" />
+          <h2 className="text-xl font-bold text-gray-800 mb-2">로딩 중...</h2>
+          <p className="text-gray-600">학생 정보를 불러오고 있습니다.</p>
+        </div>
       </div>
     );
   }
 
   if (!classDetails) {
     return (
-      <div className="flex flex-col justify-center items-center min-h-screen bg-gray-100">
-        <div className="text-2xl text-red-500 mb-4">학급 정보를 찾을 수 없습니다</div>
+      <div className="min-h-screen bg-gray-50 flex justify-center items-center">
+        <div className="text-center">
+          <XMarkIcon className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-800 mb-2">오류가 발생했습니다</h2>
+          <p className="text-gray-600 mb-4">학급 정보를 찾을 수 없습니다.</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            다시 시도
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <div className="max-w-screen-lg mx-auto px-6 py-10">
-        {/* 헤더 - 모바일 최적화 */}
-        <header className="mb-6 sm:mb-10 bg-white p-4 sm:p-5 rounded-lg shadow-md">
-          <h1 className="text-lg sm:text-2xl font-bold text-black">{classDetails.name} 학생 정보</h1>
-        </header>
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto p-6">
+        {/* 헤더 */}
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold text-gray-800 flex items-center space-x-2">
+            <UserPlusIcon className="h-6 w-6 text-blue-600" />
+            <span>학생 관리</span>
+          </h1>
+        </div>
 
-        {/* 학생 추가 입력 필드 */}
-        <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+        {/* 학급 정보 */}
+        <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+              <UserPlusIcon className="h-5 w-5 text-blue-600" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-800">{classDetails.name} 학생 관리</h2>
+              <p className="text-sm text-gray-600">학급 학생들의 정보를 관리하고 순서를 변경할 수 있습니다</p>
+            </div>
+          </div>
+        </div>
+
+        {/* 학생 추가 섹션 */}
+        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-800">새 학생 추가</h3>
+          </div>
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <input
               type="text"
@@ -745,22 +816,22 @@ export default function ClassStudentsPage() {
               onChange={(e) => setNewStudentName(e.target.value)}
               onKeyPress={handleAddStudentKeyPress}
               placeholder="학생 이름을 입력하세요"
-              className="flex-grow px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-300 text-black placeholder:text-gray-500"
+              className="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-black placeholder:text-gray-500"
             />
             <button
               onClick={handleAddStudent}
               disabled={addStudentMutation.isPending}
-              className="px-4 py-2 text-sm bg-indigo-500 text-white rounded-md hover:bg-indigo-600 shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 flex items-center justify-center disabled:opacity-70 disabled:cursor-not-allowed"
+              className="flex items-center space-x-2 bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
             >
               {addStudentMutation.isPending ? (
                 <>
-                  <ArrowPathIcon className="w-4 h-4 animate-spin mr-2" />
-                  추가 중...
+                  <ArrowPathIcon className="w-5 h-5 animate-spin" />
+                  <span>추가 중...</span>
                 </>
               ) : (
                 <>
-                  <UserPlusIcon className="w-4 h-4 mr-2" />
-                  학생 추가
+                  <UserPlusIcon className="w-5 h-5" />
+                  <span>학생 추가</span>
                 </>
               )}
             </button>
@@ -768,41 +839,54 @@ export default function ClassStudentsPage() {
         </div>
 
         {/* 학생 목록 */}
-        <div className="space-y-4">
-          <h2 className="text-xl font-semibold text-gray-700 mb-4">
-            학생 정보 ({students?.length || 0}명)
-          </h2>
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-semibold text-gray-800">
+              학생 목록 ({students?.length || 0}명)
+            </h3>
+            <div className="text-sm text-gray-500">
+              드래그하여 순서를 변경할 수 있습니다
+            </div>
+          </div>
           
           {isStudentsError ? (
-            <div className="bg-red-100 text-red-600 p-4 rounded-lg">
-              학생 목록을 불러오는 중 오류가 발생했습니다.
+            <div className="text-center py-12">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <XMarkIcon className="h-8 w-8 text-red-600" />
+              </div>
+              <p className="text-red-600 mb-4">학생 목록을 불러오는 중 오류가 발생했습니다</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="text-blue-600 hover:text-blue-800 font-medium"
+              >
+                다시 시도
+              </button>
             </div>
           ) : students && students.length > 0 ? (
             <div 
               ref={scrollContainerRef}
-              className="space-y-2 sm:space-y-3 overflow-y-auto max-h-[70vh] sm:max-h-[600px] pr-2" 
+              className="space-y-3 overflow-y-auto max-h-[600px]" 
               style={{ 
                 WebkitOverflowScrolling: 'touch',
-                // 🎯 드래그 중에는 스크롤 비활성화, 평소에는 스크롤 허용
                 touchAction: activeId ? 'none' : 'pan-y',
                 overflowY: 'auto',
               }}
             >
               <AnimatePresence mode="popLayout">
                 <DndContext
-                  id={`dnd-context-${classId}`} // 🎯 고유 ID로 DndContext 안정화
+                  id={`dnd-context-${classId}`}
                   sensors={sensors}
-                  collisionDetection={rectIntersection} // 🎯 rectIntersection으로 변경 - 더 관대한 감지
+                  collisionDetection={rectIntersection}
                   onDragStart={handleDragStart}
                   onDragEnd={handleDragEnd}
-                  onDragCancel={handleDragCancel} // 🎯 드래그 취소 핸들러 추가
+                  onDragCancel={handleDragCancel}
                   modifiers={[]}
                 >
                   <SortableContext
                     items={studentOrder}
                     strategy={verticalListSortingStrategy}
                   >
-                    <div className="space-y-2 sm:space-y-3">
+                    <div className="space-y-3">
                       {sortedStudents.map((student) => (
                         <SortableStudentItem
                           key={student.id}
@@ -843,9 +927,20 @@ export default function ClassStudentsPage() {
               </AnimatePresence>
             </div>
           ) : (
-            <div className="bg-gray-100 text-gray-600 p-8 rounded-lg text-center">
-              <p className="mb-4">등록된 학생이 없습니다.</p>
-              <p className="text-sm">위의 '학생 추가' 버튼을 눌러 새 학생을 추가해보세요.</p>
+            <div className="text-center py-12">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <UserPlusIcon className="h-8 w-8 text-blue-600" />
+              </div>
+              <p className="text-gray-600 mb-4">아직 등록된 학생이 없습니다</p>
+              <button
+                onClick={() => {
+                  const input = document.querySelector('input[placeholder="학생 이름을 입력하세요"]') as HTMLInputElement;
+                  input?.focus();
+                }}
+                className="text-blue-600 hover:text-blue-800 font-medium"
+              >
+                첫 번째 학생 추가하기
+              </button>
             </div>
           )}
         </div>
