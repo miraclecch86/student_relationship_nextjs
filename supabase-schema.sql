@@ -407,11 +407,13 @@ CREATE TABLE IF NOT EXISTS public.surveys (
     class_id uuid REFERENCES public.classes(id) ON DELETE CASCADE NOT NULL,
     name text NOT NULL,
     description text,
+    survey_date date,
     created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 COMMENT ON TABLE public.surveys IS 'Stores survey information for each class.';
 COMMENT ON COLUMN public.surveys.name IS 'Name of the survey.';
 COMMENT ON COLUMN public.surveys.description IS 'Optional description for the survey.';
+COMMENT ON COLUMN public.surveys.survey_date IS 'Date when the survey is scheduled to be conducted.';
 CREATE INDEX IF NOT EXISTS idx_surveys_class_id ON public.surveys(class_id);
 ALTER TABLE public.surveys ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.surveys FORCE ROW LEVEL SECURITY;

@@ -1,9 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Survey } from '@/lib/supabase';
-import { DocumentTextIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
-import ConfirmModal from './ConfirmModal';
+import { PencilIcon, TrashIcon, ClipboardDocumentListIcon } from '@heroicons/react/24/outline';
 
 interface SurveyCardProps {
   survey: Survey;
@@ -13,8 +12,6 @@ interface SurveyCardProps {
 }
 
 export default function SurveyCard({ survey, onClick, onEdit, onDelete }: SurveyCardProps) {
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-
   const handleEditClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     onEdit(survey);
@@ -23,56 +20,74 @@ export default function SurveyCard({ survey, onClick, onEdit, onDelete }: Survey
 
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsDeleteDialogOpen(true);
-  };
-
-  const confirmDelete = () => {
     onDelete(survey.id);
-    setIsDeleteDialogOpen(false);
   };
 
   return (
     <>
       <div
         onClick={onClick}
-        className="bg-white rounded-lg shadow-md p-4 cursor-pointer hover:shadow-lg transition-shadow duration-200 border border-gray-200 flex flex-col justify-between min-h-[150px]"
+        className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4 hover:shadow-md transition-all cursor-pointer group min-h-[180px] flex flex-col"
       >
-        <div>
-          <h3 className="text-lg font-semibold text-gray-800 mb-1 truncate" title={survey.name}>{survey.name}</h3>
-          <p className="text-sm text-gray-500 line-clamp-2 mb-3 h-10">{survey.description || '설명 없음'}</p>
-        </div>
-        <div className="mt-auto flex items-center justify-between border-t pt-2">
-          <div className="flex items-center text-xs text-gray-400">
-            <DocumentTextIcon className="w-4 h-4 mr-1 flex-shrink-0" />
-            <span>{new Date(survey.created_at).toLocaleDateString()} 생성</span>
+        <div className="flex items-center justify-between mb-3">
+          <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+            <ClipboardDocumentListIcon className="h-5 w-5 text-green-600" />
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center space-x-1">
             <button
               onClick={handleEditClick}
-              className="p-1.5 rounded-md text-gray-500 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
-              title="수정"
+              className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-all"
+              title="설문 수정"
             >
-              <PencilIcon className="w-4 h-4" />
+              <PencilIcon className="h-4 w-4" />
             </button>
             <button
               onClick={handleDeleteClick}
-              className="p-1.5 rounded-md text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors"
-              title="삭제"
+              className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-all"
+              title="설문 삭제"
             >
-              <TrashIcon className="w-4 h-4" />
+              <TrashIcon className="h-4 w-4" />
             </button>
           </div>
         </div>
+        
+        <div className="flex-1 flex flex-col">
+          <h4 className="text-lg font-semibold text-gray-800 mb-2">{survey.name}</h4>
+          
+          {/* 설명 */}
+          <div className="flex-1 mb-3">
+            {survey.description ? (
+              <p className="text-sm text-gray-600 line-clamp-3">{survey.description}</p>
+            ) : (
+              <p className="text-sm text-gray-400 italic">설명이 없습니다</p>
+            )}
+          </div>
+          
+          {/* 하단 고정 링크와 날짜 */}
+          <div className="flex items-center justify-between text-xs mt-auto">
+            <div className="flex items-center text-green-600">
+              <ClipboardDocumentListIcon className="h-3 w-3 mr-1" />
+              <span>설문 항목 기록</span>
+            </div>
+            {/* 설문 진행 날짜 */}
+            {survey.survey_date ? (
+              <div className="flex items-center text-gray-500">
+                <svg className="h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span>{new Date(survey.survey_date).toLocaleDateString('ko-KR')}</span>
+              </div>
+            ) : (
+              <div className="flex items-center text-gray-400">
+                <svg className="h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span>미설정</span>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
-
-      <ConfirmModal
-        isOpen={isDeleteDialogOpen}
-        onClose={() => setIsDeleteDialogOpen(false)}
-        onConfirm={confirmDelete}
-        title="설문 삭제 확인"
-        message={`'${survey.name}' 설문을 정말 삭제하시겠습니까? 관련된 모든 질문, 답변, 관계 데이터가 삭제됩니다.`}
-        confirmText="삭제"
-      />
     </>
   );
 } 

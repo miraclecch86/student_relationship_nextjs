@@ -6,7 +6,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  ArrowLeftIcon,
   PlusIcon,
   XMarkIcon,
   TrashIcon,
@@ -552,20 +551,10 @@ export default function SubjectAssessmentPage() {
       <div className="max-w-full mx-auto">
         {/* 헤더 */}
         <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={() => router.back()}
-              className="flex items-center px-3 py-1.5 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors shadow-sm text-sm"
-            >
-              <ArrowLeftIcon className="h-4 w-4 mr-1.5" />
-              <span>목록으로</span>
-            </button>
-            <div className="h-4 w-px bg-gray-300" />
-            <h1 className="text-xl font-bold text-gray-800 flex items-center space-x-2">
-              <BookOpenIcon className="h-5 w-5 text-rose-600" />
-              <span>{subject.name} 평가 기록</span>
-            </h1>
-          </div>
+          <h1 className="text-xl font-bold text-gray-800 flex items-center space-x-2">
+            <BookOpenIcon className="h-5 w-5 text-rose-600" />
+            <span>{subject.name} 평가 기록</span>
+          </h1>
           <div className="flex items-center space-x-2">
             <button
               onClick={exportToExcel}

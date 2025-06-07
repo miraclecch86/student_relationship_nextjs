@@ -4,9 +4,9 @@ import React, { useState, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, Class, ClassQuickMemo } from '@/lib/supabase';
+import { useAutoSave } from '@/hooks/useAutoSave';
 import { motion } from 'framer-motion';
 import { 
-  ArrowLeftIcon,
   ClockIcon,
   PaperAirplaneIcon,
   PencilIcon,
@@ -83,6 +83,29 @@ export default function QuickMemosPage() {
   const classId = params.classId as string;
   const [quickMemoText, setQuickMemoText] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+
+  // 자동저장 설정 (검색어와 메모 초안 자동저장)
+  const { autoSave: autoSaveSearch } = useAutoSave<string>({
+    onSave: (value: string) => {
+      if (classId && value) {
+        localStorage.setItem(`quick_memos_search_${classId}`, value);
+        console.log('메모 검색어 자동저장됨:', value);
+      }
+    },
+    delay: 1000,
+    enabled: searchTerm.length > 0
+  });
+
+  const { autoSave: autoSaveMemo } = useAutoSave<string>({
+    onSave: (value: string) => {
+      if (classId && value) {
+        localStorage.setItem(`quick_memo_draft_${classId}`, value);
+        console.log('메모 초안 자동저장됨:', value);
+      }
+    },
+    delay: 2000, // 2초 딜레이 (타이핑이 끝날 때까지 기다림)
+    enabled: quickMemoText.length > 0
+  });
 
   const queryClient = useQueryClient();
 
@@ -218,20 +241,10 @@ export default function QuickMemosPage() {
       <div className="max-w-3xl mx-auto">
         {/* 헤더 */}
         <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => router.back()}
-              className="flex items-center px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors shadow-sm"
-            >
-              <ArrowLeftIcon className="h-4 w-4 mr-2" />
-              <span>돌아가기</span>
-            </button>
-            <div className="h-4 w-px bg-gray-300" />
-            <h1 className="text-xl font-bold text-gray-800 flex items-center space-x-2">
-              <PencilIcon className="h-6 w-6 text-blue-600" />
-              <span>{classDetails.name} 빠른 메모</span>
-            </h1>
-          </div>
+          <h1 className="text-xl font-bold text-gray-800 flex items-center space-x-2">
+            <PencilIcon className="h-6 w-6 text-blue-600" />
+            <span>{classDetails.name} 빠른 메모</span>
+          </h1>
         </div>
 
         {/* 메인 컨텐츠 */}
@@ -257,7 +270,11 @@ export default function QuickMemosPage() {
                   <input
                     type="text"
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={(e) => {
+                      const newValue = e.target.value;
+                      setSearchTerm(newValue);
+                      autoSaveSearch(newValue);
+                    }}
                     placeholder="메모 내용으로 검색하세요 (여러 단어는 +로 구분)"
                     className="pl-8 pr-8 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs w-48 text-gray-900 placeholder-gray-400"
                   />
@@ -279,7 +296,11 @@ export default function QuickMemosPage() {
             <div className="flex space-x-3 mb-2">
               <textarea
                 value={quickMemoText}
-                onChange={(e) => setQuickMemoText(e.target.value)}
+                onChange={(e) => {
+                  const newValue = e.target.value;
+                  setQuickMemoText(newValue);
+                  autoSaveMemo(newValue);
+                }}
                 onKeyPress={handleKeyPress}
                 placeholder="빠른 메모를 입력하세요... (Shift+Enter로 줄바꿈, Enter로 저장)"
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-gray-900 placeholder-gray-500 text-sm"

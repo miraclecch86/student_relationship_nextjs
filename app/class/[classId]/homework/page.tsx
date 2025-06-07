@@ -6,12 +6,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  ArrowLeftIcon,
   PlusIcon,
   XMarkIcon,
   ClipboardDocumentCheckIcon,
   CalendarDaysIcon,
-  ChartBarIcon
+  ChartBarIcon,
+  PencilIcon,
+  TrashIcon
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -80,6 +81,24 @@ async function addHomeworkMonth(classId: string, monthYear: string, name: string
   return data;
 }
 
+async function updateHomeworkMonth(monthId: string, monthYear: string, name: string): Promise<HomeworkMonth> {
+  const { data, error } = await (supabase as any)
+    .from('homework_months')
+    .update({
+      month_year: monthYear,
+      name: name.trim()
+    })
+    .eq('id', monthId)
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error('과제 월 수정 중 오류가 발생했습니다.');
+  }
+
+  return data;
+}
+
 export default function HomeworkPage() {
   const router = useRouter();
   const params = useParams();
@@ -91,6 +110,10 @@ export default function HomeworkPage() {
   const [isMonthModalOpen, setIsMonthModalOpen] = useState(false);
   const [newMonthYear, setNewMonthYear] = useState('');
   const [newMonthName, setNewMonthName] = useState('');
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingMonth, setEditingMonth] = useState<HomeworkMonth | null>(null);
+  const [editMonthYear, setEditMonthYear] = useState('');
+  const [editMonthName, setEditMonthName] = useState('');
 
   // 데이터 조회
   const { data: classDetails } = useQuery({
@@ -121,6 +144,23 @@ export default function HomeworkPage() {
     },
   });
 
+  // 월 수정 뮤테이션
+  const updateMonthMutation = useMutation({
+    mutationFn: ({ monthId, monthYear, name }: { monthId: string; monthYear: string; name: string }) => 
+      updateHomeworkMonth(monthId, monthYear, name),
+    onSuccess: () => {
+      toast.success('과제 월이 수정되었습니다.');
+      queryClient.invalidateQueries({ queryKey: ['homeworkMonths'] });
+      setEditMonthYear('');
+      setEditMonthName('');
+      setEditingMonth(null);
+      setIsEditModalOpen(false);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
   // 월 추가 핸들러
   const handleAddMonth = () => {
     if (!newMonthYear.trim()) {
@@ -138,6 +178,32 @@ export default function HomeworkPage() {
     });
   };
 
+  // 월 수정 핸들러
+  const handleEditMonth = (month: HomeworkMonth) => {
+    setEditingMonth(month);
+    setEditMonthYear(month.month_year);
+    setEditMonthName(month.name);
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdateMonth = () => {
+    if (!editMonthYear.trim()) {
+      toast.error('년월을 선택해주세요.');
+      return;
+    }
+
+    if (editingMonth) {
+      // 설명이 비어있으면 기본값 설정
+      const description = editMonthName.trim() || `${editMonthYear.split('-')[0]}년 ${parseInt(editMonthYear.split('-')[1])}월 과제`;
+
+      updateMonthMutation.mutate({ 
+        monthId: editingMonth.id,
+        monthYear: editMonthYear, 
+        name: description 
+      });
+    }
+  };
+
   // 현재 년월을 기본값으로 설정
   const getCurrentMonthYear = () => {
     const now = new Date();
@@ -153,20 +219,10 @@ export default function HomeworkPage() {
       <div className="max-w-7xl mx-auto">
         {/* 헤더 */}
         <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => router.back()}
-              className="flex items-center px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors shadow-sm"
-            >
-              <ArrowLeftIcon className="h-5 w-5 mr-2" />
-              <span>돌아가기</span>
-            </button>
-            <div className="h-6 w-px bg-gray-300" />
-            <h1 className="text-2xl font-bold text-gray-800 flex items-center space-x-2">
-              <ClipboardDocumentCheckIcon className="h-6 w-6 text-amber-600" />
-              <span>과제 체크</span>
-            </h1>
-          </div>
+          <h1 className="text-2xl font-bold text-gray-800 flex items-center space-x-2">
+            <ClipboardDocumentCheckIcon className="h-6 w-6 text-amber-600" />
+            <span>과제 체크</span>
+          </h1>
         </div>
 
         {/* 학급 정보 */}
@@ -225,6 +281,29 @@ export default function HomeworkPage() {
                 <div className="flex items-center justify-between mb-3">
                   <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
                     <CalendarDaysIcon className="h-5 w-5 text-amber-600" />
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditMonth(month);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-all"
+                      title="과제 월 수정"
+                    >
+                      <PencilIcon className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // 삭제 로직 (나중에 구현)
+                        console.log('Delete homework month:', month.id);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-all"
+                      title="과제 월 삭제"
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </button>
                   </div>
                 </div>
                 <h4 className="text-lg font-semibold text-gray-800 mb-2">
@@ -334,6 +413,83 @@ export default function HomeworkPage() {
                     className="bg-amber-500 text-white px-4 py-2 rounded-lg hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {addMonthMutation.isPending ? '추가 중...' : '추가하기'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 월 수정 모달 */}
+      <AnimatePresence>
+        {isEditModalOpen && editingMonth && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 flex items-center justify-center z-50 p-4"
+            style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+            onClick={() => setIsEditModalOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-xl shadow-xl max-w-md w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">과제 월 수정</h3>
+                  <button
+                    onClick={() => setIsEditModalOpen(false)}
+                    className="text-gray-600 hover:text-gray-800"
+                  >
+                    <XMarkIcon className="h-6 w-6" />
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">
+                      년월 선택 <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="month"
+                      value={editMonthYear}
+                      onChange={(e) => setEditMonthYear(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-gray-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">
+                      설명 (선택사항)
+                    </label>
+                    <textarea
+                      value={editMonthName}
+                      onChange={(e) => setEditMonthName(e.target.value)}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-gray-900 placeholder-gray-500 resize-none"
+                      placeholder="예: 중간고사 대비 과제, 여름방학 특별과제, 단원 정리 과제"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end space-x-3 mt-6">
+                  <button
+                    onClick={() => setIsEditModalOpen(false)}
+                    className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  >
+                    취소
+                  </button>
+                  <button
+                    onClick={handleUpdateMonth}
+                    disabled={!editMonthYear.trim() || updateMonthMutation.isPending}
+                    className="bg-amber-500 text-white px-4 py-2 rounded-lg hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {updateMonthMutation.isPending ? '수정 중...' : '수정하기'}
                   </button>
                 </div>
               </div>

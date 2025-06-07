@@ -5,7 +5,6 @@ import { useRouter, useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { 
-  ArrowLeftIcon,
   UserGroupIcon,
   CheckIcon,
   XMarkIcon,
@@ -17,6 +16,7 @@ import { format, parseISO } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { supabase } from '@/lib/supabase';
 import type { Class, ClassJournal, Student, JournalStudentStatus, ATTENDANCE_STATUS } from '@/lib/supabase';
+import { useAutoSave } from '@/hooks/useAutoSave';
 import toast from 'react-hot-toast';
 
 // 학급 정보 조회
@@ -202,24 +202,46 @@ export default function StudentsMemoPage() {
 
   // 출석 상태 변경
   const handleAttendanceChange = (studentId: string, attendance: string) => {
-    setStudentStatuses(prev => ({
-      ...prev,
+    const newStatuses = {
+      ...studentStatuses,
       [studentId]: {
-        ...prev[studentId],
+        ...studentStatuses[studentId],
         attendance
       }
-    }));
+    };
+    setStudentStatuses(newStatuses);
+    autoSave(newStatuses); // 자동저장 트리거
   };
+
+  // 자동저장 기능
+  const { autoSave } = useAutoSave<Record<string, { attendance: string; memo: string }>>({
+    delay: 3000, // 3초 후 자동저장
+    onSave: async (statuses) => {
+      const journal = await getOrCreateJournal(classId, date);
+      
+      const promises = Object.entries(statuses).map(([studentId, status]) => 
+        saveStudentStatus(journal.id, studentId, status.attendance, status.memo)
+      );
+      
+      await Promise.all(promises);
+      queryClient.invalidateQueries({ queryKey: ['student-statuses', classId, date] });
+      
+      console.log('자동저장 완료 - 학생 상태');
+    },
+    enabled: !!classId && !!date
+  });
 
   // 메모 변경
   const handleMemoChange = (studentId: string, memo: string) => {
-    setStudentStatuses(prev => ({
-      ...prev,
+    const newStatuses = {
+      ...studentStatuses,
       [studentId]: {
-        ...prev[studentId],
+        ...studentStatuses[studentId],
         memo
       }
-    }));
+    };
+    setStudentStatuses(newStatuses);
+    autoSave(newStatuses); // 자동저장 트리거
   };
 
   // 저장 뮤테이션
@@ -283,20 +305,10 @@ export default function StudentsMemoPage() {
       <div className="max-w-4xl mx-auto">
         {/* 헤더 */}
         <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => router.back()}
-              className="flex items-center px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors shadow-sm"
-            >
-              <ArrowLeftIcon className="h-5 w-5 mr-2" />
-              <span>돌아가기</span>
-            </button>
-            <div className="h-6 w-px bg-gray-300" />
-            <h1 className="text-3xl font-bold text-gray-800 flex items-center space-x-2">
-              <UserGroupIcon className="h-8 w-8 text-green-600" />
-              <span>오늘의 아이들</span>
-            </h1>
-          </div>
+          <h1 className="text-3xl font-bold text-gray-800 flex items-center space-x-2">
+            <UserGroupIcon className="h-8 w-8 text-green-600" />
+            <span>오늘의 아이들</span>
+          </h1>
         </div>
 
         {/* 학급 및 날짜 정보 */}

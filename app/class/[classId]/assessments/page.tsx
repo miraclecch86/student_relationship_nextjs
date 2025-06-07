@@ -6,7 +6,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  ArrowLeftIcon,
   PlusIcon,
   XMarkIcon,
   TrashIcon,
@@ -75,6 +74,22 @@ async function addSubject(classId: string, name: string): Promise<Subject> {
   return data;
 }
 
+// 과목 수정
+async function updateSubject(subjectId: string, name: string): Promise<Subject> {
+  const { data, error } = await (supabase as any)
+    .from('subjects')
+    .update({ name: name.trim() })
+    .eq('id', subjectId)
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error('과목 수정 중 오류가 발생했습니다.');
+  }
+
+  return data;
+}
+
 // 과목 삭제
 async function deleteSubject(subjectId: string): Promise<void> {
   const { error } = await (supabase as any)
@@ -95,6 +110,9 @@ export default function AssessmentsPage() {
 
   const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
   const [newSubjectName, setNewSubjectName] = useState('');
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
+  const [editSubjectName, setEditSubjectName] = useState('');
 
   // 학급 정보 조회
   const { data: classDetails, isLoading: isClassLoading } = useQuery({
@@ -125,6 +143,22 @@ export default function AssessmentsPage() {
     },
   });
 
+  // 과목 수정 뮤테이션
+  const updateSubjectMutation = useMutation({
+    mutationFn: ({ subjectId, name }: { subjectId: string; name: string }) => 
+      updateSubject(subjectId, name),
+    onSuccess: () => {
+      toast.success('과목이 수정되었습니다.');
+      queryClient.invalidateQueries({ queryKey: ['subjects'] });
+      setEditSubjectName('');
+      setEditingSubject(null);
+      setIsEditModalOpen(false);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
   // 과목 삭제 뮤테이션
   const deleteSubjectMutation = useMutation({
     mutationFn: deleteSubject,
@@ -144,6 +178,26 @@ export default function AssessmentsPage() {
     }
 
     addSubjectMutation.mutate({ classId, name: newSubjectName });
+  };
+
+  const handleEditSubject = (subject: Subject) => {
+    setEditingSubject(subject);
+    setEditSubjectName(subject.name);
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdateSubject = () => {
+    if (!editSubjectName.trim()) {
+      toast.error('과목명을 입력해주세요.');
+      return;
+    }
+
+    if (editingSubject) {
+      updateSubjectMutation.mutate({ 
+        subjectId: editingSubject.id, 
+        name: editSubjectName 
+      });
+    }
   };
 
   const handleDeleteSubject = (subjectId: string) => {
@@ -177,20 +231,10 @@ export default function AssessmentsPage() {
       <div className="max-w-7xl mx-auto">
         {/* 헤더 */}
         <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => router.back()}
-              className="flex items-center px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors shadow-sm"
-            >
-              <ArrowLeftIcon className="h-5 w-5 mr-2" />
-              <span>돌아가기</span>
-            </button>
-            <div className="h-6 w-px bg-gray-300" />
-            <h1 className="text-2xl font-bold text-gray-800 flex items-center space-x-2">
-              <ChartBarIcon className="h-6 w-6 text-rose-600" />
-              <span>평가 기록</span>
-            </h1>
-          </div>
+          <h1 className="text-2xl font-bold text-gray-800 flex items-center space-x-2">
+            <ChartBarIcon className="h-6 w-6 text-rose-600" />
+            <span>평가 기록</span>
+          </h1>
         </div>
 
         {/* 학급 정보 */}
@@ -239,16 +283,28 @@ export default function AssessmentsPage() {
                       <div className="w-10 h-10 bg-rose-100 rounded-full flex items-center justify-center">
                         <BookOpenIcon className="h-5 w-5 text-rose-600" />
                       </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteSubject(subject.id);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-all"
-                        title="과목 삭제"
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
+                      <div className="flex items-center space-x-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditSubject(subject);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-all"
+                          title="과목 수정"
+                        >
+                          <PencilIcon className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteSubject(subject.id);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-all"
+                          title="과목 삭제"
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
                     <h4 className="text-lg font-semibold text-gray-800 mb-2">{subject.name}</h4>
                     <p className="text-sm text-gray-600">평가 기록</p>
@@ -297,10 +353,10 @@ export default function AssessmentsPage() {
             >
               <div className="p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-semibold text-gray-800">새 과목 생성</h3>
+                  <h3 className="text-xl font-semibold text-gray-900">새 과목 생성</h3>
                   <button
                     onClick={() => setIsSubjectModalOpen(false)}
-                    className="text-gray-500 hover:text-gray-700"
+                    className="text-gray-600 hover:text-gray-800"
                   >
                     <XMarkIcon className="h-6 w-6" />
                   </button>
@@ -308,13 +364,13 @@ export default function AssessmentsPage() {
 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">과목명</label>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">과목명</label>
                     <input
                       type="text"
                       value={newSubjectName}
                       onChange={(e) => setNewSubjectName(e.target.value)}
                       placeholder="예: 국어, 수학, 영어..."
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500 text-gray-900 placeholder-gray-500"
                       maxLength={50}
                       onKeyPress={(e) => {
                         if (e.key === 'Enter') {
@@ -328,16 +384,85 @@ export default function AssessmentsPage() {
                 <div className="flex items-center justify-end space-x-3 mt-6">
                   <button
                     onClick={() => setIsSubjectModalOpen(false)}
-                    className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+                    className="px-4 py-2 text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
                   >
                     취소
                   </button>
                   <button
                     onClick={handleAddSubject}
                     disabled={!newSubjectName.trim() || addSubjectMutation.isPending}
-                    className="bg-rose-500 text-white px-4 py-2 rounded-lg hover:bg-rose-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="bg-rose-500 text-white px-4 py-2 rounded-lg hover:bg-rose-600 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                   >
                     {addSubjectMutation.isPending ? '생성 중...' : '생성하기'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 과목 수정 모달 */}
+      <AnimatePresence>
+        {isEditModalOpen && editingSubject && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 flex items-center justify-center z-50 p-4"
+            style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+            onClick={() => setIsEditModalOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-xl shadow-xl max-w-md w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-semibold text-gray-900">과목 수정</h3>
+                  <button
+                    onClick={() => setIsEditModalOpen(false)}
+                    className="text-gray-600 hover:text-gray-800"
+                  >
+                    <XMarkIcon className="h-6 w-6" />
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">과목명</label>
+                    <input
+                      type="text"
+                      value={editSubjectName}
+                      onChange={(e) => setEditSubjectName(e.target.value)}
+                      placeholder="예: 국어, 수학, 영어..."
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500 text-gray-900 placeholder-gray-500"
+                      maxLength={50}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          handleUpdateSubject();
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end space-x-3 mt-6">
+                  <button
+                    onClick={() => setIsEditModalOpen(false)}
+                    className="px-4 py-2 text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
+                  >
+                    취소
+                  </button>
+                  <button
+                    onClick={handleUpdateSubject}
+                    disabled={!editSubjectName.trim() || updateSubjectMutation.isPending}
+                    className="bg-rose-500 text-white px-4 py-2 rounded-lg hover:bg-rose-600 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                  >
+                    {updateSubjectMutation.isPending ? '수정 중...' : '수정하기'}
                   </button>
                 </div>
               </div>

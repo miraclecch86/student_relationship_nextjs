@@ -6,9 +6,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase, Student, Relationship, Question, Answer } from "@/lib/supabase";
 import { RELATIONSHIP_TYPES, RELATIONSHIP_COLORS } from "@/lib/constants";
 import ConfirmModal from "@/components/ConfirmModal";
-import { ArrowUturnLeftIcon, PlusIcon, TrashIcon, ExclamationCircleIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, TrashIcon, ExclamationCircleIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { handleDemoSaveAttempt, isDemoClass } from "@/utils/demo-permissions";
+import { useAutoSave } from "@/hooks/useAutoSave";
 
 // 타입 정의
 type RelationshipSetting = { [targetStudentId: string]: keyof typeof RELATIONSHIP_TYPES | null };
@@ -273,7 +274,6 @@ export default function SurveyStudentDetailPage() {
             if (classDetails && !isDemoClass(classDetails)) {
                 toast.success('설정이 저장되었습니다.');
             }
-            router.push(`/class/${classId}/survey/${surveyId}`);
         },
         onError: (error) => {
             toast.error(`저장 실패: ${error.message}`);
@@ -318,12 +318,49 @@ export default function SurveyStudentDetailPage() {
         }
     });
 
+    // --- 자동저장 훅 설정 ---
+    const { autoSave: autoSaveRelationships } = useAutoSave({
+        delay: 1000, // 1초 지연
+        onSave: useCallback(async () => {
+            if (classDetails && isDemoClass(classDetails)) {
+                // 데모 학급에서는 저장 안함
+                return;
+            }
+            try {
+                await saveAllSettings(studentId, classId, surveyId, relationshipSettings, answerSettings, initialRelationshipsData, classDetails);
+                console.log('관계 설정 자동저장 완료');
+            } catch (error) {
+                console.error('관계 설정 자동저장 실패:', error);
+            }
+        }, [studentId, classId, surveyId, relationshipSettings, answerSettings, initialRelationshipsData, classDetails]),
+    });
+
+    const { autoSave: autoSaveAnswers } = useAutoSave({
+        delay: 2000, // 2초 지연
+        onSave: useCallback(async () => {
+            if (classDetails && isDemoClass(classDetails)) {
+                // 데모 학급에서는 저장 안함
+                return;
+            }
+            try {
+                await saveAllSettings(studentId, classId, surveyId, relationshipSettings, answerSettings, initialRelationshipsData, classDetails);
+                console.log('답변 자동저장 완료');
+            } catch (error) {
+                console.error('답변 자동저장 실패:', error);
+            }
+        }, [studentId, classId, surveyId, relationshipSettings, answerSettings, initialRelationshipsData, classDetails]),
+    });
+
     // --- 핸들러 함수들 ---
     const handleRelationshipChange = (targetId: string, type: keyof typeof RELATIONSHIP_TYPES | null) => {
-        setRelationshipSettings(prev => ({ ...prev, [targetId]: type }));
+        const newSettings = { ...relationshipSettings, [targetId]: type };
+        setRelationshipSettings(newSettings);
+        autoSaveRelationships(newSettings); // 관계 변경 시 자동저장 트리거
     };
     const handleAnswerChange = (questionId: string, text: string) => {
-        setAnswerSettings(prev => ({ ...prev, [questionId]: text }));
+        const newAnswers = { ...answerSettings, [questionId]: text };
+        setAnswerSettings(newAnswers);
+        autoSaveAnswers(newAnswers); // 답변 변경 시 자동저장 트리거
     };
     const handleAddQuestion = () => {
         if (newQuestionText.trim()) {
@@ -341,17 +378,6 @@ export default function SurveyStudentDetailPage() {
     const confirmDeleteQuestion = () => {
         if (!questionToDelete) return;
         deleteQuestionMutation.mutate(questionToDelete.id);
-    };
-    const handleGoBack = async () => {
-        try {
-            await saveSettingsMutation.mutateAsync();
-            if (selectedGender !== initialGender && (selectedGender === 'male' || selectedGender === 'female')) {
-                await updateStudentGenderMutation.mutateAsync({ gender: selectedGender });
-            }
-            router.push(`/class/${classId}/survey/${surveyId}`);
-        } catch (error) {
-            console.error("저장 중 오류 발생:", error);
-        }
     };
 
     // --- 로딩 / 에러 처리 ---
@@ -380,32 +406,29 @@ export default function SurveyStudentDetailPage() {
                         {/* 성별 선택 버튼 그룹 */}
                         <div className="flex items-center space-x-1 bg-gray-100 p-0.5 rounded-lg">
                             <button
-                                onClick={() => setSelectedGender('male')}
+                                onClick={() => {
+                                    setSelectedGender('male');
+                                    if (selectedGender !== 'male') {
+                                        updateStudentGenderMutation.mutate({ gender: 'male' });
+                                    }
+                                }}
                                 className={`px-3 py-1 text-xs rounded-md transition-colors duration-150 ${selectedGender === 'male' ? 'bg-[#6366f1] text-white shadow-sm font-semibold' : 'text-gray-500 hover:text-gray-700'}`}
                             >
                                 남학생
                             </button>
                             <button
-                                onClick={() => setSelectedGender('female')}
+                                onClick={() => {
+                                    setSelectedGender('female');
+                                    if (selectedGender !== 'female') {
+                                        updateStudentGenderMutation.mutate({ gender: 'female' });
+                                    }
+                                }}
                                 className={`px-3 py-1 text-xs rounded-md transition-colors duration-150 ${selectedGender === 'female' ? 'bg-[#6366f1] text-white shadow-sm font-semibold' : 'text-gray-500 hover:text-gray-700'}`}
                             >
                                 여학생
                             </button>
                         </div>
                     </div>
-                    <button
-                        onClick={handleGoBack}
-                        disabled={saveSettingsMutation.isPending || updateStudentGenderMutation.isPending}
-                        className="px-4 py-2 text-sm bg-[#6366f1] text-white rounded-lg hover:bg-[#4f46e5] transition-colors duration-200 font-semibold flex items-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                        {(saveSettingsMutation.isPending || updateStudentGenderMutation.isPending) ? (
-                           <svg className="animate-spin -ml-1 mr-1 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                           </svg>
-                        ) : <ArrowUturnLeftIcon className="w-4 h-4" />}
-                        {(saveSettingsMutation.isPending || updateStudentGenderMutation.isPending) ? '저장중...' : '돌아가기'}
-                    </button>
                 </header>
                 <div className="mb-8 bg-white p-4 rounded-xl shadow-md">
                     {isLoadingAllStudents ? (
@@ -499,15 +522,6 @@ export default function SurveyStudentDetailPage() {
                     ) : (
                         <p className="text-gray-500 italic text-center py-4">등록된 주관식 질문이 없습니다.</p>
                     )}
-                </div>
-                <div className="mt-8 flex justify-center">
-                    <button
-                        onClick={handleGoBack}
-                        disabled={saveSettingsMutation.isPending || updateStudentGenderMutation.isPending}
-                        className="px-6 py-3 text-base bg-[#6366f1] text-white rounded-lg hover:bg-[#4f46e5] transition-colors duration-200 font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                        {(saveSettingsMutation.isPending || updateStudentGenderMutation.isPending) ? '저장중...' : '돌아가기'}
-                    </button>
                 </div>
                 {questionToDelete && (
                     <ConfirmModal

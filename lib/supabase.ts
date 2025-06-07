@@ -94,6 +94,7 @@ export interface Survey {
   class_id: string;
   name: string;
   description?: string;
+  survey_date?: string; // YYYY-MM-DD 형식
   created_at: string;
 } 
 

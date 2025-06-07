@@ -5,7 +5,6 @@ import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, Class, Student } from '@/lib/supabase';
 import {
-  ArrowLeftIcon,
   DocumentTextIcon,
   ArrowPathIcon,
   SparklesIcon,
@@ -880,16 +879,7 @@ export default function AnalysisDetailPage() {
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* 헤더 */}
         <header className="mb-8 bg-white p-4 rounded-lg shadow-md">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => router.back()}
-              className="flex items-center px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors shadow-sm"
-            >
-              <ArrowLeftIcon className="w-4 h-4 mr-2" />
-              돌아가기
-            </button>
-            <h1 className="text-2xl font-bold text-black">{classDetails.name} 분석 결과</h1>
-          </div>
+          <h1 className="text-2xl font-bold text-black">{classDetails.name} 분석 결과</h1>
           <div className="mt-2 flex items-center text-gray-500">
             <DocumentTextIcon className="w-4 h-4 mr-2" />
             <span>{formattedDate} {formattedTime} 생성</span>

@@ -5,7 +5,6 @@ import { useParams, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { supabase, Class, Student } from '@/lib/supabase';
 import {
-  ArrowLeftIcon,
   DocumentTextIcon,
   CalendarIcon,
   UserIcon,
@@ -225,16 +224,7 @@ export default function SchoolRecordDetailPage() {
         {/* 헤더 */}
         <header className="mb-8 bg-white p-4 rounded-lg shadow-md">
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => router.back()}
-                className="flex items-center px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors shadow-sm"
-              >
-                <ArrowLeftIcon className="w-4 h-4 mr-2" />
-                돌아가기
-              </button>
-              <h1 className="text-2xl font-bold text-gray-900">{classDetails?.name} 생활기록부</h1>
-            </div>
+            <h1 className="text-2xl font-bold text-gray-900">{classDetails?.name} 생활기록부</h1>
             
             <div className="flex items-center text-sm text-gray-500">
               <CalendarIcon className="w-4 h-4 mr-1" />

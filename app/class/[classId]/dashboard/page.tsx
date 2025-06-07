@@ -8,7 +8,6 @@ import {
   ClipboardDocumentListIcon,
   UserGroupIcon,
   ChartBarIcon,
-  ArrowLeftIcon,
   DocumentTextIcon,
   InformationCircleIcon,
   CalendarDaysIcon,
@@ -108,12 +107,6 @@ export default function ClassDashboardPage() {
         <p className="text-gray-700 mb-4">
           {error instanceof Error ? error.message : '학급 정보를 불러올 수 없습니다.'}
         </p>
-        <button
-          onClick={() => router.back()}
-          className="px-4 py-2 bg-indigo-500 text-white rounded-md hover:bg-indigo-600"
-        >
-          돌아가기
-        </button>
       </div>
     );
   }
@@ -124,16 +117,7 @@ export default function ClassDashboardPage() {
         <CarouselBanner slides={dashboardBannerSlides} autoPlayInterval={6000} />
         {/* 헤더 */}
         <header className="mt-5 mb-5 flex justify-between items-center bg-white p-5 rounded-lg shadow-md">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => router.back()}
-              className="px-4 py-2 text-sm bg-indigo-500 text-white rounded-md hover:bg-indigo-600 shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:ring-offset-1 transition-all duration-200 flex items-center"
-            >
-              <ArrowLeftIcon className="w-4 h-4 mr-2" />
-              돌아가기
-            </button>
-            <h1 className="text-2xl font-bold text-black">{classDetails.name} 대시보드</h1>
-          </div>
+          <h1 className="text-2xl font-bold text-black">{classDetails.name} 대시보드</h1>
         </header>
 
         {/* 대시보드 카드 그리드 */}

@@ -5,7 +5,6 @@ import { useRouter, useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { 
-  ArrowLeftIcon,
   DocumentTextIcon,
   CheckIcon,
   PencilIcon,
@@ -17,6 +16,7 @@ import { format, parseISO } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { supabase } from '@/lib/supabase';
 import type { Class, ClassJournal, JournalClassMemo } from '@/lib/supabase';
+import { useAutoSave } from '@/hooks/useAutoSave';
 import toast from 'react-hot-toast';
 
 // 학급 정보 조회
@@ -231,6 +231,23 @@ export default function ClassNotesPage() {
     },
   });
 
+  // 자동저장 기능
+  const { autoSave } = useAutoSave<string>({
+    delay: 2000, // 2초 후 자동저장
+    onSave: async (value: string) => {
+      if (!value.trim()) return;
+      
+      const journal = await getOrCreateJournal(classId, date);
+      await saveClassMemo(journal.id, value, editingMemoId || undefined);
+      
+      // 상태 업데이트
+      queryClient.invalidateQueries({ queryKey: ['class-memos', classId, date] });
+      
+      console.log('자동저장 완료 - 학급 메모');
+    },
+    enabled: !!classId && !!date
+  });
+
   // 저장 핸들러
   const handleSave = async () => {
     if (!content.trim()) {
@@ -273,20 +290,10 @@ export default function ClassNotesPage() {
       <div className="max-w-4xl mx-auto">
         {/* 헤더 */}
         <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => router.back()}
-              className="flex items-center px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors shadow-sm"
-            >
-              <ArrowLeftIcon className="h-5 w-5 mr-2" />
-              <span>돌아가기</span>
-            </button>
-            <div className="h-6 w-px bg-gray-300" />
-            <h1 className="text-3xl font-bold text-gray-800 flex items-center space-x-2">
-              <DocumentTextIcon className="h-8 w-8 text-purple-600" />
-              <span>오늘의 우리 반</span>
-            </h1>
-          </div>
+          <h1 className="text-3xl font-bold text-gray-800 flex items-center space-x-2">
+            <DocumentTextIcon className="h-8 w-8 text-purple-600" />
+            <span>오늘의 우리 반</span>
+          </h1>
         </div>
 
         {/* 학급 및 날짜 정보 */}
@@ -358,14 +365,23 @@ export default function ClassNotesPage() {
                     {editingMemoId ? '메모 수정' : '새 메모 작성'}
                   </h3>
                 </div>
-                <div className="text-sm text-gray-500">
-                  {content.length}/2000자
+                <div className="flex items-center space-x-3">
+                  <div className="text-sm text-green-600">
+                    💾 자동저장 활성화
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    {content.length}/2000자
+                  </div>
                 </div>
               </div>
 
               <textarea
                 value={content}
-                onChange={(e) => setContent(e.target.value)}
+                onChange={(e) => {
+                  const newValue = e.target.value;
+                  setContent(newValue);
+                  autoSave(newValue); // 자동저장 트리거
+                }}
                 placeholder="오늘 우리 반에서 일어난 일들을 자유롭게 기록해보세요...
 
 예시:

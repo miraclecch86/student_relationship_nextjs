@@ -5,7 +5,6 @@ import { useRouter, useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { 
-  ArrowLeftIcon,
   ChartBarIcon,
   UserGroupIcon,
   CalendarDaysIcon,
@@ -270,20 +269,10 @@ export default function AttendanceAnalysisPage() {
       <div className="max-w-7xl mx-auto">
         {/* 헤더 */}
         <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => router.back()}
-              className="flex items-center px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors shadow-sm"
-            >
-              <ArrowLeftIcon className="h-5 w-5 mr-2" />
-              <span>돌아가기</span>
-            </button>
-            <div className="h-6 w-px bg-gray-300" />
-            <h1 className="text-3xl font-bold text-gray-800 flex items-center space-x-2">
-              <ChartBarIcon className="h-8 w-8 text-green-600" />
-              <span>{classDetails.name} 출석 분석</span>
-            </h1>
-          </div>
+          <h1 className="text-3xl font-bold text-gray-800 flex items-center space-x-2">
+            <ChartBarIcon className="h-8 w-8 text-green-600" />
+            <span>{classDetails.name} 출석 분석</span>
+          </h1>
         </div>
 
         {/* 기간 정보 */}

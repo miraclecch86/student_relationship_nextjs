@@ -5,7 +5,7 @@ import { Student } from '@/lib/supabase'; // Student 타입을 가져옵니다.
 
 interface RelationshipTypeRankBoxProps {
   title: string; // 예: "가장 친한 친구", "같이 공부하고 싶은 친구"
-  students: Student[] | undefined; // 해당 관계 유형의 상위 학생 목록
+  students: (Student & { count: number })[] | undefined; // 해당 관계 유형의 상위 학생 목록 (횟수 포함)
   relationshipType: string; // 랭킹 계산에 사용된 관계 유형 (내부 로직용, 표시 X)
 }
 
@@ -24,9 +24,12 @@ const RelationshipTypeRankBox: React.FC<RelationshipTypeRankBoxProps> = ({
           {students.slice(0, 10).map((student, index) => ( 
             <li key={student.id} className="flex items-center justify-between py-0.5 px-1 rounded hover:bg-gray-100 leading-tight">
               <span className="font-medium text-gray-500">{index + 1}위:</span>
-              <span className="truncate ml-2 flex-1 text-right font-medium text-gray-500">{student.name}</span>
-              {/* 필요하다면 받은 횟수 등을 표시할 수 있습니다. */}
-              {/* 예: <span className="text-xs text-gray-500 ml-1">({student.count})</span> */}
+              <div className="flex items-center ml-2 flex-1 justify-end gap-1">
+                <span className="truncate font-medium text-gray-500">{student.name}</span>
+                <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full min-w-fit">
+                  {student.count}개
+                </span>
+              </div>
             </li>
           ))}
         </ul>

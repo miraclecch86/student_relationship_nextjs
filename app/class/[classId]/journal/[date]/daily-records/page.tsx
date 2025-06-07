@@ -6,7 +6,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, Class, ClassDailyRecord } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  ArrowLeftIcon,
   PlusIcon,
   XMarkIcon,
   TrashIcon,
@@ -803,20 +802,10 @@ export default function DailyRecordsPage() {
       <div className="max-w-7xl mx-auto">
         {/* 헤더 */}
         <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => router.back()}
-              className="flex items-center px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors shadow-sm"
-            >
-              <ArrowLeftIcon className="h-5 w-5 mr-2" />
-              <span>돌아가기</span>
-            </button>
-            <div className="h-6 w-px bg-gray-300" />
-            <h1 className="text-2xl font-bold text-gray-800 flex items-center space-x-2">
-              <CalendarDaysIcon className="h-6 w-6 text-purple-600" />
-              <span>누가 기록</span>
-            </h1>
-          </div>
+          <h1 className="text-2xl font-bold text-gray-800 flex items-center space-x-2">
+            <CalendarDaysIcon className="h-6 w-6 text-purple-600" />
+            <span>누가 기록</span>
+          </h1>
         </div>
 
         {/* 날짜 정보 */}

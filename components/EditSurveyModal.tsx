@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, Fragment, useEffect } from 'react';
-import { Dialog, Transition } from '@headlessui/react';
-import { motion } from 'framer-motion';
+import { useState, useEffect } from 'react';
 import { Survey } from '@/lib/supabase'; // Survey 타입 import
+import { PlusIcon } from '@heroicons/react/24/outline';
 
 interface EditSurveyModalProps {
   isOpen: boolean;
@@ -67,90 +66,94 @@ export default function EditSurveyModal({
     }
   };
 
+  const handleCloseModal = () => {
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
   return (
-    <Transition appear show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-50" onClose={onClose}>
-        {/* 오버레이 제거 */}
-        {/* 
-        <Transition.Child
-          as={Fragment}
-          enter="ease-out duration-200" enterFrom="opacity-0" enterTo="opacity-100"
-          leave="ease-in duration-150" leaveFrom="opacity-100" leaveTo="opacity-0"
-        >
-          <div className="fixed inset-0 bg-black bg-opacity-50" /> 
-        </Transition.Child>
-        */}
+    <div 
+      className="fixed inset-0 flex items-center justify-center p-4"
+      style={{ 
+        backgroundColor: 'rgba(0, 0, 0, 0.5)', 
+        zIndex: 9999 
+      }}
+      onClick={handleCloseModal}
+    >
+      <div
+        className="bg-white rounded-xl shadow-xl max-w-md w-full relative"
+        style={{ zIndex: 10000 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-semibold text-gray-800" style={{ color: '#1f2937' }}>설문 정보 수정</h3>
+            <button
+              onClick={handleCloseModal}
+              className="text-gray-500 hover:text-gray-700"
+              style={{ color: '#6b7280' }}
+            >
+              <PlusIcon className="h-6 w-6 rotate-45" />
+            </button>
+          </div>
 
-        <div className="fixed inset-0 overflow-y-auto">
-          <div className="flex min-h-full items-center justify-center p-4 text-center">
-            <Transition.Child
-              as={Fragment}
-              enter="ease-out duration-200" enterFrom="opacity-0 scale-95" enterTo="opacity-100 scale-100"
-              leave="ease-in duration-150" leaveFrom="opacity-100 scale-100" leaveTo="opacity-0 scale-95"
-             >
-              <Dialog.Panel 
-                className="w-full max-w-md transform overflow-hidden rounded-lg bg-white p-6 text-left align-middle transition-all"
-                style={{ boxShadow: '0 -8px 20px rgba(0, 0, 0, 0.1), 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)' }}
-              >
-                <Dialog.Title as="h3" className="text-lg font-semibold leading-6 text-indigo-600">
-                  설문 정보 수정
-                </Dialog.Title>
-                <div className="mt-4 space-y-4">
-                  <div>
-                    <label htmlFor="survey-name" className="block text-sm font-medium text-gray-900 mb-1">설문 이름</label>
-                    <input
-                      id="survey-name"
-                      type="text"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 shadow-sm text-black placeholder:text-gray-400"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="survey-desc" className="block text-sm font-medium text-gray-900 mb-1">설명 (선택)</label>
-                    <textarea
-                      id="survey-desc"
-                      rows={3}
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 shadow-sm resize-none text-black placeholder:text-gray-400"
-                    />
-                  </div>
-                  <div>
-                     <label htmlFor="survey-date" className="block text-sm font-medium text-gray-900 mb-1">생성일</label>
-                    <input
-                      id="survey-date"
-                      type="date"
-                      value={createdAt}
-                      onChange={(e) => setCreatedAt(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 shadow-sm text-black"
-                    />
-                  </div>
-                </div>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2" style={{ color: '#374151' }}>설문명</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="예: 1학기 친구관계, 2학기 설문..."
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                style={{ color: '#111827', backgroundColor: '#ffffff' }}
+                maxLength={50}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2" style={{ color: '#374151' }}>설명</label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="설문에 대한 간단한 설명을 입력하세요..."
+                rows={3}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 resize-none"
+                style={{ color: '#111827', backgroundColor: '#ffffff' }}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2" style={{ color: '#374151' }}>설문진행날짜</label>
+              <input
+                type="date"
+                value={createdAt}
+                onChange={(e) => setCreatedAt(e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                style={{ color: '#111827', backgroundColor: '#ffffff' }}
+              />
+            </div>
+          </div>
 
-                <div className="mt-6 flex justify-end space-x-2">
-                  <button
-                    type="button"
-                    className="px-4 py-2 text-sm text-black bg-gray-100 rounded-md hover:bg-gray-200"
-                    onClick={onClose}
-                    disabled={isLoading}
-                  >
-                    취소
-                  </button>
-                  <button
-                    type="button"
-                    className={`px-4 py-2 text-sm font-medium text-white rounded-md shadow-sm ${isLoading ? 'bg-gray-400' : 'bg-indigo-600 hover:bg-indigo-700'}`}
-                    onClick={handleSaveClick}
-                    disabled={isLoading}
-                  >
-                    {isLoading ? '저장 중...' : '저장'}
-                  </button>
-                </div>
-              </Dialog.Panel>
-            </Transition.Child>
+          <div className="flex items-center justify-end space-x-3 mt-6">
+            <button
+              onClick={handleCloseModal}
+              className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+              style={{ color: '#374151', backgroundColor: '#ffffff', borderColor: '#d1d5db' }}
+              disabled={isLoading}
+            >
+              취소
+            </button>
+            <button
+              onClick={handleSaveClick}
+              disabled={!name.trim() || isLoading}
+              className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ backgroundColor: '#22c55e', color: '#ffffff' }}
+            >
+              {isLoading ? '저장 중...' : '저장하기'}
+            </button>
           </div>
         </div>
-      </Dialog>
-    </Transition>
+      </div>
+    </div>
   );
 } 

@@ -7,7 +7,6 @@ import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { toast } from 'react-hot-toast';
 import { 
-  ArrowLeftIcon, 
   PlusIcon, 
   TrashIcon,
   XMarkIcon,
@@ -15,6 +14,7 @@ import {
   MagnifyingGlassIcon
 } from '@heroicons/react/24/outline';
 import { supabase, Class } from '@/lib/supabase';
+import { useAutoSave } from '@/hooks/useAutoSave';
 
 // TODO 아이템 타입 정의
 interface TodoItem {
@@ -123,6 +123,19 @@ export default function TodoListPage() {
   });
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
   const [searchTerm, setSearchTerm] = useState('');
+
+  // 자동저장 설정 (검색어 자동저장)
+  const { autoSave: autoSaveSearch } = useAutoSave<string>({
+    onSave: (value: string) => {
+      // 검색어는 localStorage에 자동저장
+      if (classId && value) {
+        localStorage.setItem(`todos_search_${classId}`, value);
+        console.log('TODO 검색어 자동저장됨:', value);
+      }
+    },
+    delay: 1000, // 1초 딜레이
+    enabled: searchTerm.length > 0
+  });
 
   // 데이터 조회
   const { data: classDetails } = useQuery<Class | null, Error>({
@@ -249,22 +262,12 @@ export default function TodoListPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-6xl mx-auto p-6">
-        {/* 헤더 */}
+                          {/* 헤더 */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-8">
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => router.back()}
-              className="flex items-center px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors shadow-sm"
-            >
-              <ArrowLeftIcon className="h-5 w-5 mr-2" />
-              <span>돌아가기</span>
-            </button>
-            <div className="h-6 w-px bg-gray-300" />
-            <h1 className="text-2xl lg:text-3xl font-bold text-gray-800 flex items-center space-x-2">
-              <span className="text-2xl">✅</span>
-              <span>{classDetails.name} TO-DO</span>
-            </h1>
-          </div>
+          <h1 className="text-2xl lg:text-3xl font-bold text-gray-800 flex items-center space-x-2">
+            <span className="text-2xl">✅</span>
+            <span>{classDetails.name} TO-DO</span>
+          </h1>
           <button
             onClick={() => setIsTodoModalOpen(true)}
             className="flex items-center justify-center px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm font-medium"
@@ -285,7 +288,11 @@ export default function TodoListPage() {
               <input
                 type="text"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  const newValue = e.target.value;
+                  setSearchTerm(newValue);
+                  autoSaveSearch(newValue);
+                }}
                 placeholder="TODO 검색 (여러 단어는 +로 구분)"
                 className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 placeholder-gray-500"
               />

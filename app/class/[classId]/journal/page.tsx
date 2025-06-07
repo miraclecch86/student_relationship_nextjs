@@ -23,7 +23,6 @@ import {
   ChevronRightIcon, 
   MagnifyingGlassIcon,
   CalendarDaysIcon,
-  ArrowLeftIcon,
   PlusIcon,
   XMarkIcon,
   ClockIcon,
@@ -1342,13 +1341,6 @@ export default function ClassJournalPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-800 mb-4">학급을 찾을 수 없습니다</h1>
-          <button
-            onClick={() => router.back()}
-            className="flex items-center px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors shadow-sm"
-          >
-            <ArrowLeftIcon className="h-5 w-5 mr-2" />
-            <span>돌아가기</span>
-          </button>
         </div>
       </div>
     );
@@ -1359,20 +1351,10 @@ export default function ClassJournalPage() {
       <div className="max-w-6xl mx-auto">
         {/* 헤더 */}
         <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => router.back()}
-              className="flex items-center px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors shadow-sm"
-            >
-              <ArrowLeftIcon className="h-5 w-5 mr-2" />
-              <span>돌아가기</span>
-            </button>
-            <div className="h-6 w-px bg-gray-300" />
-            <h1 className="text-3xl font-bold text-gray-800 flex items-center space-x-2">
-              <CalendarDaysIcon className="h-8 w-8 text-blue-600" />
-              <span>{classDetails.name} 학급 일지</span>
-            </h1>
-          </div>
+          <h1 className="text-3xl font-bold text-gray-800 flex items-center space-x-2">
+            <CalendarDaysIcon className="h-8 w-8 text-blue-600" />
+            <span>{classDetails.name} 학급 일지</span>
+          </h1>
         </div>
 
         {/* 캘린더 섹션 */}

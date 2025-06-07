@@ -5,7 +5,6 @@ import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, Class } from '@/lib/supabase';
 import {
-  ArrowLeftIcon,
   SparklesIcon,
   CalendarIcon,
   ArrowPathIcon,
@@ -1169,13 +1168,6 @@ export default function ClassAnalysisPage() {
         <p className="text-gray-700 mb-4">
           {resultsError instanceof Error ? resultsError.message : '분석 결과를 불러올 수 없습니다.'}
         </p>
-        <button
-          onClick={() => router.back()}
-          className="flex items-center px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors shadow-sm"
-        >
-          <ArrowLeftIcon className="w-4 h-4 mr-2" />
-          돌아가기
-        </button>
       </div>
     );
   }
@@ -1184,13 +1176,6 @@ export default function ClassAnalysisPage() {
     return (
       <div className="flex flex-col justify-center items-center min-h-screen bg-gray-100">
         <div className="text-2xl text-red-500 mb-4">학급 정보를 찾을 수 없습니다</div>
-        <button
-          onClick={() => router.back()}
-          className="flex items-center px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors shadow-sm"
-        >
-          <ArrowLeftIcon className="w-4 h-4 mr-2" />
-          돌아가기
-        </button>
       </div>
     );
   }
@@ -1224,16 +1209,7 @@ export default function ClassAnalysisPage() {
       <div className="max-w-6xl mx-auto px-6 py-10">
         {/* 헤더 */}
         <header className="mb-10 flex justify-between items-center bg-white p-5 rounded-lg shadow-md">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => router.back()}
-              className="flex items-center px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors shadow-sm"
-            >
-              <ArrowLeftIcon className="w-4 h-4 mr-2" />
-              돌아가기
-            </button>
-            <h1 className="text-2xl font-bold text-black">{classDetails.name} 학급 분석</h1>
-          </div>
+          <h1 className="text-2xl font-bold text-black">{classDetails.name} 학급 분석</h1>
         </header>
         
         {/* 분석 실행 설명 부분 - 분석 버튼을 오른쪽으로 옮김 */}

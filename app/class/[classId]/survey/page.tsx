@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, Survey } from '@/lib/supabase';
 import SurveyCard from '@/components/SurveyCard';
-import { ArrowPathIcon, ExclamationCircleIcon, PlusIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { ArrowPathIcon, ExclamationCircleIcon, PlusIcon, ClipboardDocumentListIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import ConfirmModal from '@/components/ConfirmModal';
 import EditSurveyModal from '@/components/EditSurveyModal';
@@ -45,10 +45,20 @@ async function fetchClassDetails(classId: string): Promise<any | null> {
 // --- 데이터 Mutation 함수 --- 
 
 // 설문 생성 함수
-async function createSurvey(classId: string, name: string, description?: string): Promise<Survey> {
+async function createSurvey(classId: string, name: string, description?: string, surveyDate?: string): Promise<Survey> {
+  const insertData: any = { 
+    class_id: classId, 
+    name: name.trim(), 
+    description: description?.trim() 
+  };
+  
+  if (surveyDate) {
+    insertData.survey_date = surveyDate;
+  }
+  
   const { data, error } = await (supabase as any)
     .from('surveys')
-    .insert([{ class_id: classId, name: name.trim(), description: description?.trim() }])
+    .insert([insertData])
     .select()
     .single();
 
@@ -99,6 +109,7 @@ export default function SurveyListPage() {
   const [showCreateSurveyModal, setShowCreateSurveyModal] = useState(false);
   const [newSurveyName, setNewSurveyName] = useState('');
   const [newSurveyDesc, setNewSurveyDesc] = useState('');
+  const [newSurveyDate, setNewSurveyDate] = useState('');
   const [surveyToDelete, setSurveyToDelete] = useState<Survey | null>(null);
   const [surveyToEdit, setSurveyToEdit] = useState<Survey | null>(null);
 
@@ -117,8 +128,8 @@ export default function SurveyListPage() {
   });
 
   // 설문 생성 Mutation
-  const createSurveyMutation = useMutation<Survey, Error, { name: string; description?: string }>({ 
-    mutationFn: async ({ name, description }) => {
+  const createSurveyMutation = useMutation<Survey, Error, { name: string; description?: string; surveyDate?: string }>({ 
+    mutationFn: async ({ name, description, surveyDate }) => {
       // 🌟 데모 학급 권한 체크
       if (classDetails && isDemoClass(classDetails)) {
         const saveAttempt = handleDemoSaveAttempt(classDetails, "설문 생성");
@@ -137,13 +148,14 @@ export default function SurveyListPage() {
           throw new Error("DEMO_BLOCKED");
         }
       }
-      return createSurvey(classId, name, description);
+      return createSurvey(classId, name, description, surveyDate);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['surveys', classId] });
       setShowCreateSurveyModal(false);
       setNewSurveyName('');
       setNewSurveyDesc('');
+      setNewSurveyDate('');
       // 🌟 데모 학급이 아닌 경우만 성공 메시지 표시
       if (classDetails && !isDemoClass(classDetails)) {
         toast.success('새로운 설문이 생성되었습니다.');
@@ -249,10 +261,21 @@ export default function SurveyListPage() {
 
   const handleCreateSurvey = () => {
     if (newSurveyName.trim()) {
-      createSurveyMutation.mutate({ name: newSurveyName, description: newSurveyDesc });
+      createSurveyMutation.mutate({ 
+        name: newSurveyName, 
+        description: newSurveyDesc,
+        surveyDate: newSurveyDate
+      });
     } else {
       toast.error('설문 이름을 입력해주세요.');
     }
+  };
+
+  const handleCloseCreateModal = () => {
+    setShowCreateSurveyModal(false);
+    setNewSurveyName('');
+    setNewSurveyDesc('');
+    setNewSurveyDate('');
   };
 
   const handleSurveyClick = (surveyId: string) => {
@@ -289,42 +312,77 @@ export default function SurveyListPage() {
   const isError = isErrorSurveys;
 
   if (isLoading) {
-    return <div className="flex justify-center items-center h-screen"><ArrowPathIcon className="w-8 h-8 animate-spin" /></div>;
+    return (
+      <div className="min-h-screen bg-gray-50 flex justify-center items-center">
+        <div className="flex flex-col items-center">
+          <ArrowPathIcon className="w-12 h-12 text-indigo-600 animate-spin mb-4" />
+          <p className="text-lg text-gray-600">설문 목록을 불러오는 중...</p>
+        </div>
+      </div>
+    );
   }
 
   if (isError) {
-    return <div className="flex justify-center items-center h-screen text-red-500"><ExclamationCircleIcon className="w-8 h-8 mr-2" /> 설문 목록 로딩 실패</div>;
+    return (
+      <div className="min-h-screen bg-gray-50 flex justify-center items-center">
+        <div className="text-center">
+          <ExclamationCircleIcon className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-800 mb-2">오류가 발생했습니다</h2>
+          <p className="text-gray-600 mb-4">설문 목록을 불러오는 중 문제가 발생했습니다.</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+          >
+            다시 시도
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <div className="max-w-6xl mx-auto px-6 py-10">
-        <header className="mb-10 flex justify-between items-center bg-white p-5 rounded-lg shadow-md">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => router.back()}
-              className="flex items-center px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors shadow-sm"
-            >
-              <ArrowLeftIcon className="w-4 h-4 mr-2" />
-              돌아가기
-            </button>
-            <h1 className="text-2xl font-bold text-black">
-              {classDetails?.name ?? ''} - 설문 목록
-            </h1>
-          </div>
-          <button
-            onClick={() => setShowCreateSurveyModal(true)}
-            className="flex items-center px-4 py-2 text-sm bg-indigo-500 text-white rounded-md hover:bg-indigo-600 shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:ring-offset-1 transition-all duration-200"
-          >
-            <PlusIcon className="w-4 h-4 mr-2" />
-            새 설문 만들기
-          </button>
-        </header>
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* 헤더 */}
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold text-gray-800 flex items-center space-x-2">
+            <ClipboardDocumentListIcon className="h-6 w-6 text-green-600" />
+            <span>설문 작성</span>
+          </h1>
+        </div>
 
-        <main className="bg-white rounded-lg shadow-md border border-gray-200 p-6 lg:p-8 overflow-y-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {surveys && surveys.length > 0 ? (
-              surveys.map((survey) => (
+        {/* 학급 정보 */}
+        <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+              <ClipboardDocumentListIcon className="h-5 w-5 text-green-600" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-800">{classDetails?.name ?? ''} 설문 작성</h2>
+              <p className="text-sm text-gray-600">학급 설문을 생성하고 관리합니다. 학생들의 관계도를 파악할 수 있습니다</p>
+            </div>
+          </div>
+        </div>
+
+        {/* 설문 목록 */}
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-semibold text-gray-800">
+              설문 목록 ({surveys?.length || 0}개)
+            </h3>
+            <button
+              onClick={() => setShowCreateSurveyModal(true)}
+              className="flex items-center space-x-2 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors"
+            >
+              <PlusIcon className="h-5 w-5" />
+              <span>설문 생성</span>
+            </button>
+          </div>
+
+          {/* 설문 카드 그리드 */}
+          {surveys && surveys.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {surveys.map((survey) => (
                 <SurveyCard 
                   key={survey.id} 
                   survey={survey} 
@@ -332,46 +390,104 @@ export default function SurveyListPage() {
                   onEdit={handleEditSurvey}
                   onDelete={handleDeleteSurveyClick}
                 />
-              ))
-            ) : (
-              <p className="text-gray-500 italic col-span-full text-center mt-8">생성된 설문이 없습니다. '새 설문 만들기' 버튼을 클릭하여 설문을 추가하세요.</p>
-            )}
-          </div>
-        </main>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <ClipboardDocumentListIcon className="h-8 w-8 text-green-600" />
+              </div>
+              <p className="text-gray-600 mb-4">아직 생성된 설문이 없습니다</p>
+              <button
+                onClick={() => setShowCreateSurveyModal(true)}
+                className="text-green-600 hover:text-green-800 font-medium"
+              >
+                첫 번째 설문 생성하기
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {showCreateSurveyModal && (
-        <div className="fixed inset-0 bg-indigo-900 bg-opacity-60 backdrop-blur-sm flex justify-center items-center z-50">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
-            <h2 className="text-2xl font-bold text-indigo-800 mb-6 text-center">새 설문 만들기</h2>
-            <input
-              type="text"
-              placeholder="설문 이름"
-              value={newSurveyName}
-              onChange={(e) => setNewSurveyName(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black placeholder:text-gray-400"
-            />
-            <textarea
-              placeholder="설문 설명 (선택)"
-              value={newSurveyDesc}
-              onChange={(e) => setNewSurveyDesc(e.target.value)}
-              rows={3}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-6 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-black placeholder:text-gray-400"
-            />
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setShowCreateSurveyModal(false)}
-                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300"
-              >
-                취소
-              </button>
-              <button
-                onClick={handleCreateSurvey}
-                disabled={createSurveyMutation.isPending}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg shadow-sm hover:bg-indigo-700 disabled:opacity-50"
-              >
-                {createSurveyMutation.isPending ? '생성 중...' : '생성'}
-              </button>
+        <div 
+          className="fixed inset-0 flex items-center justify-center p-4"
+          style={{ 
+            backgroundColor: 'rgba(0, 0, 0, 0.5)', 
+            zIndex: 9999 
+          }}
+          onClick={handleCloseCreateModal}
+        >
+          <div
+            className="bg-white rounded-xl shadow-xl max-w-md w-full relative"
+            style={{ zIndex: 10000 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-semibold text-gray-800" style={{ color: '#1f2937' }}>새 설문 생성</h3>
+                <button
+                  onClick={handleCloseCreateModal}
+                  className="text-gray-500 hover:text-gray-700"
+                  style={{ color: '#6b7280' }}
+                >
+                  <PlusIcon className="h-6 w-6 rotate-45" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{ color: '#374151' }}>설문명</label>
+                  <input
+                    type="text"
+                    value={newSurveyName}
+                    onChange={(e) => setNewSurveyName(e.target.value)}
+                    placeholder="예: 1학기 친구관계, 2학기 설문..."
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    style={{ color: '#111827', backgroundColor: '#ffffff' }}
+                    maxLength={50}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{ color: '#374151' }}>설명</label>
+                  <textarea
+                    value={newSurveyDesc}
+                    onChange={(e) => setNewSurveyDesc(e.target.value)}
+                    placeholder="설문에 대한 간단한 설명을 입력하세요..."
+                    rows={3}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 resize-none"
+                    style={{ color: '#111827', backgroundColor: '#ffffff' }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2" style={{ color: '#374151' }}>설문진행날짜</label>
+                  <input
+                    type="date"
+                    value={newSurveyDate}
+                    onChange={(e) => setNewSurveyDate(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    style={{ color: '#111827', backgroundColor: '#ffffff' }}
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end space-x-3 mt-6">
+                <button
+                  onClick={handleCloseCreateModal}
+                  className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  style={{ color: '#374151', backgroundColor: '#ffffff', borderColor: '#d1d5db' }}
+                >
+                  취소
+                </button>
+                <button
+                  onClick={handleCreateSurvey}
+                  disabled={!newSurveyName.trim() || createSurveyMutation.isPending}
+                  className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ backgroundColor: '#22c55e', color: '#ffffff' }}
+                >
+                  {createSurveyMutation.isPending ? '생성 중...' : '생성하기'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

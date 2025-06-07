@@ -273,9 +273,6 @@ export default function SurveyRelationshipPage() {
         <div className="flex flex-col justify-center items-center min-h-screen bg-gray-100">
             <ExclamationCircleIcon className="w-16 h-16 text-yellow-500 mb-4" />
             <p className="text-lg text-black">학급 또는 설문 정보를 찾을 수 없습니다.</p>
-            <button onClick={() => router.push(`/class/${classId}/survey`)} className="mt-4 text-[#6366f1] hover:underline">
-                설문 목록으로 돌아가기
-            </button>
         </div>
     );
   }
@@ -284,16 +281,8 @@ export default function SurveyRelationshipPage() {
     <div className="min-h-screen bg-gray-100">
       <div className="max-w-6xl mx-auto px-6 py-10 flex flex-col">
 
-        <header className="mb-10 flex justify-between items-center bg-white p-5 rounded-lg shadow-md flex-shrink-0">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => router.push(`/class/${classId}/survey`)}
-              className="px-4 py-2 text-sm bg-indigo-500 text-white rounded-md hover:bg-indigo-600 shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:ring-offset-1 transition-all duration-200 flex items-center"
-            >
-              설문 목록
-            </button>
-            <h1 className="text-2xl font-bold text-black">{classDetails.name} - {surveyDetails.name}</h1>
-          </div>
+        <header className="mb-10 bg-white p-5 rounded-lg shadow-md flex-shrink-0">
+          <h1 className="text-2xl font-bold text-black">{classDetails.name} - {surveyDetails.name}</h1>
         </header>
 
         <div className="mb-4 flex flex-wrap justify-between items-center gap-4 bg-white p-3 rounded-lg shadow-md flex-shrink-0">
