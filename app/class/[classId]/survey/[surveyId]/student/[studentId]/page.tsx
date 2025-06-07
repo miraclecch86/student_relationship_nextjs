@@ -439,9 +439,9 @@ export default function SurveyStudentDetailPage() {
                               otherStudents.map(target => {
                                   const currentRelation = relationshipSettings[target.id] || null;
                                   return (
-                                      <div key={target.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 flex flex-col justify-between">
-                                          <p className="font-semibold text-center mb-3 text-black truncate" title={target.name}>{target.name || `학생 ${target.id.substring(0, 4)}`}</p>
-                                          <div className="flex justify-center gap-1.5">
+                                      <div key={target.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 h-28 flex flex-col justify-between">
+                                          <p className="font-semibold text-center mb-2 text-black truncate text-sm" title={target.name}>{target.name || `학생 ${target.id.substring(0, 4)}`}</p>
+                                          <div className="flex justify-center gap-1">
                                               {(Object.keys(RELATIONSHIP_TYPES) as Array<keyof typeof RELATIONSHIP_TYPES>).map(type => {
                                                   const isSelected = currentRelation === type;
                                                   const bgColor = isSelected ? RELATIONSHIP_COLORS[type] : '#f3f4f6';
@@ -451,7 +451,7 @@ export default function SurveyStudentDetailPage() {
                                                       <button
                                                           key={type}
                                                           onClick={() => handleRelationshipChange(target.id, isSelected ? null : type)}
-                                                          className={`px-3 py-1 text-xs rounded-md transition-all duration-150 ${hoverEffect} ${textColor} ${isSelected ? '' : 'border border-gray-200'}`}
+                                                          className={`px-1.5 py-1.5 text-xs rounded-md transition-all duration-150 ${hoverEffect} ${textColor} ${isSelected ? 'font-medium' : 'border border-gray-200'} text-center whitespace-nowrap`}
                                                           style={{ backgroundColor: bgColor }}
                                                       >
                                                           {RELATIONSHIP_TYPES[type]}

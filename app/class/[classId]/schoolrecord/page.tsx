@@ -361,7 +361,7 @@ function SchoolRecordCard({ record, classDetails }: SchoolRecordCardProps) {
   return (
     <>
       <motion.div
-        className="bg-white rounded-lg shadow-md p-4 transition-all duration-300 hover:shadow-lg hover:bg-gray-50 relative group"
+        className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 transition-all duration-300 hover:shadow-md hover:border-green-200 relative group"
         whileHover={{ scale: 1.02 }}
         layout
       >
@@ -371,29 +371,27 @@ function SchoolRecordCard({ record, classDetails }: SchoolRecordCardProps) {
         >
           <div className="flex items-start justify-between">
             <div className="flex items-start space-x-3">
-              <div className="bg-amber-100 text-amber-600 p-2 rounded-full">
+              <div className="bg-green-100 text-green-600 p-2.5 rounded-xl">
                 <DocumentTextIcon className="w-5 h-5" />
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="font-semibold text-black">{formattedDate}</h3>
-                </div>
-                <p className="text-sm font-medium text-black">{formattedTime}</p>
+                <h3 className="font-semibold text-gray-800 mb-1">{formattedDate}</h3>
+                <p className="text-sm text-gray-600">{formattedTime}</p>
               </div>
             </div>
-            {!isEditing && <ChevronRightIcon className="w-5 h-5 text-gray-400" />}
+            {!isEditing && <ChevronRightIcon className="w-5 h-5 text-gray-400 group-hover:text-green-600 transition-colors" />}
           </div>
-          <div className="mt-3">
+          <div className="mt-4">
             {isEditing ? (
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 onClick={(e) => e.stopPropagation()}
-                className="w-full h-24 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none text-black"
+                className="w-full h-24 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 resize-none text-gray-700"
                 placeholder="이 생활기록부에 대한 설명을 입력하세요..."
               />
             ) : (
-              <p className={`text-sm font-medium line-clamp-2 ${isDefaultDescription ? 'text-gray-500 italic' : 'text-black'}`}>
+              <p className={`text-sm line-clamp-2 ${isDefaultDescription ? 'text-gray-500 italic' : 'text-gray-700'}`}>
                 {description}
               </p>
             )}
@@ -401,12 +399,12 @@ function SchoolRecordCard({ record, classDetails }: SchoolRecordCardProps) {
         </div>
         
         {/* 버튼 영역 */}
-        <div className="absolute bottom-3 right-3 flex space-x-2">
+        <div className={`absolute bottom-4 right-4 flex space-x-2 transition-opacity ${isEditing ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
           {isEditing ? (
             <>
               <button
                 onClick={handleCancelEdit}
-                className="p-1.5 rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300"
+                className="p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300"
                 title="취소"
               >
                 <XCircleIcon className="w-4 h-4" />
@@ -414,7 +412,7 @@ function SchoolRecordCard({ record, classDetails }: SchoolRecordCardProps) {
               <button
                 onClick={handleSaveClick}
                 disabled={isSaving}
-                className="p-1.5 rounded-full bg-green-100 text-green-600 hover:bg-green-200 transition-colors focus:outline-none focus:ring-2 focus:ring-green-300"
+                className="p-2 rounded-lg bg-green-100 text-green-600 hover:bg-green-200 transition-colors focus:outline-none focus:ring-2 focus:ring-green-300"
                 title="저장"
               >
                 {isSaving ? (
@@ -428,7 +426,7 @@ function SchoolRecordCard({ record, classDetails }: SchoolRecordCardProps) {
             <>
               <button
                 onClick={handleEditClick}
-                className="p-1.5 rounded-full bg-gray-50 hover:bg-blue-50 text-gray-500 hover:text-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-300"
+                className="p-2 rounded-lg bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-700 transition-colors focus:outline-none focus:ring-2 focus:ring-green-300"
                 title="편집"
               >
                 <PencilIcon className="w-4 h-4" />
@@ -436,7 +434,7 @@ function SchoolRecordCard({ record, classDetails }: SchoolRecordCardProps) {
               <button
                 onClick={handleDeleteClick}
                 disabled={deleteMutation.isPending}
-                className="p-1.5 rounded-full bg-gray-50 hover:bg-red-50 text-gray-500 hover:text-red-600 transition-colors focus:outline-none focus:ring-2 focus:ring-red-300"
+                className="p-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-red-300"
                 title="삭제"
               >
                 {deleteMutation.isPending ? (
@@ -471,7 +469,6 @@ export default function SchoolRecordPage() {
   const [isDeleteAllModalOpen, setIsDeleteAllModalOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState('');
-  const [selectedModel, setSelectedModel] = useState<'gpt' | 'gemini-flash'>('gpt');
   
   // 학급 정보 조회
   const { 
@@ -519,7 +516,7 @@ export default function SchoolRecordPage() {
           return Promise.resolve({} as SchoolRecord);
         }
       }
-      return generateSchoolRecord(classId, selectedModel);
+      return generateSchoolRecord(classId, 'gemini-flash');
     },
     onSuccess: (data) => {
       // 🌟 데모 학급인 경우에는 쿼리 무효화나 상태 업데이트 안함
@@ -602,127 +599,132 @@ export default function SchoolRecordPage() {
 
   if (isClassError || !classDetails) {
     return (
-      <div className="flex flex-col justify-center items-center min-h-screen bg-gray-100">
-        <div className="text-2xl text-red-500 mb-4">오류가 발생했습니다</div>
-        <p className="text-gray-700 mb-4">
-          {classError instanceof Error ? classError.message : '학급 정보를 불러올 수 없습니다.'}
-        </p>
-        <button
-          onClick={() => router.back()}
-          className="px-4 py-2 bg-amber-500 text-white rounded-md hover:bg-amber-600"
-        >
-          돌아가기
-        </button>
+      <div className="flex flex-col justify-center items-center min-h-screen bg-gray-50">
+        <div className="bg-white rounded-xl shadow-sm p-8 text-center max-w-md">
+          <div className="w-16 h-16 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
+            <ExclamationTriangleIcon className="w-8 h-8 text-red-600" />
+          </div>
+          <h2 className="text-xl font-semibold text-gray-800 mb-3">오류가 발생했습니다</h2>
+          <p className="text-gray-600 mb-4">
+            {classError instanceof Error ? classError.message : '학급 정보를 불러올 수 없습니다.'}
+          </p>
+          <button
+            onClick={() => router.back()}
+            className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          >
+            돌아가기
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 relative">
+    <div className="min-h-screen bg-gray-50 relative">
       {/* 생성 진행 중 팝업 */}
       {isGenerating && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center">
-          <div className="bg-white p-8 rounded-lg shadow-xl max-w-md text-center border-2 border-amber-200">
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/20 backdrop-blur-sm">
+          <div className="bg-white p-8 rounded-xl shadow-xl max-w-md text-center border border-gray-200">
             {/* AI 스타일 로딩 아이콘 */}
-            <div className="flex justify-center items-center mb-4">
+            <div className="flex justify-center items-center mb-6">
               <div className="relative w-16 h-16">
                 {/* 바깥쪽 원 */}
-                <div className="absolute inset-0 border-4 border-amber-200 rounded-full"></div>
+                <div className="absolute inset-0 border-4 border-green-100 rounded-full"></div>
                 {/* 회전하는 부분 */}
-                <div className="absolute inset-0 border-4 border-transparent border-t-amber-600 rounded-full animate-spin"></div>
+                <div className="absolute inset-0 border-4 border-transparent border-t-green-600 rounded-full animate-spin"></div>
                 {/* 중앙 AI 아이콘 */}
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <SparklesIcon className="w-8 h-8 text-amber-600" />
+                  <SparklesIcon className="w-8 h-8 text-green-600" />
                 </div>
               </div>
             </div>
-            <h3 className="text-xl font-semibold text-gray-800 mb-2">생성 진행 중</h3>
-            <p className="text-gray-600 mb-4">{generationProgress}</p>
+            <h3 className="text-xl font-semibold text-gray-800 mb-3">AI 생성 진행 중</h3>
+            <p className="text-gray-600 mb-4 font-medium">{generationProgress}</p>
             <p className="text-sm text-gray-500">생성에는 몇 분 정도 소요될 수 있습니다. 잠시만 기다려주세요.</p>
           </div>
         </div>
       )}
       
-      <div className="max-w-6xl mx-auto px-6 py-10">
+      <div className="max-w-7xl mx-auto p-6">
         {/* 헤더 */}
-        <header className="mb-10 flex justify-between items-center bg-white p-5 rounded-lg shadow-md">
-          <div>
-            <h1 className="text-2xl font-bold text-black">{classDetails.name} 생활기록부</h1>
-          </div>
-          <div className="flex items-center gap-3">
-            {/* AI 모델 선택 버튼 */}
-            <div className="flex bg-gray-100 rounded-lg p-1">
-              <button
-                onClick={() => setSelectedModel('gpt')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
-                  selectedModel === 'gpt'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                GPT-4
-              </button>
-              <button
-                onClick={() => setSelectedModel('gemini-flash')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
-                  selectedModel === 'gemini-flash'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Gemini 2.5
-              </button>
+        <div className="flex items-center justify-between mb-6">
+                                <h1 className="text-2xl font-bold text-gray-800 flex items-center space-x-2">
+             <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+             </svg>
+             <span>쫑알쫑알</span>
+           </h1>
+         </div>
+
+        {/* 학급 정보 카드 */}
+        <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+              <DocumentTextIcon className="h-5 w-5 text-green-600" />
             </div>
-            <button
-              onClick={generateSchoolRecordWithProgress}
-              disabled={generateMutation.isPending || isGenerating}
-              className="px-4 py-2 text-sm bg-amber-500 text-white rounded-md hover:bg-amber-600 shadow focus:outline-none focus:ring-2 focus:ring-amber-300 focus:ring-offset-1 transition-all duration-200 flex items-center disabled:opacity-70 disabled:cursor-not-allowed"
-            >
-              {generateMutation.isPending || isGenerating ? (
-                <>
-                  <ArrowPathIcon className="w-4 h-4 animate-spin mr-2" />
-                  생성 중...
-                </>
-              ) : (
-                <>
-                  <SparklesIcon className="w-4 h-4 mr-2" />
-                  새 생활기록부 생성
-                </>
-              )}
-            </button>
-          </div>
-        </header>
-        
-        {/* 생활기록부 생성 설명 부분은 현재 위치 유지 */}
-        <div className="bg-white rounded-lg shadow-md p-4 mb-8">
-          <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-gray-800 flex items-center">
-                <SparklesIcon className="w-5 h-5 text-amber-500 mr-2" />
-                AI 기반 생활기록부 생성
-              </h2>
-              <p className="text-sm text-gray-600 mt-1">
-                학생들의 관계 데이터와 활동 내용을 AI가 분석하여 학생별 맞춤형 생활기록부 문구를 생성합니다.
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                각 학생의 특성을 반영한 구체적이고 개성 있는 생활기록부 문구를 제공합니다.
-              </p>
+              <h2 className="text-lg font-semibold text-gray-800">{classDetails.name}</h2>
+              <p className="text-sm text-gray-600">AI 기반 생활기록부 자동 생성</p>
             </div>
           </div>
         </div>
         
-        {/* 생활기록부 목록 설명 */}
-        <div className="bg-white shadow-md rounded-lg p-4 mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center space-x-2">
-              <DocumentTextIcon className="w-5 h-5 text-amber-600" />
-              <h2 className="text-lg font-semibold text-gray-800">생활기록부 목록</h2>
+        {/* 생활기록부 생성 설명 카드 */}
+        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <div className="flex items-center mb-3">
+                <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
+                  <SparklesIcon className="w-4 h-4 text-green-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-800">AI 기반 생활기록부 생성</h3>
+              </div>
+              <p className="text-sm text-gray-600 mb-2">
+                학생들의 관계 데이터와 활동 내용을 AI가 분석하여 학생별 맞춤형 생활기록부 문구를 생성합니다.
+              </p>
+              <p className="text-xs text-gray-500">
+                각 학생의 특성을 반영한 구체적이고 개성 있는 생활기록부 문구를 제공합니다. (Gemini 2.5 Flash 모델 사용)
+              </p>
+            </div>
+            <div className="flex items-center gap-3 ml-6">
+              <button
+                onClick={generateSchoolRecordWithProgress}
+                disabled={generateMutation.isPending || isGenerating}
+                className="px-6 py-3 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-green-300 transition-all duration-200 flex items-center disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {generateMutation.isPending || isGenerating ? (
+                  <>
+                    <ArrowPathIcon className="w-4 h-4 animate-spin mr-2" />
+                    생성 중...
+                  </>
+                ) : (
+                  <>
+                    <SparklesIcon className="w-4 h-4 mr-2" />
+                    새 생활기록부 생성
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        {/* 생활기록부 목록 헤더 */}
+        <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                <DocumentTextIcon className="w-4 h-4 text-green-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800">생활기록부 목록</h3>
+                <p className="text-sm text-gray-600">각 생활기록부를 클릭하여 상세 내용을 확인할 수 있습니다</p>
+              </div>
             </div>
             {schoolRecords && schoolRecords.length > 0 && (
               <button
                 onClick={handleDeleteAllClick}
                 disabled={deleteAllMutation.isPending}
-                className="p-2 rounded-full text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors focus:outline-none focus:ring-2 focus:ring-red-300"
+                className="p-2 rounded-lg text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors focus:outline-none focus:ring-2 focus:ring-red-300"
                 title="모든 생활기록부 삭제"
               >
                 {deleteAllMutation.isPending ? (
@@ -733,33 +735,40 @@ export default function SchoolRecordPage() {
               </button>
             )}
           </div>
-          <p className="text-sm text-gray-600">
-            각 생활기록부를 클릭하면 상세 내용을 볼 수 있습니다. 생성된 생활기록부에는 학생별 맞춤형 문구가 포함되어 있습니다.
-          </p>
         </div>
         
         {/* 생활기록부 목록 */}
-        <div className="mt-8">
+        <div className="space-y-4">
           {isRecordsLoading ? (
-            <div className="flex justify-center items-center p-12">
-              <ArrowPathIcon className="w-6 h-6 animate-spin text-amber-500" />
-              <span className="ml-2 text-amber-500">로딩 중...</span>
+            <div className="bg-white rounded-xl shadow-sm p-12 text-center">
+              <div className="w-16 h-16 mx-auto mb-4 relative">
+                <div className="absolute inset-0 border-4 border-green-100 rounded-full"></div>
+                <div className="absolute inset-0 border-4 border-transparent border-t-green-600 rounded-full animate-spin"></div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <DocumentTextIcon className="w-6 h-6 text-green-600" />
+                </div>
+              </div>
+              <span className="text-gray-600 font-medium">생활기록부를 불러오는 중...</span>
             </div>
           ) : isRecordsError ? (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-8 flex items-start">
-              <ExclamationTriangleIcon className="w-6 h-6 text-red-500 mr-3 flex-shrink-0 mt-0.5" />
-              <div>
-                <h3 className="text-lg font-medium text-red-800">데이터 로딩 오류</h3>
-                <p className="text-red-700 mt-1">
-                  {recordsError instanceof Error ? recordsError.message : '생활기록부 목록을 불러오는 중 오류가 발생했습니다.'}
-                </p>
-                <button
-                  onClick={() => queryClient.invalidateQueries({ queryKey: ['schoolRecords', classId] })}
-                  className="mt-2 px-3 py-1 bg-red-100 text-red-800 text-sm rounded-md hover:bg-red-200 inline-flex items-center"
-                >
-                  <ArrowPathIcon className="w-4 h-4 mr-1" />
-                  다시 시도
-                </button>
+            <div className="bg-white rounded-xl shadow-sm p-8">
+              <div className="flex items-start">
+                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mr-4 flex-shrink-0">
+                  <ExclamationTriangleIcon className="w-6 h-6 text-red-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-2">데이터 로딩 오류</h3>
+                  <p className="text-gray-600 mb-4">
+                    {recordsError instanceof Error ? recordsError.message : '생활기록부 목록을 불러오는 중 오류가 발생했습니다.'}
+                  </p>
+                  <button
+                    onClick={() => queryClient.invalidateQueries({ queryKey: ['schoolRecords', classId] })}
+                    className="px-4 py-2 bg-red-100 text-red-700 text-sm rounded-lg hover:bg-red-200 inline-flex items-center transition-colors"
+                  >
+                    <ArrowPathIcon className="w-4 h-4 mr-2" />
+                    다시 시도
+                  </button>
+                </div>
               </div>
             </div>
           ) : schoolRecords && schoolRecords.length > 0 ? (
@@ -775,9 +784,13 @@ export default function SchoolRecordPage() {
               </AnimatePresence>
             </div>
           ) : (
-            <div className="bg-gray-100 text-gray-600 p-8 rounded-lg text-center">
-              <p className="mb-4">생성된 생활기록부가 없습니다.</p>
-              <p className="text-sm">위의 '새 생활기록부 생성' 버튼을 눌러 생성을 시작해보세요.</p>
+            <div className="bg-white rounded-xl shadow-sm p-12 text-center">
+              <div className="w-16 h-16 mx-auto mb-4 bg-green-100 rounded-full flex items-center justify-center">
+                <SparklesIcon className="w-8 h-8 text-green-600" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-800 mb-2">생성된 생활기록부가 없습니다</h3>
+              <p className="text-gray-600 mb-4">아직 생성된 생활기록부가 없습니다.</p>
+              <p className="text-sm text-gray-500">위의 '새 생활기록부 생성' 버튼을 눌러 첫 번째 생활기록부를 생성해보세요.</p>
             </div>
           )}
         </div>

@@ -251,49 +251,108 @@ export default function SurveyRelationshipPage() {
 
   if (isLoading) {
     return (
-        <div className="flex flex-col justify-center items-center min-h-screen bg-gray-100">
-            <ArrowPathIcon className="w-12 h-12 text-blue-500 animate-spin mb-4" />
-            <p className="text-lg text-black">데이터를 불러오는 중입니다...</p>
+      <div className="min-h-screen bg-gray-50 flex justify-center items-center">
+        <div className="text-center">
+          <ArrowPathIcon className="w-16 h-16 text-blue-500 mx-auto mb-4 animate-spin" />
+          <h2 className="text-xl font-bold text-gray-800 mb-2">로딩 중...</h2>
+          <p className="text-gray-600">학생 관계도를 불러오고 있습니다.</p>
         </div>
+      </div>
     );
   }
 
   if (isError) {
     return (
-        <div className="flex flex-col justify-center items-center min-h-screen bg-gray-100 p-4">
-            <ExclamationCircleIcon className="w-16 h-16 text-red-500 mb-4" />
-            <h2 className="text-xl font-semibold text-red-700 mb-2">오류 발생</h2>
-            <p className="text-black mb-4 text-center">데이터를 불러오는 중 문제가 발생했습니다.</p>
+      <div className="min-h-screen bg-gray-50 flex justify-center items-center">
+        <div className="text-center">
+          <ExclamationCircleIcon className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-800 mb-2">오류가 발생했습니다</h2>
+          <p className="text-gray-600 mb-4">데이터를 불러오는 중 문제가 발생했습니다.</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            다시 시도
+          </button>
         </div>
+      </div>
     );
   }
 
   if (!classDetails || !surveyDetails) {
     return (
-        <div className="flex flex-col justify-center items-center min-h-screen bg-gray-100">
-            <ExclamationCircleIcon className="w-16 h-16 text-yellow-500 mb-4" />
-            <p className="text-lg text-black">학급 또는 설문 정보를 찾을 수 없습니다.</p>
+      <div className="min-h-screen bg-gray-50 flex justify-center items-center">
+        <div className="text-center">
+          <ExclamationCircleIcon className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-800 mb-2">정보를 찾을 수 없습니다</h2>
+          <p className="text-gray-600 mb-4">학급 또는 설문 정보를 찾을 수 없습니다.</p>
+          <button
+            onClick={() => router.back()}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            돌아가기
+          </button>
         </div>
+      </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <div className="max-w-6xl mx-auto px-6 py-10 flex flex-col">
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto p-6">
+        {/* 헤더 */}
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold text-gray-800 flex items-center space-x-2">
+            <svg className="h-6 w-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            <span>학생 관계도</span>
+          </h1>
+        </div>
 
-        <header className="mb-10 bg-white p-5 rounded-lg shadow-md flex-shrink-0">
-          <h1 className="text-2xl font-bold text-black">{classDetails.name} - {surveyDetails.name}</h1>
-        </header>
+        {/* 학급 및 설문 정보 */}
+        <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+              <svg className="h-5 w-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-800">{classDetails.name} - {surveyDetails.name}</h2>
+              <p className="text-sm text-gray-600">학생들 간의 관계를 시각적으로 확인하고 분석할 수 있습니다</p>
+            </div>
+          </div>
+        </div>
 
-        <div className="mb-4 flex flex-wrap justify-between items-center gap-4 bg-white p-3 rounded-lg shadow-md flex-shrink-0">
+        {/* 관계 필터 */}
+        <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-semibold text-gray-800">관계 필터</h3>
+            <span className="text-sm text-gray-500">
+              원하는 관계 유형을 선택하여 필터링하세요
+            </span>
+          </div>
           <div className="flex gap-2 items-center flex-wrap">
-            <span className="font-semibold text-sm mr-2 text-[#6366f1]">관계 필터:</span>
-            <button onClick={() => setFilterType('ALL')} className={`px-3 py-1 text-xs rounded-md transition-all duration-200 ${filterType === 'ALL' ? 'bg-[#6366f1] text-white shadow' : 'bg-gray-100 text-gray-700 hover:bg-[#e0e7ff]'}`}>전체</button>
+            <button 
+              onClick={() => setFilterType('ALL')} 
+              className={`px-4 py-2 text-sm rounded-lg font-medium transition-all duration-200 ${
+                filterType === 'ALL' 
+                  ? 'bg-purple-500 text-white shadow-md' 
+                  : 'bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200'
+              }`}
+            >
+              전체
+            </button>
             {Object.entries(RELATIONSHIP_TYPES).map(([key, label]) => (
               <button
                 key={key}
                 onClick={() => setFilterType(key as keyof typeof RELATIONSHIP_TYPES)}
-                className={`px-3 py-1 text-xs rounded-md transition-all duration-200 ${filterType === key ? 'text-white shadow' : 'bg-gray-100 text-gray-700 hover:bg-[#e0e7ff]'}`}
+                className={`px-4 py-2 text-sm rounded-lg font-medium transition-all duration-200 ${
+                  filterType === key 
+                    ? 'text-white shadow-md' 
+                    : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200'
+                }`}
                 style={filterType === key ? { backgroundColor: RELATIONSHIP_COLORS[key as keyof typeof RELATIONSHIP_COLORS] } : {}}
               >
                 {label}
@@ -302,9 +361,9 @@ export default function SurveyRelationshipPage() {
           </div>
         </div>
 
-        <div className="flex-grow flex flex-col md:flex-row gap-4">
-
-          <div className="w-full md:w-[230px] bg-white rounded-lg shadow-md flex flex-col flex-shrink-0">
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* 학생 목록 패널 */}
+          <div className="w-full lg:w-80 bg-white rounded-xl shadow-sm flex flex-col">
             <StudentListPanel
               classId={classId}
               onStudentSelect={(studentId) => {
@@ -313,52 +372,69 @@ export default function SurveyRelationshipPage() {
             />
           </div>
 
-          <div className="flex-1 flex flex-col gap-5">
-            <div className="bg-white rounded-lg shadow-md overflow-hidden relative h-[720px] flex-shrink-0">
-              {students && relationships ? (
-                <RelationshipGraph
-                  ref={graphRef}
-                  nodes={students}
-                  links={filteredRelationships}
-                  onNodeClick={handleSelectStudent}
-                  selectedNodeId={selectedStudent?.id}
-                  classId={classId}
-                  surveyId={surveyId}
-                  // TODO: RelationshipGraph가 관계 생성/삭제 이벤트를 발생시킨다면,
-                  //       아래와 같이 핸들러를 props로 전달해야 함
-                  // onAddRelationship={handleAddRelationship} 
-                  // onDeleteRelationship={handleDeleteRelationship}
-                />
-              ) : (
-                <div className="flex justify-center items-center h-full text-gray-500 italic">학생 또는 관계 데이터가 없습니다.</div>
-              )}
+          {/* 메인 콘텐츠 */}
+          <div className="flex-1 flex flex-col gap-6">
+            {/* 관계도 그래프 */}
+            <div className="bg-white rounded-xl shadow-sm overflow-hidden relative" style={{ height: '600px' }}>
+              <div className="p-4 border-b border-gray-100">
+                <h3 className="text-lg font-semibold text-gray-800">관계도 그래프</h3>
+                <p className="text-sm text-gray-600">학생들을 클릭하거나 드래그하여 상호작용할 수 있습니다</p>
+              </div>
+              <div className="absolute inset-0 top-16">
+                {students && relationships ? (
+                  <RelationshipGraph
+                    ref={graphRef}
+                    nodes={students}
+                    links={filteredRelationships}
+                    onNodeClick={handleSelectStudent}
+                    selectedNodeId={selectedStudent?.id || null}
+                    classId={classId}
+                    surveyId={surveyId}
+                  />
+                ) : (
+                  <div className="flex justify-center items-center h-full text-gray-500">
+                    관계도 데이터를 불러오고 있습니다...
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="w-full flex-shrink-0 mb-2">
+            {/* 주간 답변 박스 */}
+            <div className="bg-white rounded-xl shadow-sm">
               <WeeklyAnswersBox
-                  questions={questions}
-                  answers={answers}
-                  selectedStudent={selectedStudent}
-                  isLoadingAnswers={isLoadingAnswers}
+                questions={questions}
+                answers={answers}
+                selectedStudent={selectedStudent}
+                isLoadingAnswers={isLoadingAnswers}
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 flex-shrink-0">
-              {Object.entries(RELATIONSHIP_TYPES).map(([type, title]) => (
-                  <div key={type} className="min-h-[180px]">
-                      {students && relationships ? (
-                          <RelationshipTypeRankBox
-                              title={title}
-                              students={rankedStudentsByType[type]?.slice(0, 10)}
-                              relationshipType={type}
-                          />
-                      ) : (
-                          <div className="bg-white rounded-lg shadow-md p-3 h-full flex items-center justify-center text-sm text-gray-500 italic">
-                              랭킹 데이터 로딩 중...
-                          </div>
-                      )}
+            {/* 관계 유형별 순위 */}
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold text-gray-800">관계 유형별 순위</h3>
+                <span className="text-sm text-gray-500">각 관계 유형별로 가장 많이 선택받은 학생들</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                {Object.entries(RELATIONSHIP_TYPES).map(([type, title]) => (
+                  <div key={type} className="min-h-[200px]">
+                    {students && relationships ? (
+                      <RelationshipTypeRankBox
+                        title={title}
+                        students={rankedStudentsByType[type]?.slice(0, 10)}
+                        relationshipType={type}
+                      />
+                    ) : (
+                      <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4 h-full flex items-center justify-center border border-gray-200">
+                        <div className="text-center">
+                          <ArrowPathIcon className="w-8 h-8 text-gray-400 mx-auto mb-2 animate-spin" />
+                          <p className="text-sm text-gray-500">로딩 중...</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         </div>

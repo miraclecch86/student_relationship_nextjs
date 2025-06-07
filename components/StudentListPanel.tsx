@@ -173,16 +173,14 @@ export default function StudentListPanel({ classId, onStudentSelect }: StudentLi
   const [studentOrder, setStudentOrder] = useState<string[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
-  const [touchStartY, setTouchStartY] = useState<number | null>(null);
-  const [isTouchScrolling, setIsTouchScrolling] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        delay: 200,
-        tolerance: 0
-      }
+        delay: 150,
+        tolerance: 8
+      },
     }),
     useSensor(KeyboardSensor)
   );
@@ -312,35 +310,7 @@ export default function StudentListPanel({ classId, onStudentSelect }: StudentLi
     }
   };
 
-  // 터치 이벤트 핸들러 추가
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchStartY(e.touches[0].clientY);
-    setIsTouchScrolling(false);
-  };
 
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (touchStartY === null || !scrollContainerRef.current) return;
-    
-    const touchY = e.touches[0].clientY;
-    const diff = touchStartY - touchY;
-    
-    if (Math.abs(diff) > 10 && !isTouchScrolling) {
-      setIsTouchScrolling(true);
-    }
-    
-    if (isTouchScrolling) {
-      // 스크롤 동작 처리
-      scrollContainerRef.current.scrollTop += diff / 2;
-      setTouchStartY(touchY);
-      e.stopPropagation();
-    }
-  };
-
-  const handleTouchEnd = () => {
-    setTouchStartY(null);
-    // 잠시 후 스크롤 플래그 리셋 (드래그를 위해)
-    setTimeout(() => setIsTouchScrolling(false), 300);
-  };
 
   // 드롭 애니메이션 설정
   const dropAnimation = {
@@ -388,10 +358,10 @@ export default function StudentListPanel({ classId, onStudentSelect }: StudentLi
       <div 
         ref={scrollContainerRef}
         className="flex-grow overflow-y-auto p-2 space-y-1" 
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        style={{ WebkitOverflowScrolling: 'touch' }}
+        style={{ 
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-y',
+        }}
       >
         <AnimatePresence>
           {students && students.length > 0 ? (
@@ -416,7 +386,7 @@ export default function StudentListPanel({ classId, onStudentSelect }: StudentLi
                     onUpdateStudent={handleUpdateStudent}
                     onDeleteStudent={handleDeleteStudent}
                     onClick={handleStudentClick} // 클릭 핸들러 전달
-                    disabled={isTouchScrolling} // 스크롤 중에는 드래그 비활성화
+                    disabled={false} // 드래그 항상 활성화
                   />
                 ))}
               </SortableContext>

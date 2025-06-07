@@ -69,6 +69,7 @@ const RelationshipGraph = forwardRef<RelationshipGraphRef, RelationshipGraphProp
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const initialFitDoneRef = useRef(false);
   const currentTransformRef = useRef<d3.ZoomTransform>(d3.zoomIdentity);
+  const isDraggingRef = useRef(false);
   const queryClient = useQueryClient();
 
   const updateNodePositionMutation = useMutation<Student | null, Error, { studentId: string; x: number | null; y: number | null }>({
@@ -101,32 +102,86 @@ const RelationshipGraph = forwardRef<RelationshipGraphRef, RelationshipGraphProp
   }));
 
   const drag = (simulation: d3.Simulation<NodeData, LinkData> | null) => {
+      let startX = 0;
+      let startY = 0;
+      let hasMoved = false;
+      
       function dragstarted(event: d3.D3DragEvent<SVGGElement, NodeData, any>, d: NodeData & { isNewlyPlaced?: boolean }) {
-          event.sourceEvent.stopPropagation();
-          event.sourceEvent.stopImmediatePropagation();
+          console.log('🚀 Drag started for node:', d.name);
+          startX = event.x;
+          startY = event.y;
+          hasMoved = false;
+          
           if (d.isNewlyPlaced) {
               console.log(`Releasing fixed position for NEW node: ${d.name}`);
               d.fx = null;
               d.fy = null;
-              d.isNewlyPlaced = false; // 플래그 제거 중요!
+              d.isNewlyPlaced = false;
           }
           if (!event.active) simulation?.alphaTarget(0.3).restart();
       }
+      
       function dragged(event: d3.D3DragEvent<SVGGElement, NodeData, any>, d: NodeData) {
-          event.sourceEvent.stopPropagation();
-          event.sourceEvent.stopImmediatePropagation();
-          d.fx = event.x;
-          d.fy = event.y;
-      }
-      function dragended(event: d3.D3DragEvent<SVGGElement, NodeData, any>, d: NodeData) {
-          if (!event.active) simulation?.alphaTarget(0);
-          const finalX = d.fx;
-          const finalY = d.fy;
-          if (finalX != null && finalY != null) {
-              updateNodePositionMutation.mutate({ studentId: d.id, x: finalX, y: finalY });
+          const distance = Math.sqrt(
+              Math.pow(event.x - startX, 2) + Math.pow(event.y - startY, 2)
+          );
+          
+          if (distance > 5) { // 5px 이상 움직이면 드래그로 인식
+              hasMoved = true;
+              isDraggingRef.current = true;
+              d.fx = event.x;
+              d.fy = event.y;
           }
       }
+      
+      function dragended(event: d3.D3DragEvent<SVGGElement, NodeData, any>, d: NodeData) {
+          console.log('🏁 Drag ended for node:', d.name, 'hasMoved:', hasMoved, 'currentSelectedId:', selectedNodeId);
+          if (!event.active) simulation?.alphaTarget(0);
+          
+          if (hasMoved) {
+              // 실제 드래그인 경우
+              const finalX = d.fx;
+              const finalY = d.fy;
+              
+              if (finalX != null && finalY != null) {
+                  updateNodePositionMutation.mutate({ studentId: d.id, x: finalX, y: finalY });
+              }
+              
+              // 드래그 후 상태 해제
+              setTimeout(() => {
+                  isDraggingRef.current = false;
+                  console.log('🔄 Drag state cleared for node:', d.name);
+              }, 50);
+          } else {
+              // 클릭으로 처리 - 약간의 지연을 두어 상태가 안정화되도록 함
+              console.log('👆 Click detected for node:', d.name, 'currentSelectedId:', selectedNodeId);
+              isDraggingRef.current = false;
+              
+              // 현재 선택된 노드 ID를 저장 (클로저로 캡처)
+              const currentSelected = selectedNodeId;
+              
+                             setTimeout(() => {
+                  // 현재 선택된 노드 ID 정규화 (null, undefined -> null)
+                  const normalizedSelected = currentSelected || null;
+                  const isCurrentlySelected = normalizedSelected === d.id;
+                  
+                  console.log('🔍 Selection check - nodeId:', d.id, 'currentSelected:', currentSelected, 'normalizedSelected:', normalizedSelected, 'isCurrentlySelected:', isCurrentlySelected);
+                  
+                  if (isCurrentlySelected) { 
+                      console.log('🔄 Deselecting node:', d.name, '(was selected)');
+                      onNodeClick(null); 
+                  } else { 
+                      console.log('🎯 Selecting node:', d.name, '(was not selected, current selected:', normalizedSelected, ')');
+                      onNodeClick(d); 
+                  }
+              }, 0);
+          }
+      }
+      
       return d3.drag<SVGGElement, NodeData>()
+          .filter((event) => {
+              return event.button === 0;
+          })
           .on("start", dragstarted)
           .on("drag", dragged)
           .on("end", dragended);
@@ -207,6 +262,11 @@ const RelationshipGraph = forwardRef<RelationshipGraphRef, RelationshipGraphProp
   // Effect 1: 초기 설정
   useEffect(() => {
     if (!svgRef.current) return;
+    
+    // 드래그 상태 초기화
+    isDraggingRef.current = false;
+    console.log('📍 Component initialized, isDragging:', isDraggingRef.current);
+    
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
 
@@ -453,11 +513,8 @@ const RelationshipGraph = forwardRef<RelationshipGraphRef, RelationshipGraphProp
                   .style("fill", "#4b5563")
                   .style("pointer-events", "none");
               
-              g.on("click", (event, d) => {
-                  event.stopPropagation();
-                  if (selectedNodeId === d.id) { onNodeClick(null); } else { onNodeClick(d); }
-              });
-              
+
+                
               // Hover 효과: 기본 테두리일 때만 변경
               g.on('mouseover', function(event, d) {
                   const circle = d3.select(this).select('circle');

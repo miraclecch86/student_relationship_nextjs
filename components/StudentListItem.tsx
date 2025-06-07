@@ -101,18 +101,23 @@ export default function StudentListItem({
       onClick={handleCardClick}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
-      {...listeners}
       className={`relative group py-1.5 px-2 rounded-lg transition-all duration-150 cursor-pointer border ${
         isSelected
           ? 'bg-indigo-50 border-indigo-500'
           : 'hover:bg-gray-50 border-gray-200'
-      } shadow-sm hover:shadow touch-none ${
+      } shadow-sm hover:shadow ${
         isDragging ? 'opacity-100 scale-105 shadow-lg bg-white' : ''
       } ${disabled ? 'pointer-events-none' : ''}`}
+      style={{ touchAction: 'pan-y' }}
     >
       <div className="flex items-center gap-1">
         <div 
+          {...listeners}
           className={`p-1 hover:bg-gray-100 rounded cursor-grab active:cursor-grabbing flex-shrink-0 drag-handle ${disabled ? 'opacity-50' : ''}`}
+          title="드래그하여 순서 변경"
+          style={{ touchAction: 'none' }}
+          onTouchStart={(e) => e.stopPropagation()}
+          onTouchMove={(e) => e.stopPropagation()}
         >
           <Bars3Icon className="w-3.5 h-3.5 text-gray-400" />
         </div>
