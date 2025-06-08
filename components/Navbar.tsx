@@ -39,7 +39,7 @@ export default function Navbar() {
           </Link>
         </div>
         
-        <div className="hidden md:flex flex-grow justify-center items-center space-x-10">
+        <div className="hidden md:flex absolute left-1/2 transform -translate-x-1/2 items-center space-x-10">
           {navLinks.map((link) => {
             const isActive = (
               (pathname === link.href || pathname.startsWith(link.href + '/') || 
