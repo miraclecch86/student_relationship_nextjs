@@ -10,7 +10,7 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 // import Banner from '@/components/Banner'; // 기존 Banner 주석 처리 또는 삭제
 import CarouselBanner from '@/components/CarouselBanner'; // CarouselBanner import
-import { SparklesIcon } from '@heroicons/react/24/outline'; // 예시 아이콘
+import { SparklesIcon, UserGroupIcon } from '@heroicons/react/24/outline'; // 예시 아이콘
 import { handleDemoSaveAttempt, isDemoClass } from '@/utils/demo-permissions';
 
 // 주관식 질문 개수를 포함하는 새로운 인터페이스 정의
@@ -355,12 +355,13 @@ export default function TeacherPage() {
   return (
     <div className="min-h-screen bg-gray-100">
       {/* CarouselBanner와 하단 콘텐츠를 모두 감싸는 단일 div */}
-      <div className="max-w-6xl mx-auto px-6 pb-10 pt-5"> 
+      <div className="max-w-7xl mx-auto px-6 pb-10 pt-5"> 
         <CarouselBanner slides={bannerSlides} autoPlayInterval={5000} />
         <header className="flex justify-between items-center mt-5 mb-5 bg-white p-5 rounded-lg shadow-md">
           <div>
-            <h1 className="text-2xl font-bold text-black">
-              {teacherName ? `${teacherName}선생님의 학급 목록` : '내 학급 목록'}
+            <h1 className="text-2xl font-bold text-black flex items-center space-x-3">
+              <UserGroupIcon className="h-7 w-7 text-indigo-600" />
+              <span>{teacherName ? `${teacherName}선생님의 학급 목록` : '내 학급 목록'}</span>
             </h1>
             {teacherName && (
               <p className="text-sm text-gray-600 mt-1">

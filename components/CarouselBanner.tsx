@@ -84,7 +84,7 @@ const CarouselBanner: React.FC<CarouselBannerProps> = ({ slides, autoPlayInterva
   };
 
   return (
-    <div className="relative w-full max-w-6xl mx-auto overflow-hidden rounded-lg bg-blue-600 shadow-lg mt-2.5 mb-2.5 h-[170px] md:h-[210px]">
+    <div className="relative w-full max-w-7xl mx-auto overflow-hidden rounded-lg bg-blue-600 shadow-lg mt-2.5 mb-2.5 h-[170px] md:h-[210px]">
       <AnimatePresence initial={false} custom={direction}>
         <motion.div
           key={currentIndex}

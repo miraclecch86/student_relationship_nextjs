@@ -22,15 +22,16 @@ export default function Navbar() {
   const navLinks = [
     { name: '학급 목록', href: '/teacher' },
     { name: '대시보드', href: classId ? `/class/${classId}/dashboard` : undefined, requiresClassId: true },
+    { name: '학급 일지', href: classId ? `/class/${classId}/journal` : undefined, requiresClassId: true },
     { name: '설문 작성', href: classId ? `/class/${classId}/survey` : undefined, requiresClassId: true },
     { name: '학급 분석', href: classId ? `/class/${classId}/analysis` : undefined, requiresClassId: true },
     { name: '쫑알쫑알', href: classId ? `/class/${classId}/schoolrecord` : undefined, requiresClassId: true },
-    { name: '학생 목록', href: classId ? `/class/${classId}/students` : undefined, requiresClassId: true },
+    { name: '학생 관리', href: classId ? `/class/${classId}/students` : undefined, requiresClassId: true },
   ];
 
   return (
     <nav className="fixed top-0 left-0 right-0 h-14 bg-gray-900 shadow-md z-50 text-white flex items-center px-4">
-      <div className="flex items-center justify-between w-full max-w-6xl mx-auto">
+      <div className="flex items-center justify-between w-full max-w-7xl mx-auto">
         <div className="flex items-center">
           <Link href="/teacher" className="flex items-center">
             <span className="text-xl font-bold text-indigo-400 mr-1">학생</span>

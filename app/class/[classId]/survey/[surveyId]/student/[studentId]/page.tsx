@@ -397,7 +397,7 @@ export default function SurveyStudentDetailPage() {
     }
     return (
         <div className="min-h-screen bg-white p-6">
-            <div className="max-w-screen-lg mx-auto">
+            <div className="max-w-7xl mx-auto">
                 <header className="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
                     <div className="flex items-center gap-4">
                         <h1 className="text-xl font-bold text-gray-800">
@@ -434,7 +434,7 @@ export default function SurveyStudentDetailPage() {
                     {isLoadingAllStudents ? (
                        <div className="text-center text-gray-500 py-4">학생 목록 로딩 중...</div>
                     ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                           {otherStudents && otherStudents.length > 0 ? (
                               otherStudents.map(target => {
                                   const currentRelation = relationshipSettings[target.id] || null;
