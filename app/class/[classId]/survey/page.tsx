@@ -346,7 +346,7 @@ export default function SurveyListPage() {
         {/* 헤더 */}
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-gray-800 flex items-center space-x-2">
-            <ClipboardDocumentListIcon className="h-6 w-6 text-green-600" />
+            <ClipboardDocumentListIcon className="h-6 w-6 text-indigo-600" />
             <span>설문 작성</span>
           </h1>
         </div>
@@ -354,8 +354,8 @@ export default function SurveyListPage() {
         {/* 학급 정보 */}
         <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-              <ClipboardDocumentListIcon className="h-5 w-5 text-green-600" />
+            <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
+              <ClipboardDocumentListIcon className="h-5 w-5 text-indigo-600" />
             </div>
             <div>
               <h2 className="text-lg font-semibold text-gray-800">{classDetails?.name ?? ''} 설문 작성</h2>
@@ -372,7 +372,7 @@ export default function SurveyListPage() {
             </h3>
             <button
               onClick={() => setShowCreateSurveyModal(true)}
-              className="flex items-center space-x-2 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors"
+              className="flex items-center space-x-2 bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600 transition-colors"
             >
               <PlusIcon className="h-5 w-5" />
               <span>설문 생성</span>
@@ -394,13 +394,13 @@ export default function SurveyListPage() {
             </div>
           ) : (
             <div className="text-center py-12">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <ClipboardDocumentListIcon className="h-8 w-8 text-green-600" />
+              <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <ClipboardDocumentListIcon className="h-8 w-8 text-indigo-600" />
               </div>
               <p className="text-gray-600 mb-4">아직 생성된 설문이 없습니다</p>
               <button
                 onClick={() => setShowCreateSurveyModal(true)}
-                className="text-green-600 hover:text-green-800 font-medium"
+                className="text-indigo-600 hover:text-indigo-800 font-medium"
               >
                 첫 번째 설문 생성하기
               </button>
@@ -443,7 +443,7 @@ export default function SurveyListPage() {
                     value={newSurveyName}
                     onChange={(e) => setNewSurveyName(e.target.value)}
                     placeholder="예: 1학기 친구관계, 2학기 설문..."
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     style={{ color: '#111827', backgroundColor: '#ffffff' }}
                     maxLength={50}
                   />
@@ -455,7 +455,7 @@ export default function SurveyListPage() {
                     onChange={(e) => setNewSurveyDesc(e.target.value)}
                     placeholder="설문에 대한 간단한 설명을 입력하세요..."
                     rows={3}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 resize-none"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
                     style={{ color: '#111827', backgroundColor: '#ffffff' }}
                   />
                 </div>
@@ -465,7 +465,7 @@ export default function SurveyListPage() {
                     type="date"
                     value={newSurveyDate}
                     onChange={(e) => setNewSurveyDate(e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     style={{ color: '#111827', backgroundColor: '#ffffff' }}
                   />
                 </div>
@@ -482,8 +482,8 @@ export default function SurveyListPage() {
                 <button
                   onClick={handleCreateSurvey}
                   disabled={!newSurveyName.trim() || createSurveyMutation.isPending}
-                  className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{ backgroundColor: '#22c55e', color: '#ffffff' }}
+                  className="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ backgroundColor: '#6366f1', color: '#ffffff' }}
                 >
                   {createSurveyMutation.isPending ? '생성 중...' : '생성하기'}
                 </button>

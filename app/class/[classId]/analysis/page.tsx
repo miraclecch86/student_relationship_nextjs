@@ -659,6 +659,20 @@ export default function ClassAnalysisPage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState('');
   const [selectedModel, setSelectedModel] = useState<'gpt' | 'gemini-flash'>('gemini-flash');
+  const [teacherName, setTeacherName] = useState<string | null>(null);
+
+  // 선생님 이름 가져오기
+  React.useEffect(() => {
+    const getTeacherName = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const teacherName = session.user.user_metadata?.teacher_name;
+        setTeacherName(teacherName || null);
+      }
+    };
+
+    getTeacherName();
+  }, []);
   
   // 학급 정보 조회
   const { data: classDetails, isLoading: isClassLoading } = useQuery({
@@ -1241,8 +1255,10 @@ export default function ClassAnalysisPage() {
               <SparklesIcon className="h-5 w-5 text-purple-600" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-gray-800">{classDetails.name}</h2>
-              <p className="text-sm text-gray-600">AI 기반 학급 관계 분석 시스템</p>
+              <h2 className="text-lg font-semibold text-gray-800">{classDetails.name} 분석</h2>
+              <p className="text-sm text-gray-600">
+                {teacherName ? `${teacherName}선생님, AI가 학급 관계를 깊이 있게 분석해드립니다 🔍` : 'AI 기반 학급 관계 분석 시스템'}
+              </p>
             </div>
           </div>
         </div>
@@ -1261,7 +1277,7 @@ export default function ClassAnalysisPage() {
                 학생들의 관계 데이터를 AI가 분석하여 학급 내 사회적 역학 구조와 관계 패턴을 파악합니다.
               </p>
               <p className="text-xs text-gray-500">
-                분석은 종합분석 및 학생그룹별 분석으로 나누어 진행됩니다. (Gemini 2.5 Flash 모델 사용)
+                분석은 종합분석 및 학생그룹별 분석으로 나누어 진행됩니다.
               </p>
             </div>
             <div className="flex items-center gap-3 ml-6">
@@ -1278,7 +1294,7 @@ export default function ClassAnalysisPage() {
                 ) : (
                   <>
                     <SparklesIcon className="w-4 h-4 mr-2" />
-                    새 분석 실행
+                    새 학급 분석 실행
                   </>
                 )}
               </button>
@@ -1345,7 +1361,7 @@ export default function ClassAnalysisPage() {
               </div>
               <h3 className="text-lg font-medium text-gray-800 mb-2">분석 결과가 없습니다</h3>
               <p className="text-gray-600 mb-4">아직 실행된 분석이 없습니다.</p>
-              <p className="text-sm text-gray-500">위의 '새 분석 실행' 버튼을 눌러 첫 번째 분석을 시작해보세요.</p>
+              <p className="text-sm text-gray-500">위의 '새 학급 분석 실행' 버튼을 눌러 첫 번째 분석을 시작해보세요.</p>
             </div>
           )}
         </div>

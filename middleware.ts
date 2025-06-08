@@ -14,13 +14,13 @@ export async function middleware(req: NextRequest) {
 
   console.log('[Middleware FINAL] Session exists:', !!session);
 
-  // 로그인, 인증 콜백, 역할 선택 경로는 일단 허용 (나중에 로그인 상태면 리디렉션)
-  if (pathname.startsWith('/login') || pathname.startsWith('/auth') || pathname === '/select-role') {
-    // 만약 유저가 있고 역할도 있는데 이 페이지들에 접근 시도하면 리디렉션
-    if (session && session.user?.user_metadata?.role) {
+  // 로그인, 인증 콜백, 선생님 이름 입력 경로는 일단 허용 (나중에 로그인 상태면 리디렉션)
+  if (pathname.startsWith('/login') || pathname.startsWith('/auth') || pathname === '/teacher-setup') {
+    // 만약 유저가 있고 역할도 있고 선생님 이름도 있는데 이 페이지들에 접근 시도하면 리디렉션
+    if (session && session.user?.user_metadata?.role && session.user?.user_metadata?.teacher_name) {
        const userRole = session.user.user_metadata.role;
-       if (pathname.startsWith('/login') || pathname === '/select-role') {
-          console.log('[Middleware FINAL] Already logged in with role, redirecting from:', pathname);
+       if (pathname.startsWith('/login') || pathname === '/teacher-setup') {
+          console.log('[Middleware FINAL] Already logged in with role and name, redirecting from:', pathname);
           return NextResponse.redirect(new URL(userRole === 'teacher' ? '/teacher' : '/student', req.url));
        }
     }
@@ -65,16 +65,17 @@ export async function middleware(req: NextRequest) {
 
   console.log('[Middleware FINAL] Final role check:', userRole);
 
-  // 역할 없는 경우
-  if (!userRole) {
-      console.log('[Middleware FINAL] Role still missing, redirecting to select-role.');
-      // 루트 경로에서 역할이 없을 때도 역할 선택으로 보내야 함
+  // 역할이 없거나 선생님 이름이 없는 경우 선생님 이름 입력 페이지로 리다이렉트
+  const teacherName = user.user_metadata?.teacher_name;
+  
+  if (!userRole || (userRole === 'teacher' && !teacherName)) {
+      console.log('[Middleware FINAL] Role missing or teacher name missing, redirecting to teacher-setup.');
+      console.log('[Middleware FINAL] userRole:', userRole, 'teacherName:', teacherName);
+      // 루트 경로에서 역할이 없을 때도 선생님 이름 입력으로 보내야 함
       if (pathname === '/') {
-           return NextResponse.redirect(new URL('/select-role', req.url));
-      } // 다른 보호된 경로에서 역할 없는 경우는 이미 위에서 처리됨 (로그인으로 리디렉션 또는 select-role)
-      // select-role 페이지 자체는 허용됨 (위쪽 로직)
-      // 따라서 이 블록은 사실상 루트 경로 처리만 남게 될 수 있음. 하지만 안전하게 유지.
-      return NextResponse.redirect(new URL('/select-role', req.url));
+           return NextResponse.redirect(new URL('/teacher-setup', req.url));
+      } // 다른 보호된 경로에서 역할이나 이름이 없는 경우
+      return NextResponse.redirect(new URL('/teacher-setup', req.url));
   }
 
   // --- 역할이 있는 경우 --- 
@@ -87,9 +88,9 @@ export async function middleware(req: NextRequest) {
       } else if (userRole === 'student') {
           return NextResponse.redirect(new URL('/student', req.url));
       }
-      // 혹시 모를 다른 역할 처리 (예: admin 등). 여기서는 일단 select-role로 보냄.
+      // 혹시 모를 다른 역할 처리 (예: admin 등). 여기서는 일단 teacher-setup으로 보냄.
       console.warn('[Middleware FINAL] Unknown role on root path:', userRole);
-      return NextResponse.redirect(new URL('/select-role', req.url));
+      return NextResponse.redirect(new URL('/teacher-setup', req.url));
   }
 
   // 2. 역할 기반 접근 제어 (기존 로직에서 '/' 제거)
@@ -102,7 +103,7 @@ export async function middleware(req: NextRequest) {
      return NextResponse.redirect(new URL('/login?error=unauthorized_student', req.url));
   }
 
-  // 3. 특정 역할 페이지 접근 시 역할 재확인 (예: /select-role 접근 시 역할 있으면 리디렉션 - 이미 상단에서 처리됨)
+  // 3. 특정 역할 페이지 접근 시 역할 재확인 (예: /teacher-setup 접근 시 역할 있으면 리디렉션 - 이미 상단에서 처리됨)
   // 필요 시 추가: /login 접근 시 역할 있으면 리디렉션 (이미 상단에서 처리됨)
 
   console.log('[Middleware FINAL] Access allowed for path:', pathname);

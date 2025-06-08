@@ -1,12 +1,27 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 
 export default function Page() {
   const router = useRouter();
   const [year, setYear] = useState('');
   const [schoolName, setSchoolName] = useState('');
+  const [teacherName, setTeacherName] = useState<string | null>(null);
+
+  useEffect(() => {
+    // 선생님 이름 가져오기
+    const getTeacherName = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const teacherName = session.user.user_metadata?.teacher_name;
+        setTeacherName(teacherName || null);
+      }
+    };
+
+    getTeacherName();
+  }, []);
 
   const handleSubmit = () => {
     if (!year.trim()) {
@@ -24,7 +39,15 @@ export default function Page() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-700 via-indigo-800 to-indigo-900">
       <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
-        <h1 className="text-2xl font-bold text-indigo-800 mb-6 text-center">학교 정보 입력</h1>
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-bold text-indigo-800 mb-2">새 학급 만들기</h1>
+          {teacherName && (
+            <p className="text-sm text-gray-600">
+              {teacherName}선생님, 새로운 학급을 만들어 보세요! 🎓
+            </p>
+          )}
+        </div>
+        
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-1">연도</label>
           <input

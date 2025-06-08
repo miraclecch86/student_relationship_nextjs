@@ -143,6 +143,7 @@ export default function TeacherPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [newClassName, setNewClassName] = useState('');
+  const [teacherName, setTeacherName] = useState<string | null>(null);
   // const [showBanner, setShowBanner] = useState(true); // 기존 Banner 상태 주석 처리
 
   // CarouselBanner를 위한 슬라이드 데이터 예시
@@ -173,6 +174,17 @@ export default function TeacherPage() {
     let isMounted = true;
     console.log("[TeacherPage MOUNT]");
 
+    // 선생님 이름 가져오기
+    const getTeacherName = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const teacherName = session.user.user_metadata?.teacher_name;
+        setTeacherName(teacherName || null);
+      }
+    };
+
+    getTeacherName();
+
     // 인증/역할 확인 로직 모두 제거 - Middleware에서 처리
 
     // 데이터 로딩 시작 시 로딩 상태 관리 (useQuery 사용)
@@ -190,6 +202,12 @@ export default function TeacherPage() {
          console.log('[TeacherPage Auth] SIGNED_IN event. Invalidating queries.');
          // setIsAuthenticated(true); // 미들웨어가 접근을 보장
          queryClient.invalidateQueries({ queryKey: ['classes'] }); // 데이터 갱신
+         // 선생님 이름도 다시 가져오기
+         getTeacherName();
+      } else if (event === 'USER_UPDATED' && session?.user) {
+         // 사용자 메타데이터 업데이트 시 선생님 이름 즉시 반영
+         const teacherName = session.user.user_metadata?.teacher_name;
+         setTeacherName(teacherName || null);
       }
     });
 
@@ -340,7 +358,16 @@ export default function TeacherPage() {
       <div className="max-w-6xl mx-auto px-6 pb-10 pt-5"> 
         <CarouselBanner slides={bannerSlides} autoPlayInterval={5000} />
         <header className="flex justify-between items-center mt-5 mb-5 bg-white p-5 rounded-lg shadow-md">
-          <h1 className="text-2xl font-bold text-black">내 학급 목록</h1>
+          <div>
+            <h1 className="text-2xl font-bold text-black">
+              {teacherName ? `${teacherName}선생님의 학급 목록` : '내 학급 목록'}
+            </h1>
+            {teacherName && (
+              <p className="text-sm text-gray-600 mt-1">
+                안녕하세요, {teacherName}선생님! 오늘도 좋은 하루 되세요 😊
+              </p>
+            )}
+          </div>
           <Link
             href="/class/create/school"
             className="inline-block bg-indigo-500 text-white px-4 py-2 text-sm font-medium rounded-md hover:bg-indigo-600 shadow focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:ring-offset-1 transition-all duration-200"

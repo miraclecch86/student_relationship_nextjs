@@ -280,7 +280,7 @@ function StudentItem({
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -20 }}
         transition={{ type: "tween", duration: 0.2 }}
-        className={`bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 hover:shadow-md transition-all duration-200 group ${
+        className={`bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4 hover:shadow-md transition-all duration-200 group ${
           isDragging ? 'opacity-30' : ''
         } ${disabled ? 'pointer-events-none' : ''}`}
         style={{ 
@@ -293,16 +293,16 @@ function StudentItem({
           <div className="flex items-center gap-3 flex-grow">
             {/* 드래그 핸들 */}
             <div 
-              className={`p-2 hover:bg-blue-100 rounded-lg cursor-grab active:cursor-grabbing flex-shrink-0 drag-handle transition-colors ${
+              className={`p-2 hover:bg-green-100 rounded-lg cursor-grab active:cursor-grabbing flex-shrink-0 drag-handle transition-colors ${
                 disabled ? 'opacity-50' : ''
               } ${
-                activeId === student.id ? 'bg-blue-200 border-2 border-blue-400' : 'bg-blue-50'
+                activeId === student.id ? 'bg-green-200 border-2 border-green-400' : 'bg-green-50'
               }`} 
               title="드래그하여 순서 변경"
               {...listeners}
             >
               <Bars3Icon className={`w-5 h-5 transition-colors ${
-                activeId === student.id ? 'text-blue-700' : 'text-blue-500'
+                activeId === student.id ? 'text-green-700' : 'text-green-500'
               }`} />
             </div>
             
@@ -314,7 +314,7 @@ function StudentItem({
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  className="flex-grow p-2 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 font-medium bg-white"
+                  className="flex-grow p-2 border border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-900 font-medium bg-white"
                   onClick={(e) => e.stopPropagation()}
                 />
               ) : (
@@ -362,15 +362,15 @@ function StudentItem({
               <>
                 <button
                   onClick={handleDetailClick}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 transition-colors shadow-sm"
-                  title="상세정보보기"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-500 text-white text-sm font-medium rounded-lg hover:bg-green-600 transition-colors shadow-sm"
+                  title="상세정보입력"
                 >
                   <InformationCircleIcon className="w-4 h-4" />
-                  <span className="hidden sm:inline">상세정보보기</span>
+                  <span className="hidden sm:inline">상세정보입력</span>
                 </button>
                 <button
                   onClick={handleUpdateClick}
-                  className="inline-flex items-center justify-center w-8 h-8 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors shadow-sm opacity-0 group-hover:opacity-100"
+                  className="inline-flex items-center justify-center w-8 h-8 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors shadow-sm opacity-0 group-hover:opacity-100"
                   title="수정"
                 >
                   <PencilIcon className="w-4 h-4" />
@@ -786,7 +786,7 @@ export default function ClassStudentsPage() {
         {/* 헤더 */}
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-gray-800 flex items-center space-x-2">
-            <UserPlusIcon className="h-6 w-6 text-blue-600" />
+            <UserPlusIcon className="h-6 w-6 text-green-600" />
             <span>학생 관리</span>
           </h1>
         </div>
@@ -794,8 +794,8 @@ export default function ClassStudentsPage() {
         {/* 학급 정보 */}
         <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-              <UserPlusIcon className="h-5 w-5 text-blue-600" />
+            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+              <UserPlusIcon className="h-5 w-5 text-green-600" />
             </div>
             <div>
               <h2 className="text-lg font-semibold text-gray-800">{classDetails.name} 학생 관리</h2>
@@ -816,12 +816,12 @@ export default function ClassStudentsPage() {
               onChange={(e) => setNewStudentName(e.target.value)}
               onKeyPress={handleAddStudentKeyPress}
               placeholder="학생 이름을 입력하세요"
-              className="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-black placeholder:text-gray-500"
+              className="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-black placeholder:text-gray-500"
             />
             <button
               onClick={handleAddStudent}
               disabled={addStudentMutation.isPending}
-              className="flex items-center space-x-2 bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              className="flex items-center space-x-2 bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
             >
               {addStudentMutation.isPending ? (
                 <>
@@ -857,7 +857,7 @@ export default function ClassStudentsPage() {
               <p className="text-red-600 mb-4">학생 목록을 불러오는 중 오류가 발생했습니다</p>
               <button
                 onClick={() => window.location.reload()}
-                className="text-blue-600 hover:text-blue-800 font-medium"
+                className="text-green-600 hover:text-green-800 font-medium"
               >
                 다시 시도
               </button>
@@ -928,8 +928,8 @@ export default function ClassStudentsPage() {
             </div>
           ) : (
             <div className="text-center py-12">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <UserPlusIcon className="h-8 w-8 text-blue-600" />
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <UserPlusIcon className="h-8 w-8 text-green-600" />
               </div>
               <p className="text-gray-600 mb-4">아직 등록된 학생이 없습니다</p>
               <button
@@ -937,7 +937,7 @@ export default function ClassStudentsPage() {
                   const input = document.querySelector('input[placeholder="학생 이름을 입력하세요"]') as HTMLInputElement;
                   input?.focus();
                 }}
-                className="text-blue-600 hover:text-blue-800 font-medium"
+                className="text-green-600 hover:text-green-800 font-medium"
               >
                 첫 번째 학생 추가하기
               </button>

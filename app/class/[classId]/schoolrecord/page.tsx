@@ -361,7 +361,7 @@ function SchoolRecordCard({ record, classDetails }: SchoolRecordCardProps) {
   return (
     <>
       <motion.div
-        className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 transition-all duration-300 hover:shadow-md hover:border-green-200 relative group"
+        className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 transition-all duration-300 hover:shadow-md hover:border-amber-200 relative group"
         whileHover={{ scale: 1.02 }}
         layout
       >
@@ -371,7 +371,7 @@ function SchoolRecordCard({ record, classDetails }: SchoolRecordCardProps) {
         >
           <div className="flex items-start justify-between">
             <div className="flex items-start space-x-3">
-              <div className="bg-green-100 text-green-600 p-2.5 rounded-xl">
+              <div className="bg-amber-100 text-amber-600 p-2.5 rounded-xl">
                 <DocumentTextIcon className="w-5 h-5" />
               </div>
               <div>
@@ -379,7 +379,7 @@ function SchoolRecordCard({ record, classDetails }: SchoolRecordCardProps) {
                 <p className="text-sm text-gray-600">{formattedTime}</p>
               </div>
             </div>
-            {!isEditing && <ChevronRightIcon className="w-5 h-5 text-gray-400 group-hover:text-green-600 transition-colors" />}
+            {!isEditing && <ChevronRightIcon className="w-5 h-5 text-gray-400 group-hover:text-amber-600 transition-colors" />}
           </div>
           <div className="mt-4">
             {isEditing ? (
@@ -387,7 +387,7 @@ function SchoolRecordCard({ record, classDetails }: SchoolRecordCardProps) {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 onClick={(e) => e.stopPropagation()}
-                className="w-full h-24 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 resize-none text-gray-700"
+                className="w-full h-24 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 resize-none text-gray-700"
                 placeholder="이 생활기록부에 대한 설명을 입력하세요..."
               />
             ) : (
@@ -412,7 +412,7 @@ function SchoolRecordCard({ record, classDetails }: SchoolRecordCardProps) {
               <button
                 onClick={handleSaveClick}
                 disabled={isSaving}
-                className="p-2 rounded-lg bg-green-100 text-green-600 hover:bg-green-200 transition-colors focus:outline-none focus:ring-2 focus:ring-green-300"
+                className="p-2 rounded-lg bg-amber-100 text-amber-600 hover:bg-amber-200 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-300"
                 title="저장"
               >
                 {isSaving ? (
@@ -426,7 +426,7 @@ function SchoolRecordCard({ record, classDetails }: SchoolRecordCardProps) {
             <>
               <button
                 onClick={handleEditClick}
-                className="p-2 rounded-lg bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-700 transition-colors focus:outline-none focus:ring-2 focus:ring-green-300"
+                className="p-2 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-600 hover:text-amber-700 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-300"
                 title="편집"
               >
                 <PencilIcon className="w-4 h-4" />
@@ -469,6 +469,20 @@ export default function SchoolRecordPage() {
   const [isDeleteAllModalOpen, setIsDeleteAllModalOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState('');
+  const [teacherName, setTeacherName] = useState<string | null>(null);
+
+  // 선생님 이름 가져오기
+  React.useEffect(() => {
+    const getTeacherName = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const teacherName = session.user.user_metadata?.teacher_name;
+        setTeacherName(teacherName || null);
+      }
+    };
+
+    getTeacherName();
+  }, []);
   
   // 학급 정보 조회
   const { 
@@ -610,7 +624,7 @@ export default function SchoolRecordPage() {
           </p>
           <button
             onClick={() => router.back()}
-            className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            className="px-6 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
           >
             돌아가기
           </button>
@@ -629,12 +643,12 @@ export default function SchoolRecordPage() {
             <div className="flex justify-center items-center mb-6">
               <div className="relative w-16 h-16">
                 {/* 바깥쪽 원 */}
-                <div className="absolute inset-0 border-4 border-green-100 rounded-full"></div>
+                <div className="absolute inset-0 border-4 border-amber-100 rounded-full"></div>
                 {/* 회전하는 부분 */}
-                <div className="absolute inset-0 border-4 border-transparent border-t-green-600 rounded-full animate-spin"></div>
+                <div className="absolute inset-0 border-4 border-transparent border-t-amber-600 rounded-full animate-spin"></div>
                 {/* 중앙 AI 아이콘 */}
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <SparklesIcon className="w-8 h-8 text-green-600" />
+                  <SparklesIcon className="w-8 h-8 text-amber-600" />
                 </div>
               </div>
             </div>
@@ -649,7 +663,7 @@ export default function SchoolRecordPage() {
         {/* 헤더 */}
         <div className="flex items-center justify-between mb-6">
                                 <h1 className="text-2xl font-bold text-gray-800 flex items-center space-x-2">
-             <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+             <svg className="h-6 w-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
              </svg>
              <span>쫑알쫑알</span>
@@ -659,12 +673,14 @@ export default function SchoolRecordPage() {
         {/* 학급 정보 카드 */}
         <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-              <DocumentTextIcon className="h-5 w-5 text-green-600" />
+            <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+              <DocumentTextIcon className="h-5 w-5 text-amber-600" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-gray-800">{classDetails.name}</h2>
-              <p className="text-sm text-gray-600">AI 기반 생활기록부 자동 생성</p>
+              <h2 className="text-lg font-semibold text-gray-800">{classDetails.name} 생활기록부</h2>
+              <p className="text-sm text-gray-600">
+                {teacherName ? `${teacherName}선생님, AI가 개성 있는 생활기록부를 작성해드립니다 ✨` : 'AI 기반 생활기록부 자동 생성'}
+              </p>
             </div>
           </div>
         </div>
@@ -674,8 +690,8 @@ export default function SchoolRecordPage() {
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <div className="flex items-center mb-3">
-                <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
-                  <SparklesIcon className="w-4 h-4 text-green-600" />
+                <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center mr-3">
+                  <SparklesIcon className="w-4 h-4 text-amber-600" />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-800">AI 기반 생활기록부 생성</h3>
               </div>
@@ -683,14 +699,14 @@ export default function SchoolRecordPage() {
                 학생들의 관계 데이터와 활동 내용을 AI가 분석하여 학생별 맞춤형 생활기록부 문구를 생성합니다.
               </p>
               <p className="text-xs text-gray-500">
-                각 학생의 특성을 반영한 구체적이고 개성 있는 생활기록부 문구를 제공합니다. (Gemini 2.5 Flash 모델 사용)
+                각 학생의 특성을 반영한 구체적이고 개성 있는 생활기록부 문구를 제공합니다.
               </p>
             </div>
             <div className="flex items-center gap-3 ml-6">
               <button
                 onClick={generateSchoolRecordWithProgress}
                 disabled={generateMutation.isPending || isGenerating}
-                className="px-6 py-3 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-green-300 transition-all duration-200 flex items-center disabled:opacity-70 disabled:cursor-not-allowed"
+                className="px-6 py-3 text-sm bg-amber-600 text-white rounded-lg hover:bg-amber-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-300 transition-all duration-200 flex items-center disabled:opacity-70 disabled:cursor-not-allowed"
               >
                 {generateMutation.isPending || isGenerating ? (
                   <>
@@ -712,8 +728,8 @@ export default function SchoolRecordPage() {
         <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                <DocumentTextIcon className="w-4 h-4 text-green-600" />
+              <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center">
+                <DocumentTextIcon className="w-4 h-4 text-amber-600" />
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-gray-800">생활기록부 목록</h3>
@@ -742,10 +758,10 @@ export default function SchoolRecordPage() {
           {isRecordsLoading ? (
             <div className="bg-white rounded-xl shadow-sm p-12 text-center">
               <div className="w-16 h-16 mx-auto mb-4 relative">
-                <div className="absolute inset-0 border-4 border-green-100 rounded-full"></div>
-                <div className="absolute inset-0 border-4 border-transparent border-t-green-600 rounded-full animate-spin"></div>
+                <div className="absolute inset-0 border-4 border-amber-100 rounded-full"></div>
+                <div className="absolute inset-0 border-4 border-transparent border-t-amber-600 rounded-full animate-spin"></div>
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <DocumentTextIcon className="w-6 h-6 text-green-600" />
+                  <DocumentTextIcon className="w-6 h-6 text-amber-600" />
                 </div>
               </div>
               <span className="text-gray-600 font-medium">생활기록부를 불러오는 중...</span>
@@ -785,8 +801,8 @@ export default function SchoolRecordPage() {
             </div>
           ) : (
             <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-              <div className="w-16 h-16 mx-auto mb-4 bg-green-100 rounded-full flex items-center justify-center">
-                <SparklesIcon className="w-8 h-8 text-green-600" />
+              <div className="w-16 h-16 mx-auto mb-4 bg-amber-100 rounded-full flex items-center justify-center">
+                <SparklesIcon className="w-8 h-8 text-amber-600" />
               </div>
               <h3 className="text-lg font-medium text-gray-800 mb-2">생성된 생활기록부가 없습니다</h3>
               <p className="text-gray-600 mb-4">아직 생성된 생활기록부가 없습니다.</p>

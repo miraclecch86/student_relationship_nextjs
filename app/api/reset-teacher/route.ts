@@ -21,33 +21,24 @@ export async function GET(request: Request) {
       return NextResponse.redirect(new URL('/login', request.url));
     }
     
-    // 세션에서 사용자 역할 정보 제거 (데이터 필드를 null로 설정)
+    // 세션에서 선생님 이름과 역할 정보 제거 (재설정을 위해)
     const { error: updateError } = await supabase.auth.updateUser({
-      data: { role: null, role_verified: false }
+      data: { 
+        teacher_name: null, 
+        role: null, 
+        role_verified: false 
+      }
     });
     
     if (updateError) {
-      console.error('Error clearing role data:', updateError);
+      console.error('Error clearing teacher info:', updateError);
       return NextResponse.json(
-        { error: 'Failed to clear role data' },
+        { error: 'Failed to clear teacher info' },
         { status: 500 }
       );
     }
     
-    // profiles 테이블에서도 역할 정보 초기화
-    if (session.user?.id) {
-      const { data: profile, error: profileError } = await (supabase as any)
-        .from('profiles')
-        .update({ 
-          role: null,
-          role_verified: false 
-        })
-        .eq('id', session.user.id);
-        
-      if (profileError) {
-        console.error('Error updating profile:', profileError);
-      }
-    }
+    // 메타데이터만 사용 (profiles 테이블 사용 안함)
     
     // 세션 갱신을 요청하여 변경사항이 즉시 반영되도록 함
     await supabase.auth.refreshSession();
@@ -55,12 +46,13 @@ export async function GET(request: Request) {
     // 타임스탬프 추가하여 캐시 방지
     const timestamp = new Date().getTime();
     
-    // 성공적으로 역할 정보를 초기화한 후 역할 선택 페이지로 리디렉션
-    return NextResponse.redirect(new URL(`/select-role?reset=true&t=${timestamp}`, request.url));
+    // 성공적으로 정보를 초기화한 후 선생님 이름 입력 페이지로 리디렉션
+    return NextResponse.redirect(new URL(`/teacher-setup?reset=true&t=${timestamp}`, request.url));
+    
   } catch (error) {
-    console.error('Unexpected error:', error);
+    console.error('Unexpected error in reset-teacher:', error);
     return NextResponse.json(
-      { error: 'An unexpected error occurred' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

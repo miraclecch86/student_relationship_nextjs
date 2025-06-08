@@ -67,6 +67,20 @@ export default function ClassDashboardPage() {
   const params = useParams();
   const router = useRouter();
   const classId = params.classId as string;
+  const [teacherName, setTeacherName] = useState<string | null>(null);
+
+  useEffect(() => {
+    // 선생님 이름 가져오기
+    const getTeacherName = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const teacherName = session.user.user_metadata?.teacher_name;
+        setTeacherName(teacherName || null);
+      }
+    };
+
+    getTeacherName();
+  }, []);
 
   // CarouselBanner를 위한 슬라이드 데이터 예시
   const dashboardBannerSlides = [
@@ -116,12 +130,30 @@ export default function ClassDashboardPage() {
       <div className="max-w-6xl mx-auto px-6 pb-10 pt-5">
         <CarouselBanner slides={dashboardBannerSlides} autoPlayInterval={6000} />
         {/* 헤더 */}
-        <header className="mt-5 mb-5 flex justify-between items-center bg-white p-5 rounded-lg shadow-md">
-          <h1 className="text-2xl font-bold text-black">{classDetails.name} 대시보드</h1>
+        <header className="mt-5 mb-5 bg-white p-5 rounded-lg shadow-md">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-bold text-black">{classDetails.name} 대시보드</h1>
+              {teacherName && (
+                <p className="text-sm text-gray-600 mt-1">
+                  {teacherName}선생님, 오늘도 화이팅! 📚✨
+                </p>
+              )}
+            </div>
+          </div>
         </header>
 
         {/* 대시보드 카드 그리드 */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 px-2">
+          {/* 학급 일지 카드 - 첫 번째로 이동 */}
+          <DashboardCard
+            title="학급 일지"
+            description="스마트 학급 일지를 작성하고 관리합니다. AI 알림장 생성, 학생 출결 관리, 학급 메모 등을 한 곳에서 관리하세요."
+            icon={<CalendarDaysIcon className="w-7 h-7 text-white" />}
+            href={`/class/${classId}/journal`}
+            color="bg-blue-500"
+          />
+          
           {/* 설문 작성 카드 */}
           <DashboardCard
             title="설문 작성"
@@ -131,16 +163,7 @@ export default function ClassDashboardPage() {
             color="bg-indigo-500"
           />
           
-          {/* 학급 일지 카드 */}
-          <DashboardCard
-            title="학급 일지"
-            description="스마트 학급 일지를 작성하고 관리합니다. AI 알림장 생성, 학생 출결 관리, 학급 메모 등을 한 곳에서 관리하세요."
-            icon={<CalendarDaysIcon className="w-7 h-7 text-white" />}
-            href={`/class/${classId}/journal`}
-            color="bg-blue-500"
-          />
-          
-          {/* 분석 카드 */}
+          {/* 학급 분석 카드 */}
           <DashboardCard
             title="학급 분석"
             description="AI 기반 학급 분석 결과를 확인합니다. 학생 관계에 대한 인사이트를 얻어보세요."
@@ -158,9 +181,9 @@ export default function ClassDashboardPage() {
             color="bg-amber-500"
           />
 
-          {/* 학생 정보 카드 - 마지막으로 이동 */}
+          {/* 학생 관리 카드 - 마지막으로 이동 */}
           <DashboardCard
-            title="학생 정보"
+            title="학생 관리"
             description="학급 학생들의 정보를 관리합니다. 학생 추가, 개인정보 입력, 순서 조정 및 상세 정보를 관리할 수 있습니다."
             icon={<UserGroupIcon className="w-7 h-7 text-white" />}
             href={`/class/${classId}/students`}
