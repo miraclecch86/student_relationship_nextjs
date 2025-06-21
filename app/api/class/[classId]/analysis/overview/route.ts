@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { analyzeClassOverview } from '@/lib/openai';
 import { analyzeClassOverviewWithGemini } from '@/lib/gemini';
 import { Database } from '@/lib/database.types';
 import { isDemoClass } from '@/utils/demo-permissions';
@@ -138,20 +137,12 @@ export async function POST(
     }
     console.log('[종합분석 API] 관계 데이터 조회 완료, 관계 수:', relationships ? relationships.length : 0);
 
-    // AI 분석 수행 (선택된 모델에 따라)
+    // Gemini AI 분석 수행
     try {
-      console.log('[종합분석 API] AI 분석 시작, 선택된 모델:', model);
+      console.log('[종합분석 API] Gemini AI 분석 시작');
       
       // 환경 변수 확인
-      if (model === 'gpt' && !process.env.OPENAI_API_KEY) {
-        console.error('[종합분석 API] OPENAI_API_KEY 환경 변수가 설정되지 않았습니다.');
-        return NextResponse.json(
-          { error: 'OpenAI API 키가 설정되지 않았습니다. 환경 변수를 확인해주세요.' },
-          { status: 500 }
-        );
-      }
-      
-      if (model === 'gemini-flash' && !process.env.GEMINI_API_KEY) {
+      if (!process.env.GEMINI_API_KEY) {
         console.error('[종합분석 API] GEMINI_API_KEY 환경 변수가 설정되지 않았습니다.');
         return NextResponse.json(
           { error: 'Gemini API 키가 설정되지 않았습니다. 환경 변수를 확인해주세요.' },
@@ -253,35 +244,79 @@ export async function POST(
         console.error('[종합분석 API] 학급 상세 정보 조회 오류:', classDetailsError);
       }
       console.log('[종합분석 API] 학급 상세 정보 조회 완료');
-      
-      // AI 분석을 위해 모든 데이터를 전달 (선택된 모델에 따라)
-      let analysisResult;
-      if (model === 'gemini-flash') {
-        analysisResult = await analyzeClassOverviewWithGemini(
-          students,
-          relationships || [],
-          allAnswers || [],
-          allQuestions || [],
-          {
-            classDetails: classDetails || { id: classId },
-            surveys: surveys || [],
-            surveyData: surveyData,
-          }
-        );
-      } else {
-        analysisResult = await analyzeClassOverview(
-          students,
-          relationships || [],
-          allAnswers || [],
-          allQuestions || [],
-          {
-            classDetails: classDetails || { id: classId },
-            surveys: surveys || [],
-            surveyData: surveyData,
-          }
-        );
+
+      // 일기기록 데이터 조회
+      console.log('[종합분석 API] 일기기록 데이터 조회 시작');
+      const { data: dailyRecords, error: dailyRecordsError } = await (supabase as any)
+        .from('class_daily_records')
+        .select('*')
+        .eq('class_id', classId)
+        .order('record_date', { ascending: false });
+        
+      if (dailyRecordsError) {
+        console.error('[종합분석 API] 일기기록 데이터 조회 오류:', dailyRecordsError);
       }
-      console.log('[종합분석 API] AI 분석 완료, 모델:', model, ', 결과 타입:', typeof analysisResult);
+      console.log('[종합분석 API] 일기기록 데이터 조회 완료, 기록 수:', dailyRecords ? dailyRecords.length : 0);
+
+      // 평가기록 데이터 조회
+      console.log('[종합분석 API] 평가기록 데이터 조회 시작');
+      const { data: subjects, error: subjectsError } = await (supabase as any)
+        .from('subjects')
+        .select(`
+          *,
+          assessment_items (
+            *,
+            assessment_records (
+              *,
+              students (name)
+            )
+          )
+        `)
+        .eq('class_id', classId);
+        
+      if (subjectsError) {
+        console.error('[종합분석 API] 평가기록 데이터 조회 오류:', subjectsError);
+      }
+      console.log('[종합분석 API] 평가기록 데이터 조회 완료, 과목 수:', subjects ? subjects.length : 0);
+
+      // 과제체크 데이터 조회
+      console.log('[종합분석 API] 과제체크 데이터 조회 시작');
+      const { data: homeworkMonths, error: homeworkError } = await (supabase as any)
+        .from('homework_months')
+        .select(`
+          *,
+          homework_items (
+            *,
+            homework_records (
+              *,
+              students (name)
+            )
+          )
+        `)
+        .eq('class_id', classId)
+        .order('month_year', { ascending: false });
+        
+      if (homeworkError) {
+        console.error('[종합분석 API] 과제체크 데이터 조회 오류:', homeworkError);
+      }
+      console.log('[종합분석 API] 과제체크 데이터 조회 완료, 월별 그룹 수:', homeworkMonths ? homeworkMonths.length : 0);
+      
+      // Gemini AI 분석을 위해 모든 데이터를 전달
+      const analysisResult = await analyzeClassOverviewWithGemini(
+        students,
+        relationships || [],
+        allAnswers || [],
+        allQuestions || [],
+        {
+          classDetails: classDetails || { id: classId },
+          surveys: surveys || [],
+          surveyData: surveyData,
+          dailyRecords: dailyRecords || [],
+          subjects: subjects || [],
+          homeworkMonths: homeworkMonths || [],
+        }
+      );
+      console.log('[종합분석 API] Gemini AI 분석 완료, 결과 타입:', typeof analysisResult);
       
       // 분석 결과 저장
       console.log('[종합분석 API] 분석 결과 저장 시작');

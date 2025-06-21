@@ -153,8 +153,8 @@ async function runAnalysis(classId: string): Promise<AnalysisResult> {
 }
 
 // 종합 분석 실행 함수 수정
-async function runOverviewAnalysis(classId: string, sessionId: string, model: 'gpt' | 'gemini-flash' = 'gpt'): Promise<AnalysisResult> {
-  console.log(`종합 분석 실행 요청: classId=${classId}, sessionId=${sessionId}, model=${model}`);
+async function runOverviewAnalysis(classId: string, sessionId: string): Promise<AnalysisResult> {
+  console.log(`종합 분석 실행 요청: classId=${classId}, sessionId=${sessionId}`);
   
   try {
     const response = await fetch(`/api/class/${encodeURIComponent(classId)}/analysis/overview?sessionId=${encodeURIComponent(sessionId)}`, {
@@ -163,9 +163,8 @@ async function runOverviewAnalysis(classId: string, sessionId: string, model: 'g
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ 
-        session_id: sessionId,
-        model: model 
-      }), // session_id와 model 전달
+        session_id: sessionId
+      }), // session_id 전달
     });
     
     if (!response.ok) {
@@ -195,8 +194,8 @@ async function runOverviewAnalysis(classId: string, sessionId: string, model: 'g
 }
 
 // 학생 그룹별 분석 실행 함수 수정
-async function runStudentGroupAnalysis(classId: string, groupIndex: number, sessionId: string, model: 'gpt' | 'gemini-flash' = 'gpt'): Promise<AnalysisResult> {
-  console.log(`학생 그룹${groupIndex} 분석 실행 요청: classId=${classId}, sessionId=${sessionId}, model=${model}`);
+async function runStudentGroupAnalysis(classId: string, groupIndex: number, sessionId: string): Promise<AnalysisResult> {
+  console.log(`학생 그룹${groupIndex} 분석 실행 요청: classId=${classId}, sessionId=${sessionId}`);
   
   try {
     const response = await fetch(`/api/class/${encodeURIComponent(classId)}/analysis/students?group=${groupIndex}&sessionId=${encodeURIComponent(sessionId)}`, {
@@ -205,9 +204,8 @@ async function runStudentGroupAnalysis(classId: string, groupIndex: number, sess
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ 
-        session_id: sessionId,
-        model: model 
-      }), // session_id와 model 전달
+        session_id: sessionId
+      }), // session_id 전달
     });
     
     if (!response.ok) {
@@ -658,7 +656,7 @@ export default function ClassAnalysisPage() {
   const [isDeleteAllDialogOpen, setIsDeleteAllDialogOpen] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState('');
-  const [selectedModel, setSelectedModel] = useState<'gpt' | 'gemini-flash'>('gemini-flash');
+
   const [teacherName, setTeacherName] = useState<string | null>(null);
 
   // 선생님 이름 가져오기
@@ -715,7 +713,7 @@ export default function ClassAnalysisPage() {
           return Promise.resolve({} as AnalysisResult);
         }
       }
-      return runOverviewAnalysis(classId, sessionId, selectedModel);
+      return runOverviewAnalysis(classId, sessionId);
     },
     onSuccess: (newAnalysis) => {
       // 🌟 데모 학급인 경우에는 쿼리 무효화나 상태 업데이트 안함
@@ -753,7 +751,7 @@ export default function ClassAnalysisPage() {
           throw new Error("DEMO_BLOCKED");
         }
       }
-      return runStudentGroupAnalysis(classId, 1, sessionId, selectedModel);
+      return runStudentGroupAnalysis(classId, 1, sessionId);
     },
     onSuccess: (newAnalysis) => {
       queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
@@ -791,7 +789,7 @@ export default function ClassAnalysisPage() {
           throw new Error("DEMO_BLOCKED");
         }
       }
-      return runStudentGroupAnalysis(classId, 2, sessionId, selectedModel);
+      return runStudentGroupAnalysis(classId, 2, sessionId);
     },
     onSuccess: (newAnalysis) => {
       queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
@@ -829,7 +827,7 @@ export default function ClassAnalysisPage() {
           throw new Error("DEMO_BLOCKED");
         }
       }
-      return runStudentGroupAnalysis(classId, 3, sessionId, selectedModel);
+      return runStudentGroupAnalysis(classId, 3, sessionId);
     },
     onSuccess: (newAnalysis) => {
       queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
@@ -867,7 +865,7 @@ export default function ClassAnalysisPage() {
           throw new Error("DEMO_BLOCKED");
         }
       }
-      return runStudentGroupAnalysis(classId, 4, sessionId, selectedModel);
+      return runStudentGroupAnalysis(classId, 4, sessionId);
     },
     onSuccess: (newAnalysis) => {
       queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
@@ -905,7 +903,7 @@ export default function ClassAnalysisPage() {
           throw new Error("DEMO_BLOCKED");
         }
       }
-      return runStudentGroupAnalysis(classId, 5, sessionId, selectedModel);
+      return runStudentGroupAnalysis(classId, 5, sessionId);
     },
     onSuccess: (newAnalysis) => {
       queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
@@ -943,7 +941,7 @@ export default function ClassAnalysisPage() {
           throw new Error("DEMO_BLOCKED");
         }
       }
-      return runStudentGroupAnalysis(classId, 6, sessionId, selectedModel);
+      return runStudentGroupAnalysis(classId, 6, sessionId);
     },
     onSuccess: (newAnalysis) => {
       queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
@@ -981,7 +979,7 @@ export default function ClassAnalysisPage() {
           throw new Error("DEMO_BLOCKED");
         }
       }
-      return runStudentGroupAnalysis(classId, 7, sessionId, selectedModel);
+      return runStudentGroupAnalysis(classId, 7, sessionId);
     },
     onSuccess: (newAnalysis) => {
       queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
@@ -1019,7 +1017,7 @@ export default function ClassAnalysisPage() {
           throw new Error("DEMO_BLOCKED");
         }
       }
-      return runStudentGroupAnalysis(classId, 8, sessionId, selectedModel);
+      return runStudentGroupAnalysis(classId, 8, sessionId);
     },
     onSuccess: (newAnalysis) => {
       queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });

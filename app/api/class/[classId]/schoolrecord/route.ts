@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { generateSchoolRecord } from '@/lib/openai';
 import { generateSchoolRecordWithGemini } from '@/lib/gemini';
 import { Database } from '@/lib/database.types';
 import { isDemoClass } from '@/utils/demo-permissions';
@@ -17,18 +16,7 @@ export async function POST(
   try {
     const { classId } = params;
     
-    // 요청 본문에서 model 추출
-    const requestData = await request.json().catch(() => ({}));
-    let model = requestData.model || 'gpt'; // 기본값은 gpt
-    
-    // 모델 이름 정규화
-    if (model.includes('gemini')) {
-      model = 'gemini';
-    } else if (model.includes('openai') || model.includes('gpt')) {
-      model = 'openai';
-    }
-    
-    console.log('[POST API] 선택된 모델:', requestData.model, '-> 정규화된 모델:', model);
+    console.log('[POST API] Gemini 모델을 사용하여 생활기록부 생성');
     
     // Supabase 클라이언트 생성
     const cookieStore = cookies();
@@ -224,19 +212,11 @@ export async function POST(
     }
     console.log('[POST API] 전체 응답 데이터 조회 완료, 응답 수:', allAnswers ? allAnswers.length : 0);
 
-    // AI를 사용한 학생별 생활기록부 생성
-    console.log('[POST API] 생활기록부 생성 시작, 선택된 모델:', model);
+    // Gemini AI를 사용한 학생별 생활기록부 생성
+    console.log('[POST API] 생활기록부 생성 시작');
     
     // 환경 변수 확인
-    if (model === 'openai' && !process.env.OPENAI_API_KEY) {
-      console.error('[POST API] OPENAI_API_KEY 환경 변수가 설정되지 않았습니다.');
-      return NextResponse.json(
-        { error: 'OpenAI API 키가 설정되지 않았습니다. 환경 변수를 확인해주세요.' },
-        { status: 500 }
-      );
-    }
-    
-    if (model === 'gemini' && !process.env.GEMINI_API_KEY) {
+    if (!process.env.GEMINI_API_KEY) {
       console.error('[POST API] GEMINI_API_KEY 환경 변수가 설정되지 않았습니다.');
       return NextResponse.json(
         { error: 'Gemini API 키가 설정되지 않았습니다. 환경 변수를 확인해주세요.' },
@@ -255,7 +235,7 @@ export async function POST(
 
     let analysis = '';
     try {
-      console.log('[POST API] AI 분석 시작, 모델:', model);
+      console.log('[POST API] Gemini AI 분석 시작');
       console.log('[POST API] 분석 데이터 준비 완료:', {
         studentCount: students.length,
         relationshipCount: relationships ? relationships.length : 0,
@@ -264,34 +244,16 @@ export async function POST(
         surveysCount: surveys ? surveys.length : 0
       });
       
-      if (model === 'openai') {
-        console.log('[POST API] OpenAI 모델로 생활기록부 생성 시작');
-        analysis = await generateSchoolRecord(
-          students,
-          relationships || [],
-          allAnswers || [],
-          allQuestions || [],
-          additionalAnalysisData
-        );
-        console.log('[POST API] OpenAI 생성 완료, 결과 길이:', analysis.length);
-      } else if (model === 'gemini') {
-        console.log('[POST API] Gemini 모델로 생활기록부 생성 시작');
-        analysis = await generateSchoolRecordWithGemini(
-          students,
-          relationships || [],
-          allAnswers || [],
-          allQuestions || [],
-          additionalAnalysisData,
-          'flash'
-        );
-        console.log('[POST API] Gemini 생성 완료, 결과 길이:', analysis.length);
-      } else {
-        console.error('[POST API] 지원하지 않는 모델:', model);
-        return NextResponse.json(
-          { error: '지원하지 않는 AI 모델입니다.' },
-          { status: 400 }
-        );
-      }
+      console.log('[POST API] Gemini 모델로 생활기록부 생성 시작');
+      analysis = await generateSchoolRecordWithGemini(
+        students,
+        relationships || [],
+        allAnswers || [],
+        allQuestions || [],
+        additionalAnalysisData,
+        'flash'
+      );
+      console.log('[POST API] Gemini 생성 완료, 결과 길이:', analysis.length);
       
       if (!analysis || analysis.trim().length === 0) {
         console.error('[POST API] AI에서 빈 결과 반환됨');

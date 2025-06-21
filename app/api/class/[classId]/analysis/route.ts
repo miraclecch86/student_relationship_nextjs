@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { analyzeStudentRelationships } from '@/lib/openai';
+import { analyzeStudentRelationshipsWithGemini } from '@/lib/gemini';
 import { Database } from '@/lib/database.types';
 import { isDemoClass } from '@/utils/demo-permissions';
 
@@ -131,20 +131,20 @@ export async function POST(
     }
     console.log('[POST API] 관계 데이터 조회 완료, 관계 수:', relationships ? relationships.length : 0);
 
-    // OpenAI API를 통해 분석 수행
+    // Gemini API를 통해 분석 수행
     try {
       console.log('[POST API] AI 분석 시작');
       
       // 환경 변수 확인
-      if (!process.env.OPENAI_API_KEY) {
-        console.error('[POST API] OPENAI_API_KEY 환경 변수가 설정되지 않았습니다.');
+      if (!process.env.GEMINI_API_KEY) {
+        console.error('[POST API] GEMINI_API_KEY 환경 변수가 설정되지 않았습니다.');
         return NextResponse.json(
-          { error: 'OpenAI API 키가 설정되지 않았습니다. 환경 변수를 확인해주세요.' },
+          { error: 'Gemini API 키가 설정되지 않았습니다. 환경 변수를 확인해주세요.' },
           { status: 500 }
         );
       }
       
-      console.log('[POST API] 환경 변수 확인 완료, API 키 길이:', process.env.OPENAI_API_KEY.length);
+      console.log('[POST API] 환경 변수 확인 완료');
       
       // 학급에 속한 모든 설문지 조회
       console.log('[POST API] 설문지 정보 조회 시작');
@@ -224,23 +224,79 @@ export async function POST(
       if (allAnswersError) {
         console.error('[POST API] 전체 응답 데이터 조회 오류:', allAnswersError);
       }
-      console.log('[POST API] 전체 응답 데이터 조회 완료, 응답 수:', allAnswers ? allAnswers.length : 0);
+          console.log('[POST API] 전체 응답 데이터 조회 완료, 응답 수:', allAnswers ? allAnswers.length : 0);
+    
+    // 학급 정보 상세 조회
+    console.log('[POST API] 학급 상세 정보 조회 시작');
+    const { data: classDetails, error: classDetailsError } = await (supabase as any)
+      .from('classes')
+      .select('*')
+      .eq('id', classId)
+      .single();
       
-      // 학급 정보 상세 조회
-      console.log('[POST API] 학급 상세 정보 조회 시작');
-      const { data: classDetails, error: classDetailsError } = await (supabase as any)
-        .from('classes')
-        .select('*')
-        .eq('id', classId)
-        .single();
-        
-      if (classDetailsError) {
-        console.error('[POST API] 학급 상세 정보 조회 오류:', classDetailsError);
-      }
-      console.log('[POST API] 학급 상세 정보 조회 완료');
+    if (classDetailsError) {
+      console.error('[POST API] 학급 상세 정보 조회 오류:', classDetailsError);
+    }
+    console.log('[POST API] 학급 상세 정보 조회 완료');
+
+    // 일기기록 데이터 조회
+    console.log('[POST API] 일기기록 데이터 조회 시작');
+    const { data: dailyRecords, error: dailyRecordsError } = await (supabase as any)
+      .from('class_daily_records')
+      .select('*')
+      .eq('class_id', classId)
+      .order('record_date', { ascending: false });
+      
+    if (dailyRecordsError) {
+      console.error('[POST API] 일기기록 데이터 조회 오류:', dailyRecordsError);
+    }
+    console.log('[POST API] 일기기록 데이터 조회 완료, 기록 수:', dailyRecords ? dailyRecords.length : 0);
+
+    // 평가기록 데이터 조회
+    console.log('[POST API] 평가기록 데이터 조회 시작');
+    const { data: subjects, error: subjectsError } = await (supabase as any)
+      .from('subjects')
+      .select(`
+        *,
+        assessment_items (
+          *,
+          assessment_records (
+            *,
+            students (name)
+          )
+        )
+      `)
+      .eq('class_id', classId);
+      
+    if (subjectsError) {
+      console.error('[POST API] 평가기록 데이터 조회 오류:', subjectsError);
+    }
+    console.log('[POST API] 평가기록 데이터 조회 완료, 과목 수:', subjects ? subjects.length : 0);
+
+    // 과제체크 데이터 조회
+    console.log('[POST API] 과제체크 데이터 조회 시작');
+    const { data: homeworkMonths, error: homeworkError } = await (supabase as any)
+      .from('homework_months')
+      .select(`
+        *,
+        homework_items (
+          *,
+          homework_records (
+            *,
+            students (name)
+          )
+        )
+      `)
+      .eq('class_id', classId)
+      .order('month_year', { ascending: false });
+      
+    if (homeworkError) {
+      console.error('[POST API] 과제체크 데이터 조회 오류:', homeworkError);
+    }
+    console.log('[POST API] 과제체크 데이터 조회 완료, 월별 그룹 수:', homeworkMonths ? homeworkMonths.length : 0);
       
       // AI 분석을 위해 모든 데이터를 전달
-      const analysisResult = await analyzeStudentRelationships(
+      const analysisResult = await analyzeStudentRelationshipsWithGemini(
         students,
         relationships || [],
         allAnswers || [],
@@ -249,6 +305,9 @@ export async function POST(
           classDetails: classDetails || { id: classId },
           surveys: surveys || [],
           surveyData: surveyData,
+          dailyRecords: dailyRecords || [],
+          subjects: subjects || [],
+          homeworkMonths: homeworkMonths || [],
         }
       );
       console.log('[POST API] AI 분석 완료, 결과 타입:', typeof analysisResult);

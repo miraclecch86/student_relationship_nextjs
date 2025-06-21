@@ -52,6 +52,7 @@ const COMPREHENSIVE_ANALYSIS_PROMPT = `${AI_EXPERT_IDENTITY}
 - **시간별 변화 추이**: 설문 데이터를 통해 본 학급의 관계 변화 흐름과 성장 패턴
 - **현재 교실 역학**: 리더-팔로워 구조, 인기도 분포, 영향력 중심 분석
 - **교실 분위기 온도계**: 전체적인 심리적 안전감과 소속감 수준 진단
+- **일상 기록 패턴**: 일기기록, 평가기록, 과제체크 데이터에서 나타나는 학급의 일상적 특징과 패턴
 
 ## 2. 🕵️ **데이터 기반 심층 통찰 및 숨겨진 패턴**
 - **AI가 발견한 특이 패턴**: 일반적이지 않은 관계 형성이나 심리적 변화 신호
@@ -59,6 +60,7 @@ const COMPREHENSIVE_ANALYSIS_PROMPT = `${AI_EXPERT_IDENTITY}
 - **긍정적 성장 동력**: 학급 발전을 이끌 수 있는 강점 관계와 리더십 요소
 - **숨겨진 니즈**: 설문 응답에서 드러나는 학생들의 미충족 욕구와 기대
 - **예상 시나리오**: 현재 패턴이 지속될 경우 예상되는 학급 변화 방향
+- **학습 및 생활 패턴**: 평가기록과 과제체크에서 나타나는 학습 태도와 책임감, 일기기록에서 드러나는 정서적 변화
 
 ## 3. 🎯 **맞춤형 교실 운영 전략 3가지 (즉시 실행 가능)**
 
@@ -242,7 +244,10 @@ export async function analyzeStudentRelationshipsWithGemini(
       relationships: Relationship[],
       questions: Question[],
       answers: Answer[]
-    }>
+    }>,
+    dailyRecords?: any[],
+    subjects?: any[],
+    homeworkMonths?: any[]
   },
   modelType: 'flash' = 'flash'
 ): Promise<string> {
@@ -324,7 +329,44 @@ export async function analyzeStudentRelationshipsWithGemini(
             };
           })
         };
-      }) || []
+      }) || [],
+
+      // 일기기록 데이터
+      dailyRecords: additionalData?.dailyRecords?.map(record => ({
+        date: record.record_date,
+        actualDate: record.actual_date,
+        title: record.title,
+        content: record.content,
+        hashtags: record.hashtags || [],
+        createdAt: record.created_at
+      })) || [],
+
+      // 평가기록 데이터
+      assessmentData: additionalData?.subjects?.map(subject => ({
+        subjectName: subject.name,
+        assessmentItems: subject.assessment_items?.map((item: any) => ({
+          itemName: item.name,
+          assessmentDate: item.assessment_date,
+          records: item.assessment_records?.map((record: any) => ({
+            studentName: record.students?.name || '알 수 없음',
+            score: record.score
+          })) || []
+        })) || []
+      })) || [],
+
+      // 과제체크 데이터
+      homeworkData: additionalData?.homeworkMonths?.map(month => ({
+        monthYear: month.month_year,
+        name: month.name,
+        homeworkItems: month.homework_items?.map((item: any) => ({
+          itemName: item.name,
+          dueDate: item.due_date,
+          records: item.homework_records?.map((record: any) => ({
+            studentName: record.students?.name || '알 수 없음',
+            isSubmitted: record.is_submitted
+          })) || []
+        })) || []
+      })) || []
     };
 
     const userContent = `다음 데이터를 기반으로 학급 관계 분석을 진행해주세요: 
@@ -351,7 +393,10 @@ export async function analyzeClassOverviewWithGemini(
       relationships: Relationship[],
       questions: Question[],
       answers: Answer[]
-    }>
+    }>,
+    dailyRecords?: any[],
+    subjects?: any[],
+    homeworkMonths?: any[]
   },
   modelType: 'flash' = 'flash'
 ): Promise<string> {
@@ -427,7 +472,44 @@ export async function analyzeClassOverviewWithGemini(
             };
           })
         };
-      }) || []
+      }) || [],
+
+      // 일기기록 데이터
+      dailyRecords: additionalData?.dailyRecords?.map(record => ({
+        date: record.record_date,
+        actualDate: record.actual_date,
+        title: record.title,
+        content: record.content,
+        hashtags: record.hashtags || [],
+        createdAt: record.created_at
+      })) || [],
+
+      // 평가기록 데이터
+      assessmentData: additionalData?.subjects?.map(subject => ({
+        subjectName: subject.name,
+        assessmentItems: subject.assessment_items?.map((item: any) => ({
+          itemName: item.name,
+          assessmentDate: item.assessment_date,
+          records: item.assessment_records?.map((record: any) => ({
+            studentName: record.students?.name || '알 수 없음',
+            score: record.score
+          })) || []
+        })) || []
+      })) || [],
+
+      // 과제체크 데이터
+      homeworkData: additionalData?.homeworkMonths?.map(month => ({
+        monthYear: month.month_year,
+        name: month.name,
+        homeworkItems: month.homework_items?.map((item: any) => ({
+          itemName: item.name,
+          dueDate: item.due_date,
+          records: item.homework_records?.map((record: any) => ({
+            studentName: record.students?.name || '알 수 없음',
+            isSubmitted: record.is_submitted
+          })) || []
+        })) || []
+      })) || []
     };
 
     const userContent = `다음 데이터를 기반으로 학급 전체 종합 분석을 진행해주세요: 
@@ -456,7 +538,10 @@ export async function analyzeStudentGroupWithGemini(
       questions: Question[],
       answers: Answer[]
     }>,
-    allStudents?: Student[] // 전체 학생 목록 (참조용)
+    allStudents?: Student[], // 전체 학생 목록 (참조용)
+    dailyRecords?: any[],
+    subjects?: any[],
+    homeworkMonths?: any[]
   },
   modelType: 'flash' = 'flash'
 ): Promise<string> {
@@ -545,7 +630,44 @@ export async function analyzeStudentGroupWithGemini(
             };
           })
         };
-      }) || []
+      }) || [],
+
+      // 일기기록 데이터
+      dailyRecords: additionalData?.dailyRecords?.map(record => ({
+        date: record.record_date,
+        actualDate: record.actual_date,
+        title: record.title,
+        content: record.content,
+        hashtags: record.hashtags || [],
+        createdAt: record.created_at
+      })) || [],
+
+      // 평가기록 데이터
+      assessmentData: additionalData?.subjects?.map(subject => ({
+        subjectName: subject.name,
+        assessmentItems: subject.assessment_items?.map((item: any) => ({
+          itemName: item.name,
+          assessmentDate: item.assessment_date,
+          records: item.assessment_records?.map((record: any) => ({
+            studentName: record.students?.name || '알 수 없음',
+            score: record.score
+          })) || []
+        })) || []
+      })) || [],
+
+      // 과제체크 데이터
+      homeworkData: additionalData?.homeworkMonths?.map(month => ({
+        monthYear: month.month_year,
+        name: month.name,
+        homeworkItems: month.homework_items?.map((item: any) => ({
+          itemName: item.name,
+          dueDate: item.due_date,
+          records: item.homework_records?.map((record: any) => ({
+            studentName: record.students?.name || '알 수 없음',
+            isSubmitted: record.is_submitted
+          })) || []
+        })) || []
+      })) || []
     };
 
     const userContent = `다음 데이터를 기반으로 각 학생별 심층 분석을 진행해주세요. 
@@ -581,7 +703,10 @@ export async function generateSchoolRecordWithGemini(
       relationships: Relationship[],
       questions: Question[],
       answers: Answer[]
-    }>
+    }>,
+    dailyRecords?: any[],
+    subjects?: any[],
+    homeworkMonths?: any[]
   },
   modelType: 'flash' = 'flash'
 ): Promise<string> {
@@ -674,7 +799,44 @@ export async function generateSchoolRecordWithGemini(
           ['친한', '친해질래'].includes(r.relation_type)
         ).length / relationships.length,
         surveyCount: additionalData?.surveys?.length || 0
-      }
+      },
+
+      // 일기기록 데이터
+      dailyRecords: additionalData?.dailyRecords?.map(record => ({
+        date: record.record_date,
+        actualDate: record.actual_date,
+        title: record.title,
+        content: record.content,
+        hashtags: record.hashtags || [],
+        createdAt: record.created_at
+      })) || [],
+
+      // 평가기록 데이터
+      assessmentData: additionalData?.subjects?.map(subject => ({
+        subjectName: subject.name,
+        assessmentItems: subject.assessment_items?.map((item: any) => ({
+          itemName: item.name,
+          assessmentDate: item.assessment_date,
+          records: item.assessment_records?.map((record: any) => ({
+            studentName: record.students?.name || '알 수 없음',
+            score: record.score
+          })) || []
+        })) || []
+      })) || [],
+
+      // 과제체크 데이터
+      homeworkData: additionalData?.homeworkMonths?.map(month => ({
+        monthYear: month.month_year,
+        name: month.name,
+        homeworkItems: month.homework_items?.map((item: any) => ({
+          itemName: item.name,
+          dueDate: item.due_date,
+          records: item.homework_records?.map((record: any) => ({
+            studentName: record.students?.name || '알 수 없음',
+            isSubmitted: record.is_submitted
+          })) || []
+        })) || []
+      })) || []
     };
 
     const userContent = `다음 데이터를 기반으로 각 학생별 생활기록부 문구를 작성해주세요. 

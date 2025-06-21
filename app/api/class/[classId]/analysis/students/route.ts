@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { analyzeStudentGroup } from '@/lib/openai';
 import { analyzeStudentGroupWithGemini } from '@/lib/gemini';
 import { Database } from '@/lib/database.types';
 import { Student, Relationship, Answer, Question, Survey } from '@/lib/supabase';
@@ -61,52 +60,108 @@ async function collectAdditionalData(classId: string, studentIds: string[], supa
     
     if (surveysError) {
       console.error('[학생 그룹 분석 API] 설문지 목록 조회 오류:', surveysError);
-      return { surveys: [] };
     }
     
-    // 설문지가 없는 경우
-    if (!surveys || surveys.length === 0) {
-      return { surveys: [] };
+    // 설문지별 데이터 수집
+    let surveyData = [];
+    if (surveys && surveys.length > 0) {
+      surveyData = await Promise.all(surveys.map(async (survey: any) => {
+        // 설문지별 관계 데이터 조회
+        const { data: surveyRelationships } = await queryTable(
+          supabase, 
+          'relationship',
+          ['class_id', classId]
+        );
+        
+        // 설문지별 질문 조회
+        const { data: surveyQuestions } = await queryTable(
+          supabase,
+          'question',
+          ['survey_id', survey.id]
+        );
+        
+        // 설문지별 답변 조회
+        const { data: surveyAnswers } = await (supabase as any)
+          .from('answers')
+          .select('*')
+          .eq('survey_id', survey.id)
+          .in('student_id', studentIds);
+        
+        return {
+          survey,
+          relationships: surveyRelationships || [],
+          questions: surveyQuestions || [],
+          answers: surveyAnswers || []
+        };
+      }));
     }
-    
-    // 각 설문지별로 추가 데이터 수집
-    const surveyData = await Promise.all(surveys.map(async (survey: any) => {
-      // 설문지별 관계 데이터 조회
-      const { data: surveyRelationships } = await queryTable(
-        supabase, 
-        'relationship',
-        ['class_id', classId]
-      );
+
+    // 일기기록 데이터 조회
+    const { data: dailyRecords, error: dailyRecordsError } = await (supabase as any)
+      .from('class_daily_records')
+      .select('*')
+      .eq('class_id', classId)
+      .order('record_date', { ascending: false });
       
-      // 설문지별 질문 조회
-      const { data: surveyQuestions } = await queryTable(
-        supabase,
-        'question',
-        ['survey_id', survey.id]
-      );
+    if (dailyRecordsError) {
+      console.error('[학생 그룹 분석 API] 일기기록 데이터 조회 오류:', dailyRecordsError);
+    }
+
+    // 평가기록 데이터 조회
+    const { data: subjects, error: subjectsError } = await (supabase as any)
+      .from('subjects')
+      .select(`
+        *,
+        assessment_items (
+          *,
+          assessment_records (
+            *,
+            students (name)
+          )
+        )
+      `)
+      .eq('class_id', classId);
       
-      // 설문지별 답변 조회
-      const { data: surveyAnswers } = await (supabase as any)
-        .from('answers')
-        .select('*')
-        .eq('survey_id', survey.id)
-        .in('student_id', studentIds);
+    if (subjectsError) {
+      console.error('[학생 그룹 분석 API] 평가기록 데이터 조회 오류:', subjectsError);
+    }
+
+    // 과제체크 데이터 조회
+    const { data: homeworkMonths, error: homeworkError } = await (supabase as any)
+      .from('homework_months')
+      .select(`
+        *,
+        homework_items (
+          *,
+          homework_records (
+            *,
+            students (name)
+          )
+        )
+      `)
+      .eq('class_id', classId)
+      .order('month_year', { ascending: false });
       
-      return {
-        survey,
-        relationships: surveyRelationships || [],
-        questions: surveyQuestions || [],
-        answers: surveyAnswers || []
-      };
-    }));
+    if (homeworkError) {
+      console.error('[학생 그룹 분석 API] 과제체크 데이터 조회 오류:', homeworkError);
+    }
     
     return {
       surveys: surveys || [],
-      surveyData: surveyData || []
+      surveyData: surveyData || [],
+      dailyRecords: dailyRecords || [],
+      subjects: subjects || [],
+      homeworkMonths: homeworkMonths || []
     };
   } catch (error) {
     console.error('[학생 그룹 분석 API] 추가 데이터 수집 중 오류:', error);
-    return { surveys: [] };
+    return { 
+      surveys: [],
+      surveyData: [],
+      dailyRecords: [],
+      subjects: [],
+      homeworkMonths: []
+    };
   }
 }
 
@@ -320,20 +375,12 @@ export async function POST(
     // 추가 데이터 수집
     const additionalData = await collectAdditionalData(classId, studentIds, supabase);
     
-    // AI 분석 실행 (선택된 모델에 따라)
+    // Gemini AI 분석 실행
     try {
-      console.log('[학생 그룹 분석 API] AI 분석 시작, 선택된 모델:', model);
+      console.log('[학생 그룹 분석 API] Gemini AI 분석 시작');
       
       // 환경 변수 확인
-      if (model === 'gpt' && !process.env.OPENAI_API_KEY) {
-        console.error('[학생 그룹 분석 API] OPENAI_API_KEY 환경 변수가 설정되지 않았습니다.');
-        return NextResponse.json(
-          { error: 'OpenAI API 키가 설정되지 않았습니다. 환경 변수를 확인해주세요.' },
-          { status: 500 }
-        );
-      }
-      
-      if (model === 'gemini-flash' && !process.env.GEMINI_API_KEY) {
+      if (!process.env.GEMINI_API_KEY) {
         console.error('[학생 그룹 분석 API] GEMINI_API_KEY 환경 변수가 설정되지 않았습니다.');
         return NextResponse.json(
           { error: 'Gemini API 키가 설정되지 않았습니다. 환경 변수를 확인해주세요.' },
@@ -343,34 +390,18 @@ export async function POST(
       
       console.log('[학생 그룹 분석 API] 환경 변수 확인 완료');
       
-      let analysisResult;
-      if (model === 'gemini-flash') {
-        analysisResult = await analyzeStudentGroupWithGemini(
-          groupStudents, // 현재 그룹에 속한 학생들만 전달
-          relationships || [],
-          groupIndex,
-          (additionalData?.surveyData || []).map((data: any) => data.answers || []).flat() || [],
-          (additionalData?.surveyData || []).map((data: any) => data.questions || []).flat() || [],
-          {
-            classDetails: classData,
-            allStudents: allStudents, // 전체 학생 목록 전달
-            ...additionalData
-          }
-        );
-      } else {
-        analysisResult = await analyzeStudentGroup(
-          groupStudents, // 현재 그룹에 속한 학생들만 전달
-          relationships || [],
-          groupIndex,
-          (additionalData?.surveyData || []).map((data: any) => data.answers || []).flat() || [],
-          (additionalData?.surveyData || []).map((data: any) => data.questions || []).flat() || [],
-          {
-            classDetails: classData,
-            allStudents: allStudents, // 전체 학생 목록 전달
-            ...additionalData
-          }
-        );
-      }
+      const analysisResult = await analyzeStudentGroupWithGemini(
+        groupStudents, // 현재 그룹에 속한 학생들만 전달
+        relationships || [],
+        groupIndex,
+        (additionalData?.surveyData || []).map((data: any) => data.answers || []).flat() || [],
+        (additionalData?.surveyData || []).map((data: any) => data.questions || []).flat() || [],
+        {
+          classDetails: classData,
+          allStudents: allStudents, // 전체 학생 목록 전달
+          ...additionalData
+        }
+      );
       
       // 요약 필드를 빈 문자열로 설정하여 사용자가 직접 입력하도록 유도
       let summary = '';
@@ -398,9 +429,9 @@ export async function POST(
       
       return NextResponse.json(newAnalysis);
     } catch (error) {
-      console.error(`[학생 그룹 분석 API] AI 분석 오류 (모델: ${model}):`, error);
+      console.error(`[학생 그룹 분석 API] Gemini AI 분석 오류:`, error);
       return NextResponse.json(
-        { error: `AI 분석 중 오류가 발생했습니다 (모델: ${model})` }, 
+        { error: `Gemini AI 분석 중 오류가 발생했습니다` }, 
         { status: 500 }
       );
     }

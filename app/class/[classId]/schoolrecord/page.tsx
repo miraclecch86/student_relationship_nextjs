@@ -72,8 +72,8 @@ async function fetchSchoolRecords(classId: string): Promise<SchoolRecord[]> {
 }
 
 // 생활기록부 생성 함수
-async function generateSchoolRecord(classId: string, model: 'gpt' | 'gemini-flash' = 'gpt'): Promise<SchoolRecord> {
-  console.log(`생활기록부 생성 요청: classId=${classId}, model=${model}`);
+async function generateSchoolRecord(classId: string): Promise<SchoolRecord> {
+  console.log(`생활기록부 생성 요청: classId=${classId}`);
   
   try {
     const response = await fetch(`/api/class/${classId}/schoolrecord`, {
@@ -81,7 +81,6 @@ async function generateSchoolRecord(classId: string, model: 'gpt' | 'gemini-flas
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ model }),
     });
     
     if (!response.ok) {
@@ -530,7 +529,7 @@ export default function SchoolRecordPage() {
           return Promise.resolve({} as SchoolRecord);
         }
       }
-      return generateSchoolRecord(classId, 'gemini-flash');
+      return generateSchoolRecord(classId);
     },
     onSuccess: (data) => {
       // 🌟 데모 학급인 경우에는 쿼리 무효화나 상태 업데이트 안함
