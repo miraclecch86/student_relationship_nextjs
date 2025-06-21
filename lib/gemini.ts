@@ -88,28 +88,6 @@ const COMPREHENSIVE_ANALYSIS_PROMPT = `${AI_EXPERT_IDENTITY}
 - **관계 촉진 학생**: 학급 화합에 중요한 역할을 할 수 있는 학생들과 활용 전략
 - **안정적 지지 학생**: 학급의 든든한 기반이 되는 학생들과 역할 확대 방안
 
-## 5. 💡 **담임교사 실행 가이드**
-
-### 📅 **단기 실행 계획 (즉시~1개월)**
-- **이번 주 실행사항**: 당장 시작할 수 있는 3-5가지 구체적 액션 아이템
-- **이번 달 중점 목표**: 한 달 내 달성할 학급 변화 목표와 마일스톤
-
-### 📈 **중장기 성장 로드맵 (1개월~1학기)**  
-- **분기별 장기 계획**: 학기 전체를 아우르는 학급 성장 로드맵
-- **단계별 발전 목표**: 월별/분기별 구체적 성장 지표와 마일스톤
-
-### 🔍 **지속적 모니터링 시스템**
-- **주간 관찰 체크리스트**: 매주 점검해야 할 학급 상태 핵심 지표들
-- **월간 평가 포인트**: 한 달 단위로 확인할 학급 발전 상황과 조정 방향
-
-### 🚨 **위기 관리 및 예방 대응**
-- **위기 상황 조기 발견**: 문제 상황의 전조 증상과 감지 방법
-- **단계별 대응 매뉴얼**: 상황별 구체적 대응 방법과 에스컬레이션 절차
-
-### 🏠 **가정 연계 협력 방안**
-- **학부모 소통 포인트**: 가정과 연계하여 강화할 수 있는 지도 영역
-- **가정 내 실천 사항**: 학부모께 요청할 구체적 협력 방안과 활동
-
 **관계 용어 변환 규칙:**
 - "friendly" → "친해"
 - "wanna_be_close" → "친해질래"  
@@ -126,60 +104,68 @@ const STUDENT_ANALYSIS_PROMPT = `${AI_EXPERT_IDENTITY}
 - **받은 관계와 준 관계를 반드시 구분하여 분석**하세요
 - 예: A가 받은 불편해 vs A가 준 불편해는 완전히 다른 의미입니다
 
+**분석 깊이 요구사항:**
+- **각 항목마다 최소 5-8줄의 상세한 분석**을 제공하세요
+- **구체적인 관찰 사실과 해석**을 함께 제시하세요
+- **실제 교실 상황과 연결**하여 설명하세요
+- **심리학적 근거와 교육학적 통찰**을 포함하세요
+- **개별 학생의 고유한 특성**에 초점을 맞춰 분석하세요
+
 **중요**: 
 - 설명이나 안내 문구 없이 바로 학생 분석만 작성하세요
 - 제공된 학생 목록에 있는 학생들만 분석하세요
 - 각 학생마다 아래 5개 섹션으로 구성하세요
+- **모든 항목에서 풍부하고 구체적인 내용**을 제공하세요
 
 각 학생별 분석 형식:
 
 ## 👤 **[학생명]**
 
 ### 🔍 **관계 분석 및 사회적 위치**
-- **학급 내 위치**: 전체 사회적 관계망에서의 구체적 위치와 영향력 수준
-- **친밀 관계 패턴**: 가까운 친구들과의 관계 깊이와 상호작용 특성
-- **또래 관계 스펙트럼**: 다양한 학급 구성원들과의 관계 양상과 변화
-- **관계 변화 추이**: 시간에 따른 관계 발전 및 변화 패턴과 배경
-- **소통 스타일**: 타인과의 의사소통 방식과 상호작용 특징
-- **사회적 역할**: 학급 공동체에서 수행하는 역할과 그 영향력
+- **학급 내 위치**: 전체 사회적 관계망에서의 구체적 위치와 영향력 수준을 상세히 분석하세요. 이 학생이 학급 내에서 어떤 역할을 하는지, 다른 학생들이 이 학생을 어떻게 인식하는지, 그룹 내에서의 지위와 영향력은 어느 정도인지 구체적으로 설명하세요.
+- **친밀 관계 패턴**: 가까운 친구들과의 관계 깊이와 상호작용 특성을 심층적으로 분석하세요. 어떤 학생들과 특히 친한지, 우정의 질은 어떤지, 관계의 상호성과 안정성, 갈등 해결 방식 등을 구체적으로 서술하세요.
+- **또래 관계 스펙트럼**: 다양한 학급 구성원들과의 관계 양상과 변화를 종합적으로 분석하세요. 친한 친구부터 불편한 관계까지의 스펙트럼, 각 관계의 특징과 변화 추이, 관계 형성과 유지의 패턴을 상세히 설명하세요.
+- **관계 변화 추이**: 시간에 따른 관계 발전 및 변화 패턴과 배경을 깊이 있게 분석하세요. 어떤 관계가 강해지거나 약해졌는지, 그 원인과 과정, 앞으로 예상되는 관계 변화 방향을 구체적으로 예측하세요.
+- **소통 스타일**: 타인과의 의사소통 방식과 상호작용 특징을 세밀하게 관찰하여 분석하세요. 언어적/비언어적 소통 특성, 갈등 상황에서의 대응 방식, 협력과 경쟁 상황에서의 행동 패턴을 상세히 서술하세요.
+- **사회적 역할**: 학급 공동체에서 수행하는 역할과 그 영향력을 종합적으로 평가하세요. 리더십 발휘 양상, 조정자 역할, 분위기 메이커 등의 특성과 그것이 학급 전체에 미치는 영향을 구체적으로 분석하세요.
 
 ### 🧠 **심리적 특성 및 성장 패턴**  
-- **핵심 성격 특성**: 주요 성격 요소와 행동 패턴의 근본적 특징
-- **정서 발달 상태**: 감정 인식, 표현, 조절 능력의 현재 발달 수준
-- **인지적 특성**: 사고 방식, 문제 해결 접근법, 학습 성향
-- **자아 개념**: 자기 인식과 자존감, 자기 효능감의 발달 정도
-- **스트레스 대처**: 어려운 상황에서의 반응 패턴과 대처 전략
-- **성장 변화**: 관찰된 발달적 변화와 성장 궤적의 특성
+- **핵심 성격 특성**: 주요 성격 요소와 행동 패턴의 근본적 특징을 심층적으로 분석하세요. 내향성/외향성, 안정성/불안정성, 개방성 등의 성격 차원에서 이 학생의 고유한 특성과 그것이 일상 행동에 어떻게 나타나는지 구체적으로 설명하세요.
+- **정서 발달 상태**: 감정 인식, 표현, 조절 능력의 현재 발달 수준을 상세히 평가하세요. 감정 표현의 방식과 빈도, 스트레스 상황에서의 반응, 감정 조절 능력의 수준과 특징, 정서적 성숙도를 구체적으로 분석하세요.
+- **인지적 특성**: 사고 방식, 문제 해결 접근법, 학습 성향을 종합적으로 분석하세요. 논리적/직관적 사고 선호도, 창의성과 분석력의 수준, 학습 스타일과 정보 처리 방식, 호기심과 탐구 욕구의 정도를 상세히 서술하세요.
+- **자아 개념**: 자기 인식과 자존감, 자기 효능감의 발달 정도를 깊이 있게 분석하세요. 자신에 대한 인식의 정확성, 자존감의 수준과 안정성, 도전에 대한 자신감, 실패와 성공에 대한 반응 패턴을 구체적으로 설명하세요.
+- **스트레스 대처**: 어려운 상황에서의 반응 패턴과 대처 전략을 세밀하게 관찰하여 분석하세요. 스트레스 요인에 대한 반응 방식, 문제 해결 전략의 특징, 도움 요청 패턴, 회복력과 적응력의 수준을 상세히 평가하세요.
+- **성장 변화**: 관찰된 발달적 변화와 성장 궤적의 특성을 종합적으로 분석하세요. 시간에 따른 긍정적 변화, 극복한 어려움, 새로 나타난 특성, 앞으로의 성장 가능성과 방향을 구체적으로 예측하세요.
 
 ### 💪 **강점 및 개선 영역**
-- **핵심 강점**: 학생의 주요 장점과 뛰어난 능력 영역
-- **잠재력**: 향후 발현 가능한 재능과 성장 가능성
-- **리더십**: 다른 학생들에게 미치는 긍정적 영향력
-- **창의적 특성**: 독특하고 창의적인 사고나 행동 양상
-- **개선 필요 영역**: 성장을 위해 발전이 필요한 구체적 부분
-- **도전 과제**: 현재 직면한 어려움과 극복 과제
-- **성장 저해 요소**: 발전을 방해할 수 있는 요인과 주의점
+- **핵심 강점**: 학생의 주요 장점과 뛰어난 능력 영역을 구체적으로 분석하세요. 학업적, 사회적, 정서적, 창의적 영역에서의 특별한 재능과 능력, 그것이 발휘되는 상황과 방식, 다른 학생들과 구별되는 독특한 장점을 상세히 서술하세요.
+- **잠재력**: 향후 발현 가능한 재능과 성장 가능성을 깊이 있게 탐색하세요. 아직 충분히 발휘되지 않은 숨겨진 능력, 적절한 기회가 주어졌을 때 나타날 수 있는 잠재력, 미래 발전 가능성이 높은 영역을 구체적으로 예측하세요.
+- **리더십**: 다른 학생들에게 미치는 긍정적 영향력을 종합적으로 평가하세요. 리더십 스타일의 특징, 영향력 발휘 방식, 팔로워들의 반응, 리더십 발전 가능성과 필요한 지원 영역을 상세히 분석하세요.
+- **창의적 특성**: 독특하고 창의적인 사고나 행동 양상을 구체적으로 관찰하여 분석하세요. 문제 해결에서의 창의성, 예술적/표현적 재능, 독창적인 아이디어 제시 능력, 기존 틀을 벗어나는 사고 특성을 상세히 서술하세요.
+- **개선 필요 영역**: 성장을 위해 발전이 필요한 구체적 부분을 세밀하게 분석하세요. 학업적, 사회적, 정서적 영역에서의 약점과 개선점, 그 원인과 배경, 개선을 위한 구체적 방향을 상세히 제시하세요.
+- **도전 과제**: 현재 직면한 어려움과 극복 과제를 깊이 있게 분석하세요. 개인적 어려움의 성격과 정도, 극복을 위한 내적/외적 자원, 필요한 지원과 개입 방향을 구체적으로 설명하세요.
+- **성장 저해 요소**: 발전을 방해할 수 있는 요인과 주의점을 종합적으로 평가하세요. 성격적 한계, 환경적 제약, 부정적 행동 패턴, 위험 요소와 그에 대한 예방적 접근 방안을 상세히 분석하세요.
 
 ### 🎯 **담임교사 맞춤형 지도 전략**
-- **일상 관찰 포인트**: 교실에서 지속 관찰할 구체적 행동과 변화 신호
-- **개별 지도 방향**: 이 학생에게 가장 효과적인 지도 방식과 접근법
-- **관계 촉진 방안**: 또래 관계 개선을 위한 구체적 개입 전략
-- **학습 지원 전략**: 학업적 성장을 위한 맞춤형 지원 방향
-- **정서 지원 방법**: 심리적 안정감과 성장을 위한 지원 체계
-- **장기 성장 로드맵**: 지속적 발전을 위한 단계별 계획
-- **예방적 개입**: 특별히 주의할 상황과 예방적 대응 방안
+- **일상 관찰 포인트**: 교실에서 지속 관찰할 구체적 행동과 변화 신호를 상세히 제시하세요. 주의 깊게 봐야 할 언어적/비언어적 신호, 행동 변화의 조기 징후, 정서 상태 파악을 위한 관찰 포인트, 성장과 퇴행의 지표를 구체적으로 설명하세요.
+- **개별 지도 방향**: 이 학생에게 가장 효과적인 지도 방식과 접근법을 종합적으로 제시하세요. 학습 지도 방법, 동기부여 전략, 상담 접근법, 행동 수정 기법, 강점 개발 방안을 구체적이고 실용적으로 서술하세요.
+- **관계 촉진 방안**: 또래 관계 개선을 위한 구체적 개입 전략을 상세히 제시하세요. 사회성 향상을 위한 활동, 갈등 해결 지원 방법, 친구 관계 형성 도움 전략, 집단 활동에서의 역할 부여 방안을 실용적으로 설명하세요.
+- **학습 지원 전략**: 학업적 성장을 위한 맞춤형 지원 방향을 구체적으로 제시하세요. 개별 학습 스타일에 맞는 교수법, 학습 동기 향상 방안, 성취 수준에 적합한 과제 제공, 학습 어려움 해결 전략을 상세히 서술하세요.
+- **정서 지원 방법**: 심리적 안정감과 성장을 위한 지원 체계를 종합적으로 제시하세요. 정서적 안정을 위한 환경 조성, 스트레스 관리 지원, 자존감 향상 방법, 정서 조절 능력 개발 지원을 구체적으로 설명하세요.
+- **장기 성장 로드맵**: 지속적 발전을 위한 단계별 계획을 상세히 제시하세요. 단기/중기/장기 목표 설정, 단계별 성취 지표, 발전 과정 모니터링 방법, 필요시 계획 수정 방향을 실용적으로 서술하세요.
+- **예방적 개입**: 특별히 주의할 상황과 예방적 대응 방안을 구체적으로 제시하세요. 위험 신호 감지 방법, 문제 상황 예방 전략, 조기 개입 시점과 방법, 위기 상황 대응 매뉴얼을 상세히 설명하세요.
 
 ### 💬 **학부모·학생 소통 가이드**
-- **학부모 상담 포인트**: 이 학생에 대해 학부모님께 전달할 핵심 메시지와 상담 내용
-- **가정 연계 협력 방안**: 가정에서 실천할 수 있는 구체적 지원 방법과 활동
-- **학생과의 대화 주제**: 학생과 직접 나눌 수 있는 효과적인 대화 소재와 접근법
-- **긍정적 피드백 방향**: 학생의 자존감 향상을 위한 구체적 칭찬 포인트와 격려 방법
-- **성장 동기 부여**: 학생의 발전 의지를 높이기 위한 맞춤형 동기부여 전략
+- **학부모 상담 포인트**: 이 학생에 대해 학부모님께 전달할 핵심 메시지와 상담 내용을 구체적으로 제시하세요. 강점과 성장 영역 전달 방법, 개선 필요 사항의 민감한 전달법, 가정에서의 협력 요청 사항, 학부모의 우려 해소 방안을 상세히 서술하세요.
+- **가정 연계 협력 방안**: 가정에서 실천할 수 있는 구체적 지원 방법과 활동을 상세히 제시하세요. 학습 환경 조성 방법, 정서적 지원 방안, 사회성 개발을 위한 가정 활동, 부모의 구체적 역할과 주의사항을 실용적으로 설명하세요.
+- **학생과의 대화 주제**: 학생과 직접 나눌 수 있는 효과적인 대화 소재와 접근법을 구체적으로 제시하세요. 관심사를 바탕으로 한 대화 시작법, 깊이 있는 소통을 위한 질문 기법, 신뢰 관계 구축 방법, 어려운 주제 접근 방법을 상세히 서술하세요.
+- **긍정적 피드백 방향**: 학생의 자존감 향상을 위한 구체적 칭찬 포인트와 격려 방법을 상세히 제시하세요. 효과적인 칭찬의 타이밍과 방법, 노력 과정에 대한 인정 방안, 작은 성취에 대한 격려법, 자신감 회복을 위한 지원 방법을 구체적으로 설명하세요.
+- **성장 동기 부여**: 학생의 발전 의지를 높이기 위한 맞춤형 동기부여 전략을 종합적으로 제시하세요. 개인적 관심사와 연결한 목표 설정, 성취 가능한 단계적 도전 과제, 내재적 동기 강화 방법, 지속적 동기 유지 전략을 구체적이고 실용적으로 서술하세요.
 
 ---`;
 
 // Gemini API 호출을 위한 공통 함수
-async function callGemini(systemPrompt: string, userContent: string, modelType: 'flash' = 'flash', temperature: number = 0.3): Promise<string> {
+async function callGemini(systemPrompt: string, userContent: string, modelType: 'flash' = 'flash', temperature: number = 0.1): Promise<string> {
   try {
     // 환경 변수에서 API 키 가져오기
     const apiKey = process.env.GEMINI_API_KEY;
@@ -203,6 +189,8 @@ async function callGemini(systemPrompt: string, userContent: string, modelType: 
       generationConfig: {
         temperature: temperature,
         maxOutputTokens: 65536, // Flash 최대 토큰 (65,536) 사용
+        topK: 10, // 더 일관된 출력을 위해 선택지 축소
+        topP: 0.6, // 더 일관된 출력을 위해 확률 축소
       },
     });
 
@@ -565,15 +553,34 @@ export async function analyzeStudentGroupWithGemini(
         gender: s.gender
       })) || [],
       
-      // 그룹 내 관계 정보
-      groupRelationships: relationships.map(r => ({
-        선택한학생: students.find(s => s.id === r.from_student_id)?.name || r.from_student_id,
-        선택받은학생: students.find(s => s.id === r.to_student_id)?.name || r.to_student_id,
-        관계유형: r.relation_type,
-        from: students.find(s => s.id === r.from_student_id)?.name || r.from_student_id,
-        to: students.find(s => s.id === r.to_student_id)?.name || r.to_student_id,
-        type: r.relation_type
-      })),
+      // 그룹 내 관계 정보 (현재 그룹 학생들과 관련된 관계만 필터링)
+      groupRelationships: relationships
+        .filter(r => {
+          // from_student_id 또는 to_student_id가 현재 그룹에 속하는 경우만 포함
+          const fromInGroup = students.some(s => s.id === r.from_student_id);
+          const toInGroup = students.some(s => s.id === r.to_student_id);
+          return fromInGroup || toInGroup;
+        })
+        .map(r => ({
+          선택한학생: students.find(s => s.id === r.from_student_id)?.name || 
+                    additionalData?.allStudents?.find(s => s.id === r.from_student_id)?.name || 
+                    r.from_student_id,
+          선택받은학생: students.find(s => s.id === r.to_student_id)?.name || 
+                     additionalData?.allStudents?.find(s => s.id === r.to_student_id)?.name || 
+                     r.to_student_id,
+          관계유형: r.relation_type,
+          from: students.find(s => s.id === r.from_student_id)?.name || 
+                additionalData?.allStudents?.find(s => s.id === r.from_student_id)?.name || 
+                r.from_student_id,
+          to: students.find(s => s.id === r.to_student_id)?.name || 
+              additionalData?.allStudents?.find(s => s.id === r.to_student_id)?.name || 
+              r.to_student_id,
+          type: r.relation_type,
+          // 현재 그룹 학생이 관련된 관계인지 표시
+          isGroupInternal: students.some(s => s.id === r.from_student_id) && students.some(s => s.id === r.to_student_id),
+          isGroupOutgoing: students.some(s => s.id === r.from_student_id) && !students.some(s => s.id === r.to_student_id),
+          isGroupIncoming: !students.some(s => s.id === r.from_student_id) && students.some(s => s.id === r.to_student_id)
+        })),
       
       // 기본 질문&응답 정보
       questions: questions ? questions.map(q => ({
@@ -581,15 +588,17 @@ export async function analyzeStudentGroupWithGemini(
         text: q.question_text
       })) : [],
       
-      answers: answers ? answers.map(a => {
-        const question = questions?.find(q => q.id === a.question_id);
-        const student = students.find(s => s.id === a.student_id);
-        return {
-          student: student?.name || a.student_id,
-          question: question?.question_text || a.question_id,
-          answer: a.answer_text
-        };
-      }) : [],
+      answers: answers ? answers
+        .filter(a => students.some(s => s.id === a.student_id)) // 현재 그룹 학생의 답변만 필터링
+        .map(a => {
+          const question = questions?.find(q => q.id === a.question_id);
+          const student = students.find(s => s.id === a.student_id);
+          return {
+            student: student?.name || a.student_id,
+            question: question?.question_text || a.question_id,
+            answer: a.answer_text
+          };
+        }) : [],
       
       // 설문 정보
       surveys: additionalData?.surveys?.map(survey => ({
@@ -608,31 +617,48 @@ export async function analyzeStudentGroupWithGemini(
             description: sd.survey.description,
             created_at: sd.survey.created_at
           },
-          relationships: sd.relationships.map(r => ({
-            선택한학생: students.find(s => s.id === r.from_student_id)?.name || r.from_student_id,
-            선택받은학생: students.find(s => s.id === r.to_student_id)?.name || r.to_student_id,
-            관계유형: r.relation_type,
-            from: students.find(s => s.id === r.from_student_id)?.name || r.from_student_id,
-            to: students.find(s => s.id === r.to_student_id)?.name || r.to_student_id,
-            type: r.relation_type
-          })),
+          relationships: sd.relationships
+            .filter(r => {
+              // 현재 그룹 학생과 관련된 관계만 포함
+              const fromInGroup = students.some(s => s.id === r.from_student_id);
+              const toInGroup = students.some(s => s.id === r.to_student_id);
+              return fromInGroup || toInGroup;
+            })
+            .map(r => ({
+              선택한학생: students.find(s => s.id === r.from_student_id)?.name || 
+                        additionalData?.allStudents?.find(s => s.id === r.from_student_id)?.name || 
+                        r.from_student_id,
+              선택받은학생: students.find(s => s.id === r.to_student_id)?.name || 
+                         additionalData?.allStudents?.find(s => s.id === r.to_student_id)?.name || 
+                         r.to_student_id,
+              관계유형: r.relation_type,
+              from: students.find(s => s.id === r.from_student_id)?.name || 
+                    additionalData?.allStudents?.find(s => s.id === r.from_student_id)?.name || 
+                    r.from_student_id,
+              to: students.find(s => s.id === r.to_student_id)?.name || 
+                  additionalData?.allStudents?.find(s => s.id === r.to_student_id)?.name || 
+                  r.to_student_id,
+              type: r.relation_type
+            })),
           questions: sd.questions.map(q => ({
             id: q.id,
             text: q.question_text
           })),
-          answers: sd.answers.map(a => {
-            const question = sd.questions.find(q => q.id === a.question_id);
-            const student = students.find(s => s.id === a.student_id);
-            return {
-              student: student?.name || a.student_id,
-              question: question?.question_text || a.question_id,
-              answer: a.answer_text
-            };
-          })
+          answers: sd.answers
+            .filter(a => students.some(s => s.id === a.student_id)) // 현재 그룹 학생의 답변만 필터링
+            .map(a => {
+              const question = sd.questions.find(q => q.id === a.question_id);
+              const student = students.find(s => s.id === a.student_id);
+              return {
+                student: student?.name || a.student_id,
+                question: question?.question_text || a.question_id,
+                answer: a.answer_text
+              };
+            })
         };
       }) || [],
 
-      // 일기기록 데이터
+      // 일기기록 데이터 (현재 그룹 학생과 관련된 것만 필터링)
       dailyRecords: additionalData?.dailyRecords?.map(record => ({
         date: record.record_date,
         actualDate: record.actual_date,
@@ -642,47 +668,72 @@ export async function analyzeStudentGroupWithGemini(
         createdAt: record.created_at
       })) || [],
 
-      // 평가기록 데이터
+      // 평가기록 데이터 (현재 그룹 학생과 관련된 것만 필터링)
       assessmentData: additionalData?.subjects?.map(subject => ({
         subjectName: subject.name,
         assessmentItems: subject.assessment_items?.map((item: any) => ({
           itemName: item.name,
           assessmentDate: item.assessment_date,
-          records: item.assessment_records?.map((record: any) => ({
-            studentName: record.students?.name || '알 수 없음',
-            score: record.score
-          })) || []
+          records: item.assessment_records
+            ?.filter((record: any) => students.some(s => s.name === record.students?.name))
+            ?.map((record: any) => ({
+              studentName: record.students?.name || '알 수 없음',
+              score: record.score
+            })) || []
         })) || []
       })) || [],
 
-      // 과제체크 데이터
+      // 과제체크 데이터 (현재 그룹 학생과 관련된 것만 필터링)
       homeworkData: additionalData?.homeworkMonths?.map(month => ({
         monthYear: month.month_year,
         name: month.name,
         homeworkItems: month.homework_items?.map((item: any) => ({
           itemName: item.name,
           dueDate: item.due_date,
-          records: item.homework_records?.map((record: any) => ({
-            studentName: record.students?.name || '알 수 없음',
-            isSubmitted: record.is_submitted
-          })) || []
+          records: item.homework_records
+            ?.filter((record: any) => students.some(s => s.name === record.students?.name))
+            ?.map((record: any) => ({
+              studentName: record.students?.name || '알 수 없음',
+              isSubmitted: record.is_submitted
+            })) || []
         })) || []
       })) || []
     };
 
     const userContent = `다음 데이터를 기반으로 각 학생별 심층 분석을 진행해주세요. 
 
-**중요 지시사항:**
-1. 반드시 각 학생의 이름을 ### 헤더로 시작하세요
-2. 모든 학생에 대해 동일한 구조를 유지하세요  
-3. **핵심만 간결하게!** 각 섹션당 2-3줄, 활동 제안은 1-2줄로 제한
-4. 토큰 한계 내에서 모든 학생 분석을 완료하세요
-5. 학생 간 구분을 위해 "---" 사용하세요
+**절대 준수 사항 - 구조 통일:**
+1. 반드시 groupStudents 배열에 있는 학생들만 분석하세요 (${students.map(s => s.name).join(', ')})
+2. 각 학생마다 정확히 아래 구조를 따르세요:
+
+## 👤 **[학생명]**
+
+### 🔍 **관계 분석 및 사회적 위치**
+학급 내에서의 위치와 영향력, 친밀한 관계들의 패턴과 깊이, 다양한 또래들과의 관계 스펙트럼, 시간에 따른 관계 변화와 발전 양상, 타인과의 소통 방식과 상호작용 특징, 학급 공동체에서 수행하는 역할과 그 영향력에 대해 종합적으로 분석하여 자연스러운 문단으로 서술하세요. (8-12줄 분량)
+
+### 🧠 **심리적 특성 및 성장 패턴**  
+주요 성격 요소와 행동 패턴의 근본적 특징, 감정 인식·표현·조절 능력의 발달 수준, 사고 방식과 문제 해결 접근법, 자기 인식과 자존감·자기 효능감의 발달 정도, 어려운 상황에서의 반응 패턴과 대처 전략, 관찰된 발달적 변화와 성장 궤적의 특성을 통합하여 연속적인 문단으로 서술하세요. (8-12줄 분량)
+
+### 💪 **강점 및 개선 영역**
+학생의 주요 장점과 뛰어난 능력 영역, 향후 발현 가능한 재능과 성장 가능성, 다른 학생들에게 미치는 긍정적 영향력, 독특하고 창의적인 사고나 행동 양상, 성장을 위해 발전이 필요한 구체적 부분, 현재 직면한 어려움과 극복 과제, 발전을 방해할 수 있는 요인과 주의점을 포괄하여 자연스러운 흐름으로 서술하세요. (8-12줄 분량)
+
+### 🎯 **담임교사 맞춤형 지도 전략**
+교실에서 지속 관찰할 구체적 행동과 변화 신호, 이 학생에게 가장 효과적인 지도 방식과 접근법, 또래 관계 개선을 위한 구체적 개입 전략, 학업적 성장을 위한 맞춤형 지원 방향, 심리적 안정감과 성장을 위한 지원 체계, 지속적 발전을 위한 단계별 계획, 특별히 주의할 상황과 예방적 대응 방안을 통합적으로 제시하여 연결된 문단으로 서술하세요. (8-12줄 분량)
+
+### 💬 **학부모·학생 소통 가이드**
+이 학생에 대해 학부모님께 전달할 핵심 메시지와 상담 내용, 가정에서 실천할 수 있는 구체적 지원 방법과 활동, 학생과 직접 나눌 수 있는 효과적인 대화 소재와 접근법, 학생의 자존감 향상을 위한 구체적 칭찬 포인트와 격려 방법, 학생의 발전 의지를 높이기 위한 맞춤형 동기부여 전략을 종합하여 자연스러운 문단으로 서술하세요. (8-12줄 분량)
+
+---
+
+3. **중요**: 각 대 카테고리 내에서 소분류(- **항목명**: 내용) 형태를 사용하지 마세요
+4. 각 카테고리는 자연스럽게 연결된 문단 형태로 작성하세요
+5. 모든 학생에 대해 동일한 5개 카테고리 구조를 유지하세요
+6. 각 카테고리당 8-12줄 분량으로 충분히 상세하게 서술하세요
     
     데이터: 
     ${JSON.stringify(analysisData, null, 2)}`;
 
-    return await callGemini(STUDENT_ANALYSIS_PROMPT, userContent, modelType, 0.3);
+    return await callGemini(STUDENT_ANALYSIS_PROMPT, userContent, modelType, 0.1); // 더 일관된 출력을 위해 temperature 낮춤
   } catch (error: any) {
     console.error(`Gemini analyzeStudentGroup(${groupIndex}) API 호출 오류:`, error);
     throw error;

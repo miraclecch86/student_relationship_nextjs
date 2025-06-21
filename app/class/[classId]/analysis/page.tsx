@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, Class } from '@/lib/supabase';
@@ -306,6 +306,16 @@ const getAnalysisBadge = (type: string) => {
       return { text: '학생분석 2', bgColor: '', textColor: 'text-black' };
     case 'students-3':
       return { text: '학생분석 3', bgColor: '', textColor: 'text-black' };
+    case 'students-4':
+      return { text: '학생분석 4', bgColor: '', textColor: 'text-black' };
+    case 'students-5':
+      return { text: '학생분석 5', bgColor: '', textColor: 'text-black' };
+    case 'students-6':
+      return { text: '학생분석 6', bgColor: '', textColor: 'text-black' };
+    case 'students-7':
+      return { text: '학생분석 7', bgColor: '', textColor: 'text-black' };
+    case 'students-8':
+      return { text: '학생분석 8', bgColor: '', textColor: 'text-black' };
     case 'full':
     default:
       return { text: '전체분석', bgColor: '', textColor: 'text-black' };
@@ -656,10 +666,17 @@ export default function ClassAnalysisPage() {
   const [isDeleteAllDialogOpen, setIsDeleteAllDialogOpen] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState('');
-  const [analysisStartTime, setAnalysisStartTime] = useState<Date | null>(null);
-  const [elapsedTime, setElapsedTime] = useState(0);
+  const [analysisStartTime, setAnalysisStartTime] = useState<number | null>(null);
+  const [elapsedTime, setElapsedTime] = useState<number>(0);
 
   const [teacherName, setTeacherName] = useState<string | null>(null);
+
+  // 시간 포맷 함수
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   // 선생님 이름 가져오기
   React.useEffect(() => {
@@ -673,32 +690,25 @@ export default function ClassAnalysisPage() {
 
     getTeacherName();
   }, []);
-  
-  // 분석 진행 시간 타이머
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
+
+  // 초시계 업데이트
+  React.useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
     
     if (isAnalyzing && analysisStartTime) {
       interval = setInterval(() => {
-        const now = new Date();
-        const elapsed = Math.floor((now.getTime() - analysisStartTime.getTime()) / 1000);
-        setElapsedTime(elapsed);
+        setElapsedTime(Math.floor((Date.now() - analysisStartTime) / 1000));
       }, 1000);
+    } else {
+      setElapsedTime(0);
     }
-    
+
     return () => {
       if (interval) {
         clearInterval(interval);
       }
     };
   }, [isAnalyzing, analysisStartTime]);
-  
-  // 경과 시간을 분:초 형식으로 포맷팅
-  const formatElapsedTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
   
   // 학급 정보 조회
   const { data: classDetails, isLoading: isClassLoading } = useQuery({
@@ -1062,151 +1072,73 @@ export default function ClassAnalysisPage() {
     },
   });
   
-  // 백그라운드 분석 시스템을 사용한 전체 분석 실행
+  // 전체 분석 순차 실행 함수 수정 - 모든 분석 완료 후에도 이동하지 않음
   const runFullAnalysisSequentially = async () => {
     try {
       // 분석 상태 시작
       setIsAnalyzing(true);
-      setAnalysisStartTime(new Date());
-      setElapsedTime(0);
+      setAnalysisStartTime(Date.now());
       
-      setAnalysisProgress('백그라운드 분석 시스템을 시작합니다...');
-      toast.success('🚀 백그라운드 분석을 시작합니다! 타임아웃 없이 안전하게 진행됩니다.');
+      // 모든 분석에 사용할 공통 세션 ID 생성
+      const sessionId = generateUUID();
+      console.log('분석 세션 ID 생성:', sessionId);
 
-      // 백그라운드 큐에 분석 작업들을 순차적으로 추가
-      const analysisJobs: Array<{ type: string; jobId: string }> = [];
-
-      // 1. 기본 분석 작업 추가
-      setAnalysisProgress('기본 관계 분석을 큐에 추가 중...');
-      const basicJobResponse = await fetch(`/api/class/${classId}/analysis/queue`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ analysisType: 'basic' })
-      });
-      if (basicJobResponse.ok) {
-        const basicJob = await basicJobResponse.json();
-        analysisJobs.push({ type: 'basic', jobId: basicJob.jobId });
-        console.log('기본 분석 작업 추가됨:', basicJob.jobId);
-      }
-
-      // 2. 종합 분석 작업 추가
-      setAnalysisProgress('종합 현황 분석을 큐에 추가 중...');
-      const overviewJobResponse = await fetch(`/api/class/${classId}/analysis/queue`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ analysisType: 'overview' })
-      });
-      if (overviewJobResponse.ok) {
-        const overviewJob = await overviewJobResponse.json();
-        analysisJobs.push({ type: 'overview', jobId: overviewJob.jobId });
-        console.log('종합 분석 작업 추가됨:', overviewJob.jobId);
-      }
-
-      // 3. 학생 그룹 분석 작업들 추가 (1-8그룹)
-      for (let i = 1; i <= 8; i++) {
-        setAnalysisProgress(`학생 그룹 ${i} 분석을 큐에 추가 중...`);
-        
-        // 학생 그룹을 위한 더미 학생 ID들 (실제로는 서버에서 처리)
-        const studentIds = [`student-${i}-1`, `student-${i}-2`, `student-${i}-3`];
-        
-        const groupJobResponse = await fetch(`/api/class/${classId}/analysis/queue`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            analysisType: 'students',
-            studentIds: studentIds
-          })
-        });
-        
-        if (groupJobResponse.ok) {
-          const groupJob = await groupJobResponse.json();
-          analysisJobs.push({ type: `students-${i}`, jobId: groupJob.jobId });
-          console.log(`학생 그룹 ${i} 분석 작업 추가됨:`, groupJob.jobId);
-        }
-      }
-
-      console.log(`총 ${analysisJobs.length}개의 분석 작업이 큐에 추가되었습니다:`, analysisJobs);
-
-      // 4. 백그라운드 작업들의 진행 상황을 모니터링
-      setAnalysisProgress('백그라운드에서 AI 분석을 진행하고 있습니다...');
-      toast.success(`${analysisJobs.length}개의 분석 작업이 백그라운드에서 처리됩니다. 시간 제한 없이 안전하게 진행됩니다! 💪`);
-
-      // 폴링으로 모든 작업 완료 확인
-      let completedCount = 0;
-      const totalCount = analysisJobs.length;
+      // 종합 분석 실행
+      setAnalysisProgress('학급 종합 분석을 진행 중입니다...');
+      toast.success('종합 분석을 시작합니다...');
+      const overviewResult = await runOverviewMutation.mutateAsync(sessionId);
       
-      const checkProgress = async () => {
-        let allCompleted = true;
-        completedCount = 0;
-
-        for (const job of analysisJobs) {
-          try {
-            const statusResponse = await fetch(`/api/class/${classId}/analysis/status/${job.jobId}`);
-            if (statusResponse.ok) {
-              const status = await statusResponse.json();
-              
-              if (status.status === 'completed') {
-                completedCount++;
-              } else if (status.status === 'failed') {
-                console.error(`작업 ${job.type} 실패:`, status.error);
-                completedCount++; // 실패도 완료로 카운트
-              } else {
-                allCompleted = false;
-              }
-            }
-          } catch (error) {
-            console.error(`작업 ${job.type} 상태 확인 오류:`, error);
-          }
-        }
-
-        // 진행률 업데이트
-        const progress = Math.round((completedCount / totalCount) * 100);
-        setAnalysisProgress(`백그라운드 분석 진행 중... (${completedCount}/${totalCount} 완료, ${progress}%)`);
-
-        return allCompleted;
-      };
-
-      // 2초마다 진행 상황 확인
-      const pollInterval = setInterval(async () => {
-        const allCompleted = await checkProgress();
-        
-        if (allCompleted) {
-          clearInterval(pollInterval);
-          
-          // 모든 분석 완료
-          setAnalysisProgress('모든 백그라운드 분석이 완료되었습니다!');
-          toast.success('🎉 모든 분석이 성공적으로 완료되었습니다!');
-          
-          // 분석 결과 새로고침
-          queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
-          
-          setIsAnalyzing(false);
-          setAnalysisStartTime(null);
-          setElapsedTime(0);
-        }
-      }, 2000);
-
-      // 최대 10분 후 타임아웃 (안전장치)
-      setTimeout(() => {
-        clearInterval(pollInterval);
-                 if (isAnalyzing) {
-           setAnalysisProgress('일부 분석이 아직 진행 중일 수 있습니다...');
-           toast('분석이 계속 진행 중입니다. 페이지를 새로고침하여 최신 결과를 확인하세요.', {
-             icon: 'ℹ️',
-             duration: 5000
-           });
-           setIsAnalyzing(false);
-           setAnalysisStartTime(null);
-           setElapsedTime(0);
-         }
-      }, 600000); // 10분
-
-    } catch (error) {
-      console.error('백그라운드 분석 오류:', error);
-      toast.error('백그라운드 분석 시작 중 오류가 발생했습니다.');
+      // 학생 그룹1 분석 실행
+      setAnalysisProgress('첫 번째 학생 그룹 분석을 진행 중입니다...');
+      toast.success('첫 번째 학생 그룹 분석을 시작합니다...');
+      await runStudents1Mutation.mutateAsync(sessionId);
+      
+      // 학생 그룹2 분석 실행
+      setAnalysisProgress('두 번째 학생 그룹 분석을 진행 중입니다...');
+      toast.success('두 번째 학생 그룹 분석을 시작합니다...');
+      await runStudents2Mutation.mutateAsync(sessionId);
+      
+      // 학생 그룹3 분석 실행
+      setAnalysisProgress('세 번째 학생 그룹 분석을 진행 중입니다...');
+      toast.success('세 번째 학생 그룹 분석을 시작합니다...');
+      await runStudents3Mutation.mutateAsync(sessionId);
+      
+      // 학생 그룹4 분석 실행
+      setAnalysisProgress('네 번째 학생 그룹 분석을 진행 중입니다...');
+      toast.success('네 번째 학생 그룹 분석을 시작합니다...');
+      await runStudents4Mutation.mutateAsync(sessionId);
+      
+      // 학생 그룹5 분석 실행
+      setAnalysisProgress('다섯 번째 학생 그룹 분석을 진행 중입니다...');
+      toast.success('다섯 번째 학생 그룹 분석을 시작합니다...');
+      await runStudents5Mutation.mutateAsync(sessionId);
+      
+      // 학생 그룹6 분석 실행
+      setAnalysisProgress('여섯 번째 학생 그룹 분석을 진행 중입니다...');
+      toast.success('여섯 번째 학생 그룹 분석을 시작합니다...');
+      await runStudents6Mutation.mutateAsync(sessionId);
+      
+      // 학생 그룹7 분석 실행
+      setAnalysisProgress('일곱 번째 학생 그룹 분석을 진행 중입니다...');
+      toast.success('일곱 번째 학생 그룹 분석을 시작합니다...');
+      await runStudents7Mutation.mutateAsync(sessionId);
+      
+      // 학생 그룹8 분석 실행
+      setAnalysisProgress('여덟 번째 학생 그룹 분석을 진행 중입니다...');
+      toast.success('여덟 번째 학생 그룹 분석을 시작합니다...');
+      await runStudents8Mutation.mutateAsync(sessionId);
+      
+      // 모든 분석 완료 
+      toast.success('모든 분석이 완료되었습니다!');
       setIsAnalyzing(false);
       setAnalysisStartTime(null);
-      setElapsedTime(0);
+      
+      // 페이지 이동 코드 제거
+    } catch (error) {
+      toast.error('분석 과정 중 오류가 발생했습니다. 일부 분석은 완료되었을 수 있습니다.');
+      console.error('순차 분석 오류:', error);
+      setIsAnalyzing(false);
+      setAnalysisStartTime(null);
     }
   };
   
@@ -1323,7 +1255,7 @@ export default function ClassAnalysisPage() {
       {/* 분석 진행 중 팝업 */}
       {isAnalyzing && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/20 backdrop-blur-sm">
-          <div className="bg-white p-8 rounded-xl shadow-xl max-w-md text-center border border-gray-200">
+          <div className="bg-white p-8 rounded-xl shadow-xl max-w-lg text-center border border-gray-200">
             {/* AI 스타일 로딩 아이콘 */}
             <div className="flex justify-center items-center mb-6">
               <div className="relative w-16 h-16">
@@ -1337,17 +1269,35 @@ export default function ClassAnalysisPage() {
                 </div>
               </div>
             </div>
+            
             <h3 className="text-xl font-semibold text-gray-800 mb-3">AI 분석 진행 중</h3>
-            <p className="text-gray-600 mb-2 font-medium">{analysisProgress}</p>
-            {elapsedTime > 0 && (
-              <div className="mb-4">
-                <div className="text-2xl font-mono font-bold text-purple-600 mb-1">
-                  {formatElapsedTime(elapsedTime)}
-                </div>
-                <div className="text-xs text-purple-500">경과 시간</div>
+            
+            {/* 초시계 */}
+            <div className="mb-4">
+              <div className="inline-flex items-center px-4 py-2 bg-purple-50 rounded-lg border border-purple-200">
+                <svg className="w-5 h-5 text-purple-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-lg font-mono font-semibold text-purple-700">
+                  {formatTime(elapsedTime)}
+                </span>
               </div>
-            )}
-            <p className="text-sm text-gray-500">분석에는 몇 분 정도 소요될 수 있습니다. 잠시만 기다려주세요.</p>
+            </div>
+            
+            <p className="text-gray-600 mb-4 font-medium">{analysisProgress}</p>
+            
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <p className="text-sm text-blue-800 leading-relaxed">
+                🤖 <strong>AI가 열심히 분석 중입니다!</strong><br/>
+                학급 데이터를 종합적으로 분석하여 의미있는 인사이트를 도출하고 있어요.
+              </p>
+            </div>
+            
+            <div className="text-xs text-gray-500 space-y-1">
+              <p>⏱️ 각 분석마다 1-2분 정도 소요됩니다</p>
+              <p>📊 총 9개 분석이 순차적으로 진행됩니다</p>
+              <p>💡 잠시만 기다려주시면 상세한 분석 결과를 확인하실 수 있습니다</p>
+            </div>
           </div>
         </div>
       )}
