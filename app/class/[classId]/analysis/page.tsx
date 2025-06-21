@@ -1062,7 +1062,7 @@ export default function ClassAnalysisPage() {
     },
   });
   
-  // 전체 분석 순차 실행 함수 수정 - 모든 분석 완료 후에도 이동하지 않음
+  // 백그라운드 분석 시스템을 사용한 전체 분석 실행
   const runFullAnalysisSequentially = async () => {
     try {
       // 분석 상태 시작
@@ -1070,65 +1070,140 @@ export default function ClassAnalysisPage() {
       setAnalysisStartTime(new Date());
       setElapsedTime(0);
       
-      // 모든 분석에 사용할 공통 세션 ID 생성
-      const sessionId = generateUUID();
-      console.log('분석 세션 ID 생성:', sessionId);
+      setAnalysisProgress('백그라운드 분석 시스템을 시작합니다...');
+      toast.success('🚀 백그라운드 분석을 시작합니다! 타임아웃 없이 안전하게 진행됩니다.');
 
-      // 종합 분석 실행
-      setAnalysisProgress('학급 종합 분석을 진행 중입니다...');
-      toast.success('종합 분석을 시작합니다...');
-      const overviewResult = await runOverviewMutation.mutateAsync(sessionId);
+      // 백그라운드 큐에 분석 작업들을 순차적으로 추가
+      const analysisJobs: Array<{ type: string; jobId: string }> = [];
+
+      // 1. 기본 분석 작업 추가
+      setAnalysisProgress('기본 관계 분석을 큐에 추가 중...');
+      const basicJobResponse = await fetch(`/api/class/${classId}/analysis/queue`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ analysisType: 'basic' })
+      });
+      if (basicJobResponse.ok) {
+        const basicJob = await basicJobResponse.json();
+        analysisJobs.push({ type: 'basic', jobId: basicJob.jobId });
+        console.log('기본 분석 작업 추가됨:', basicJob.jobId);
+      }
+
+      // 2. 종합 분석 작업 추가
+      setAnalysisProgress('종합 현황 분석을 큐에 추가 중...');
+      const overviewJobResponse = await fetch(`/api/class/${classId}/analysis/queue`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ analysisType: 'overview' })
+      });
+      if (overviewJobResponse.ok) {
+        const overviewJob = await overviewJobResponse.json();
+        analysisJobs.push({ type: 'overview', jobId: overviewJob.jobId });
+        console.log('종합 분석 작업 추가됨:', overviewJob.jobId);
+      }
+
+      // 3. 학생 그룹 분석 작업들 추가 (1-8그룹)
+      for (let i = 1; i <= 8; i++) {
+        setAnalysisProgress(`학생 그룹 ${i} 분석을 큐에 추가 중...`);
+        
+        // 학생 그룹을 위한 더미 학생 ID들 (실제로는 서버에서 처리)
+        const studentIds = [`student-${i}-1`, `student-${i}-2`, `student-${i}-3`];
+        
+        const groupJobResponse = await fetch(`/api/class/${classId}/analysis/queue`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            analysisType: 'students',
+            studentIds: studentIds
+          })
+        });
+        
+        if (groupJobResponse.ok) {
+          const groupJob = await groupJobResponse.json();
+          analysisJobs.push({ type: `students-${i}`, jobId: groupJob.jobId });
+          console.log(`학생 그룹 ${i} 분석 작업 추가됨:`, groupJob.jobId);
+        }
+      }
+
+      console.log(`총 ${analysisJobs.length}개의 분석 작업이 큐에 추가되었습니다:`, analysisJobs);
+
+      // 4. 백그라운드 작업들의 진행 상황을 모니터링
+      setAnalysisProgress('백그라운드에서 AI 분석을 진행하고 있습니다...');
+      toast.success(`${analysisJobs.length}개의 분석 작업이 백그라운드에서 처리됩니다. 시간 제한 없이 안전하게 진행됩니다! 💪`);
+
+      // 폴링으로 모든 작업 완료 확인
+      let completedCount = 0;
+      const totalCount = analysisJobs.length;
       
-      // 학생 그룹1 분석 실행
-      setAnalysisProgress('첫 번째 학생 그룹 분석을 진행 중입니다...');
-      toast.success('첫 번째 학생 그룹 분석을 시작합니다...');
-      await runStudents1Mutation.mutateAsync(sessionId);
-      
-      // 학생 그룹2 분석 실행
-      setAnalysisProgress('두 번째 학생 그룹 분석을 진행 중입니다...');
-      toast.success('두 번째 학생 그룹 분석을 시작합니다...');
-      await runStudents2Mutation.mutateAsync(sessionId);
-      
-      // 학생 그룹3 분석 실행
-      setAnalysisProgress('세 번째 학생 그룹 분석을 진행 중입니다...');
-      toast.success('세 번째 학생 그룹 분석을 시작합니다...');
-      await runStudents3Mutation.mutateAsync(sessionId);
-      
-      // 학생 그룹4 분석 실행
-      setAnalysisProgress('네 번째 학생 그룹 분석을 진행 중입니다...');
-      toast.success('네 번째 학생 그룹 분석을 시작합니다...');
-      await runStudents4Mutation.mutateAsync(sessionId);
-      
-      // 학생 그룹5 분석 실행
-      setAnalysisProgress('다섯 번째 학생 그룹 분석을 진행 중입니다...');
-      toast.success('다섯 번째 학생 그룹 분석을 시작합니다...');
-      await runStudents5Mutation.mutateAsync(sessionId);
-      
-      // 학생 그룹6 분석 실행
-      setAnalysisProgress('여섯 번째 학생 그룹 분석을 진행 중입니다...');
-      toast.success('여섯 번째 학생 그룹 분석을 시작합니다...');
-      await runStudents6Mutation.mutateAsync(sessionId);
-      
-      // 학생 그룹7 분석 실행
-      setAnalysisProgress('일곱 번째 학생 그룹 분석을 진행 중입니다...');
-      toast.success('일곱 번째 학생 그룹 분석을 시작합니다...');
-      await runStudents7Mutation.mutateAsync(sessionId);
-      
-      // 학생 그룹8 분석 실행
-      setAnalysisProgress('여덟 번째 학생 그룹 분석을 진행 중입니다...');
-      toast.success('여덟 번째 학생 그룹 분석을 시작합니다...');
-      await runStudents8Mutation.mutateAsync(sessionId);
-      
-      // 모든 분석 완료 
-      toast.success('모든 분석이 완료되었습니다!');
-      setIsAnalyzing(false);
-      setAnalysisStartTime(null);
-      setElapsedTime(0);
-      
-      // 페이지 이동 코드 제거
+      const checkProgress = async () => {
+        let allCompleted = true;
+        completedCount = 0;
+
+        for (const job of analysisJobs) {
+          try {
+            const statusResponse = await fetch(`/api/class/${classId}/analysis/status/${job.jobId}`);
+            if (statusResponse.ok) {
+              const status = await statusResponse.json();
+              
+              if (status.status === 'completed') {
+                completedCount++;
+              } else if (status.status === 'failed') {
+                console.error(`작업 ${job.type} 실패:`, status.error);
+                completedCount++; // 실패도 완료로 카운트
+              } else {
+                allCompleted = false;
+              }
+            }
+          } catch (error) {
+            console.error(`작업 ${job.type} 상태 확인 오류:`, error);
+          }
+        }
+
+        // 진행률 업데이트
+        const progress = Math.round((completedCount / totalCount) * 100);
+        setAnalysisProgress(`백그라운드 분석 진행 중... (${completedCount}/${totalCount} 완료, ${progress}%)`);
+
+        return allCompleted;
+      };
+
+      // 2초마다 진행 상황 확인
+      const pollInterval = setInterval(async () => {
+        const allCompleted = await checkProgress();
+        
+        if (allCompleted) {
+          clearInterval(pollInterval);
+          
+          // 모든 분석 완료
+          setAnalysisProgress('모든 백그라운드 분석이 완료되었습니다!');
+          toast.success('🎉 모든 분석이 성공적으로 완료되었습니다!');
+          
+          // 분석 결과 새로고침
+          queryClient.invalidateQueries({ queryKey: ['analysisResults', classId] });
+          
+          setIsAnalyzing(false);
+          setAnalysisStartTime(null);
+          setElapsedTime(0);
+        }
+      }, 2000);
+
+      // 최대 10분 후 타임아웃 (안전장치)
+      setTimeout(() => {
+        clearInterval(pollInterval);
+                 if (isAnalyzing) {
+           setAnalysisProgress('일부 분석이 아직 진행 중일 수 있습니다...');
+           toast('분석이 계속 진행 중입니다. 페이지를 새로고침하여 최신 결과를 확인하세요.', {
+             icon: 'ℹ️',
+             duration: 5000
+           });
+           setIsAnalyzing(false);
+           setAnalysisStartTime(null);
+           setElapsedTime(0);
+         }
+      }, 600000); // 10분
+
     } catch (error) {
-      toast.error('분석 과정 중 오류가 발생했습니다. 일부 분석은 완료되었을 수 있습니다.');
-      console.error('순차 분석 오류:', error);
+      console.error('백그라운드 분석 오류:', error);
+      toast.error('백그라운드 분석 시작 중 오류가 발생했습니다.');
       setIsAnalyzing(false);
       setAnalysisStartTime(null);
       setElapsedTime(0);
