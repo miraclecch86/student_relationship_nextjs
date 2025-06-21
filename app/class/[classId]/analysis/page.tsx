@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, Class } from '@/lib/supabase';
@@ -656,6 +656,8 @@ export default function ClassAnalysisPage() {
   const [isDeleteAllDialogOpen, setIsDeleteAllDialogOpen] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState('');
+  const [analysisStartTime, setAnalysisStartTime] = useState<Date | null>(null);
+  const [elapsedTime, setElapsedTime] = useState(0);
 
   const [teacherName, setTeacherName] = useState<string | null>(null);
 
@@ -671,6 +673,32 @@ export default function ClassAnalysisPage() {
 
     getTeacherName();
   }, []);
+  
+  // 분석 진행 시간 타이머
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    if (isAnalyzing && analysisStartTime) {
+      interval = setInterval(() => {
+        const now = new Date();
+        const elapsed = Math.floor((now.getTime() - analysisStartTime.getTime()) / 1000);
+        setElapsedTime(elapsed);
+      }, 1000);
+    }
+    
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [isAnalyzing, analysisStartTime]);
+  
+  // 경과 시간을 분:초 형식으로 포맷팅
+  const formatElapsedTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
   
   // 학급 정보 조회
   const { data: classDetails, isLoading: isClassLoading } = useQuery({
@@ -1039,6 +1067,8 @@ export default function ClassAnalysisPage() {
     try {
       // 분석 상태 시작
       setIsAnalyzing(true);
+      setAnalysisStartTime(new Date());
+      setElapsedTime(0);
       
       // 모든 분석에 사용할 공통 세션 ID 생성
       const sessionId = generateUUID();
@@ -1092,12 +1122,16 @@ export default function ClassAnalysisPage() {
       // 모든 분석 완료 
       toast.success('모든 분석이 완료되었습니다!');
       setIsAnalyzing(false);
+      setAnalysisStartTime(null);
+      setElapsedTime(0);
       
       // 페이지 이동 코드 제거
     } catch (error) {
       toast.error('분석 과정 중 오류가 발생했습니다. 일부 분석은 완료되었을 수 있습니다.');
       console.error('순차 분석 오류:', error);
       setIsAnalyzing(false);
+      setAnalysisStartTime(null);
+      setElapsedTime(0);
     }
   };
   
@@ -1229,7 +1263,15 @@ export default function ClassAnalysisPage() {
               </div>
             </div>
             <h3 className="text-xl font-semibold text-gray-800 mb-3">AI 분석 진행 중</h3>
-            <p className="text-gray-600 mb-4 font-medium">{analysisProgress}</p>
+            <p className="text-gray-600 mb-2 font-medium">{analysisProgress}</p>
+            {elapsedTime > 0 && (
+              <div className="mb-4">
+                <div className="text-2xl font-mono font-bold text-purple-600 mb-1">
+                  {formatElapsedTime(elapsedTime)}
+                </div>
+                <div className="text-xs text-purple-500">경과 시간</div>
+              </div>
+            )}
             <p className="text-sm text-gray-500">분석에는 몇 분 정도 소요될 수 있습니다. 잠시만 기다려주세요.</p>
           </div>
         </div>
