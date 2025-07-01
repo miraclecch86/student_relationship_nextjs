@@ -9,6 +9,7 @@ import ConfirmModal from '@/components/ConfirmModal';
 import { ArrowUturnLeftIcon, PlusIcon, TrashIcon, ExclamationCircleIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { handleDemoSaveAttempt, isDemoClass } from '@/utils/demo-permissions';
+import { useAutoSave } from '@/hooks/useAutoSave';
 
 // 학생 데이터 타입 (간단 버전)
 type TargetStudent = Pick<Student, 'id' | 'name'>; // 성별 등 추가 정보 필요 시 확장
@@ -363,13 +364,65 @@ export default function StudentRelationshipEditorPage() {
         }
     });
 
+    // --- 자동저장 훅 설정 ---
+    const { autoSave: autoSaveRelationships, immediateeSave: immediateSaveRelationships } = useAutoSave({
+        delay: 1000, // 1초 지연
+        onSave: useCallback(async () => {
+            if (classDetails && isDemoClass(classDetails)) {
+                // 데모 학급에서는 저장 안함
+                return;
+            }
+            try {
+                await saveAllSettings(studentId, classId, relationshipSettings, answerSettings, initialRelationshipsData, classDetails);
+                console.log('관계 설정 자동저장 완료');
+            } catch (error) {
+                console.error('관계 설정 자동저장 실패:', error);
+            }
+        }, [studentId, classId, relationshipSettings, answerSettings, initialRelationshipsData, classDetails]),
+    });
+
+    const { autoSave: autoSaveAnswers, immediateeSave: immediateSaveAnswers } = useAutoSave({
+        delay: 2000, // 2초 지연
+        onSave: useCallback(async () => {
+            if (classDetails && isDemoClass(classDetails)) {
+                // 데모 학급에서는 저장 안함
+                return;
+            }
+            try {
+                await saveAllSettings(studentId, classId, relationshipSettings, answerSettings, initialRelationshipsData, classDetails);
+                console.log('답변 자동저장 완료');
+            } catch (error) {
+                console.error('답변 자동저장 실패:', error);
+            }
+        }, [studentId, classId, relationshipSettings, answerSettings, initialRelationshipsData, classDetails]),
+    });
+
+    // 페이지를 떠나기 전 즉시 저장 처리
+    useEffect(() => {
+        const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+            // 변경사항이 있으면 즉시 저장
+            if (classDetails && !isDemoClass(classDetails)) {
+                // 동기적으로 저장 시도 (beforeunload에서는 비동기 호출이 제한적)
+                immediateSaveRelationships({ ...relationshipSettings });
+                immediateSaveAnswers({ ...answerSettings });
+            }
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, [relationshipSettings, answerSettings, classDetails, immediateSaveRelationships, immediateSaveAnswers]);
+
     // --- 핸들러 함수들 ---
     const handleRelationshipChange = (targetId: string, type: keyof typeof RELATIONSHIP_TYPES | null) => {
-        setRelationshipSettings(prev => ({ ...prev, [targetId]: type }));
+        const newSettings = { ...relationshipSettings, [targetId]: type };
+        setRelationshipSettings(newSettings);
+        autoSaveRelationships(newSettings); // 관계 변경 시 자동저장 트리거
     };
 
     const handleAnswerChange = (questionId: string, text: string) => {
-        setAnswerSettings(prev => ({ ...prev, [questionId]: text }));
+        const newAnswers = { ...answerSettings, [questionId]: text };
+        setAnswerSettings(newAnswers);
+        autoSaveAnswers(newAnswers); // 답변 변경 시 자동저장 트리거
     };
 
     const handleAddQuestion = () => {
@@ -403,9 +456,15 @@ export default function StudentRelationshipEditorPage() {
         });
     };
 
-    // 돌아가기 핸들러 수정 (성별 업데이트 조건 강화)
+    // 돌아가기 핸들러 수정 (즉시 저장 추가)
     const handleGoBack = async () => {
         try {
+            // 0. 자동저장 대기 중인 내용 즉시 저장
+            if (classDetails && !isDemoClass(classDetails)) {
+                await immediateSaveRelationships({ ...relationshipSettings });
+                await immediateSaveAnswers({ ...answerSettings });
+            }
+
             // 1. 관계/답변 저장 먼저 실행
             await saveSettingsMutation.mutateAsync();
 

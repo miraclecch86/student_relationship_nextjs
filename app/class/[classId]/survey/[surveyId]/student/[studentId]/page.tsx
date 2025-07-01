@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase, Student, Relationship, Question, Answer } from "@/lib/supabase";
@@ -319,7 +319,19 @@ export default function SurveyStudentDetailPage() {
     });
 
     // --- 자동저장 훅 설정 ---
-    const { autoSave: autoSaveRelationships } = useAutoSave({
+    // ref로 최신 상태 참조
+    const relationshipSettingsRef = useRef(relationshipSettings);
+    const answerSettingsRef = useRef(answerSettings);
+    
+    useEffect(() => {
+        relationshipSettingsRef.current = relationshipSettings;
+    }, [relationshipSettings]);
+    
+    useEffect(() => {
+        answerSettingsRef.current = answerSettings;
+    }, [answerSettings]);
+
+    const { autoSave: autoSaveRelationships, immediateeSave: immediateSaveRelationships } = useAutoSave({
         delay: 1000, // 1초 지연
         onSave: useCallback(async () => {
             if (classDetails && isDemoClass(classDetails)) {
@@ -327,15 +339,15 @@ export default function SurveyStudentDetailPage() {
                 return;
             }
             try {
-                await saveAllSettings(studentId, classId, surveyId, relationshipSettings, answerSettings, initialRelationshipsData, classDetails);
+                await saveAllSettings(studentId, classId, surveyId, relationshipSettingsRef.current, answerSettingsRef.current, initialRelationshipsData, classDetails);
                 console.log('관계 설정 자동저장 완료');
             } catch (error) {
                 console.error('관계 설정 자동저장 실패:', error);
             }
-        }, [studentId, classId, surveyId, relationshipSettings, answerSettings, initialRelationshipsData, classDetails]),
+        }, [studentId, classId, surveyId, initialRelationshipsData, classDetails]),
     });
 
-    const { autoSave: autoSaveAnswers } = useAutoSave({
+    const { autoSave: autoSaveAnswers, immediateeSave: immediateSaveAnswers } = useAutoSave({
         delay: 2000, // 2초 지연
         onSave: useCallback(async () => {
             if (classDetails && isDemoClass(classDetails)) {
@@ -343,13 +355,59 @@ export default function SurveyStudentDetailPage() {
                 return;
             }
             try {
-                await saveAllSettings(studentId, classId, surveyId, relationshipSettings, answerSettings, initialRelationshipsData, classDetails);
+                await saveAllSettings(studentId, classId, surveyId, relationshipSettingsRef.current, answerSettingsRef.current, initialRelationshipsData, classDetails);
                 console.log('답변 자동저장 완료');
             } catch (error) {
                 console.error('답변 자동저장 실패:', error);
             }
-        }, [studentId, classId, surveyId, relationshipSettings, answerSettings, initialRelationshipsData, classDetails]),
+        }, [studentId, classId, surveyId, initialRelationshipsData, classDetails]),
     });
+
+    // 페이지를 떠나기 전 즉시 저장 처리
+    useEffect(() => {
+        const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+            // 변경사항이 있으면 즉시 저장
+            if (classDetails && !isDemoClass(classDetails)) {
+                // 동기적으로 저장 시도 (beforeunload에서는 비동기 호출이 제한적)
+                immediateSaveRelationships({ ...relationshipSettings });
+                immediateSaveAnswers({ ...answerSettings });
+            }
+        };
+
+        // Next.js router events로 페이지 변경 감지
+        const handleRouteChange = async () => {
+            if (classDetails && !isDemoClass(classDetails)) {
+                try {
+                    await immediateSaveRelationships({ ...relationshipSettings });
+                    await immediateSaveAnswers({ ...answerSettings });
+                    console.log('페이지 변경 전 즉시 저장 완료');
+                } catch (error) {
+                    console.error('페이지 변경 전 저장 실패:', error);
+                }
+            }
+        };
+
+        // popstate 이벤트로 브라우저 뒤로가기 감지
+        const handlePopState = async () => {
+            if (classDetails && !isDemoClass(classDetails)) {
+                try {
+                    await immediateSaveRelationships({ ...relationshipSettings });
+                    await immediateSaveAnswers({ ...answerSettings });
+                    console.log('뒤로가기 전 즉시 저장 완료');
+                } catch (error) {
+                    console.error('뒤로가기 전 저장 실패:', error);
+                }
+            }
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        window.addEventListener('popstate', handlePopState);
+        
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+            window.removeEventListener('popstate', handlePopState);
+        };
+    }, [relationshipSettings, answerSettings, classDetails, immediateSaveRelationships, immediateSaveAnswers]);
 
     // --- 핸들러 함수들 ---
     const handleRelationshipChange = (targetId: string, type: keyof typeof RELATIONSHIP_TYPES | null) => {
