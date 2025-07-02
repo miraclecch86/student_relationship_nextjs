@@ -1073,17 +1073,26 @@ export default function AnalysisDetailPage() {
                   color: black !important;
                   font-size: 1rem !important;
                   line-height: 1.6 !important;
-                  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+                  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+                }
+                
+                /* 본문 텍스트만 얇게 */
+                .prose p {
+                  font-weight: 300 !important;
+                  margin-top: 0.75rem !important;
+                  margin-bottom: 0.75rem !important;
+                  line-height: 1.6 !important;
+                  text-align: justify !important;
                 }
                 
                 /* 모든 제목 크기와 스타일 통일 */
                 .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
                   font-size: 1rem !important;
-                  font-weight: 700 !important;
+                  font-weight: 500 !important;
                   margin-top: 1.5rem !important;
                   margin-bottom: 0.5rem !important;
                   padding-bottom: 0.3rem !important;
-                  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+                  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
                 }
                 
                 /* 제목 계층별 밑줄 스타일만 차별화 */
@@ -1110,19 +1119,12 @@ export default function AnalysisDetailPage() {
                 .prose h1, .prose h2, .prose h3,
                 .prose h1 strong, 
                 .prose h2 strong,
-                .prose h3 strong,
-                .prose strong {
+                .prose h3 strong {
                   color: #4338ca !important; /* 파란색(#2563eb)에서 보라색(#4338ca)으로 변경 */
-                  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+                  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
                 }
                 
-                /* 일관된 단락 스타일 */
-                .prose p {
-                  margin-top: 0.75rem !important;
-                  margin-bottom: 0.75rem !important;
-                  line-height: 1.6 !important;
-                  text-align: justify !important;
-                }
+
                 
                 /* 목록 스타일 통일 */
                 .prose ul, .prose ol {
@@ -1189,7 +1191,8 @@ export default function AnalysisDetailPage() {
                 /* 볼드체 강조 일관성 */
                 .prose strong {
                   font-weight: 700 !important;
-                  color: #4b5563 !important;
+                  color: #4338ca !important;
+                  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
                 }
                 
                 /* 링크 스타일 통일 */
@@ -1243,7 +1246,7 @@ export default function AnalysisDetailPage() {
 
                 /* 활동명, 목적 등의 키워드 스타일 */
                 .prose span[style*="color: #4338ca"] {
-                  font-family: 'Pretendard', sans-serif !important;
+                  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
                   font-weight: bold !important;
                   display: inline-block !important;
                 }
@@ -1252,14 +1255,14 @@ export default function AnalysisDetailPage() {
                 span[style*="활동명"], span[style*="목적"], span[style*="방법"], 
                 span[style*="준비물"], span[style*="진행 방법"], span[style*="소요시간"],
                 span[style*="기대효과"], span[style*="참고자료"] {
-                  font-family: 'Pretendard', sans-serif !important;
+                  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
                   font-weight: bold !important;
                   color: #4338ca !important;
                 }
                 
                 /* 보라색으로 표시되는 모든 텍스트 */
                 [style*="color: #4338ca"] {
-                  font-family: 'Pretendard', sans-serif !important;
+                  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
                 }
               `}</style>
               <ReactMarkdown rehypePlugins={[rehypeRaw]}
@@ -1271,9 +1274,9 @@ export default function AnalysisDetailPage() {
                     return (
                       <h1 style={{ 
                         color: '#4338ca', 
-                        fontWeight: 'bold',
+                        fontWeight: '500',
                         fontSize: '1.5rem',
-                        fontFamily: 'Pretendard, sans-serif !important',
+                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
                         borderBottom: '2px solid #4338ca',
                         marginTop: '2.5rem',
                         marginBottom: '1rem',
@@ -1288,8 +1291,8 @@ export default function AnalysisDetailPage() {
                       return (
                         <h2 style={{ 
                           color: '#4338ca', 
-                          fontWeight: 'bold',
-                          fontFamily: 'Pretendard, sans-serif !important',
+                          fontWeight: '500',
+                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
                           borderBottom: '1px solid #e5e7eb',
                           marginTop: '1.5rem',
                           marginBottom: '0.5rem',
@@ -1318,7 +1321,7 @@ export default function AnalysisDetailPage() {
                               <span style={{ 
                                 color: '#4338ca', 
                                 fontWeight: 'bold',
-                                fontFamily: 'Pretendard, sans-serif !important',
+                                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
                                 display: 'inline-block'
                               }}>
                                 {label}
