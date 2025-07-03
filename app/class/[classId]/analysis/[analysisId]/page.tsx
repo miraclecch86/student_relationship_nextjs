@@ -614,37 +614,9 @@ export default function AnalysisDetailPage() {
       // 필요없는 제목 제거 및 숫자 변환 
       content = content.replace(/# .*학급 .*보고서(\n|\r\n)?/g, '');
       
-      // ===== 1. 최상위 제목 스타일 통일화 =====
-      // 최상위 제목 변환 (학급 전체 분석, 교사를 위한 구체적 실행 방안 등) - 모두 강조표시
-      content = content.replace(/^학급 전체 분석/gm, '# **학급 전체 분석**');
-      content = content.replace(/^(\d+)\.\s*교사를 위한 구체적 실행 방안/gm, '# **$1. 교사를 위한 구체적 실행 방안**');
+
       
-      // ===== 2. 하위 섹션 제목 스타일 통일화 =====
-      // 종합분석의 하위 섹션 제목 변환 (전반적인 분위기 및 특징, 강점, 약점 등) - 모두 강조표시 
-      content = content.replace(/^(전반적인 분위기 및 특징|강점|약점|심리적 역동성 및 집단적 성향)/gm, '## **$1**');
-      content = content.replace(/^(\d+\.\d+)\s*(학급 환경 및 분위기 개선 전략|교우 관계 촉진 프로그램|고립 및 취약 학생 지원 방안|학급 리더십 및 긍정적 영향력 개발)/gm, '## **$1 $2**');
-      
-      // 모든 숫자 시작 제목 변환 (1. 학급 전체 분석, 2. 학생 간 관계 분석 등)
-      content = content.replace(/^(\d+)\.\s*([^\n]+)/gm, '## **$1. $2**');
-      
-      // ===== 추가: 특정 제목 보라색으로 강조 =====
-      // 보라색으로 강조할 패턴 목록
-      const purpleTitlePatterns = [
-        // 숫자로 시작하는 제목들 (1. 학급 전체 분석, 2. 학생 간 관계 분석 등)
-        /## \*\*(\d+)\.\s*([^\n]+?)\*\*/g,
-        // 세부 숫자 시작 제목 (6.1, 6.2 등)
-        /## \*\*(\d+\.\d+)\s*([^\n]+?)\*\*/g,
-      ];
-      
-      // 각 패턴에 대해 보라색 클래스 추가
-      purpleTitlePatterns.forEach(pattern => {
-        content = content.replace(pattern, (match, num, title) => {
-          // strong 태그를 제거하고 직접 스타일 적용
-          return `<div style="color: #4338ca; font-weight: bold; border-bottom: 1px solid #e5e7eb; margin-top: 1.5rem; margin-bottom: 0.5rem; padding-bottom: 0.3rem;">${num}. ${title}</div>`;
-        });
-      });
-      
-      // ===== 3. 학생분석 페이지 정리 =====
+            // ===== 특수 케이스: 학생분석 페이지 정리 =====
       if (activeTab.startsWith('students-')) {
         // 불필요한 제목 및 설명 제거
         content = content.replace(/# 학생 그룹 \d+ 개별 분석(\n|\r\n)?/g, '');
@@ -674,62 +646,12 @@ export default function AnalysisDetailPage() {
         // 구분선 형식 통일
         content = content.replace(/---+/g, '\n\n---\n\n');
         
-        // 학생 이름/번호 형식 통일 
-        content = content.replace(/### ([^\n]+)/g, '## $1');
-        
-        // 다양한 형식의 학생 헤더를 숫자로 통일
-        // "학생 1" -> "1. 학생"
-        content = content.replace(/### 학생\s*(\d+)([^\*]*)/gi, '### $1. 학생');
-        
-        // "이름 (숫자)" -> "숫자. 학생"
-        content = content.replace(/### (.+?)\s*\((\d+)\)\s*/g, '### $2. 학생');
-        
-        // "이름 숫자" -> "숫자. 학생"
-        content = content.replace(/### (.+?)\s+(\d+)\s*/g, '### $2. 학생');
-        
-        // 제목 변환을 정교하게 처리
-        // 1. h3 태그: "숫자. 이름" -> "숫자. 학생" (단, "발전을 위한 구체적 제안"은 제외)
-        content = content.replace(/### (\d+)\.\s+(.+?)(\s*|$)/g, (match, num, name) => {
-          if (name.includes("발전을 위한 구체적 제안")) {
-            return match;
-          }
-          return `### ${num}. 학생`;
-        });
-        
-        // 2. h4 태그: "숫자. 이름" -> "숫자. 학생" (단, "발전을 위한 구체적 제안"은 제외)
-        content = content.replace(/#### (\d+)\.\s+(.+?)(\s*|$)/g, (match, num, name) => {
-          if (name.includes("발전을 위한 구체적 제안")) {
-            return match;
-          }
-          return `#### ${num}. 학생`;
-        });
-        
-        // display_order 활용 (이미 숫자로 시작하는 경우 건너뛰기)
-        content = content.replace(/### ([^\d\*][^\*]+)/g, (match, name) => {
-          const student = students.find(s => s.name === name.trim());
-          if (student && student.display_order) {
-            return `### ${student.display_order}. 학생`;
-          }
-          return match;
-        });
+
       }
       
-      // ===== 4. 섹션 제목 볼드체 처리 =====
-      // 심리적 특성 분석, 관계 분석 등 섹션 제목 처리 (콜론 포함 및 제외 모두 처리)
-      const sectionTitles = [
-        '심리적 특성 분석', '심리적 특성 및 발달 단계 분석', '성격 유형 및 행동 패턴',
-        '관계 분석', '사회적 위치와 영향력', '관계 패턴 및 주요 교우 관계',
-        '강점과 과제', '강점과 잠재력', '직면한 어려움 또는 도전 과제', '발전을 위한 구체적 제안'
-      ];
+
       
-      sectionTitles.forEach(title => {
-        // "제목:" 형식
-        content = content.replace(new RegExp(`^\\s*(${title}):\\s*$`, 'gm'), `### ${title}:`);
-        // "제목" 형식
-        content = content.replace(new RegExp(`^\\s*(${title})\\s*$`, 'gm'), `### ${title}`);
-      });
-      
-      // ===== 5. 하위 항목 제목 볼드체 처리 =====
+              // ===== 1. 하위 항목 제목 볼드체 처리 =====
       // 교실 활동, 교우 관계 전략 등
       const subSectionTitles = [
         '교실 활동', '교우 관계 전략', '그룹 활동 참여', '갈등 해결 및 의사소통 기술',
@@ -740,12 +662,12 @@ export default function AnalysisDetailPage() {
         content = content.replace(new RegExp(`^\\s*(${title}):\\s*(.*)$`, 'gm'), `**${title}:** $2`);
       });
       
-      // ===== 6. 번호 매김 통일 =====
+      // ===== 2. 번호 매김 통일 =====
       // 번호가 있는 제안 항목 처리
       content = content.replace(/^(\d+\)\s*[^\n:]+)$/gm, '- **$1**');
       content = content.replace(/^(\d+\.\s*[^\n:]+)$/gm, '- **$1**');
       
-      // ===== 7. 기타 키워드 및 특수 항목 강조 =====
+      // ===== 3. 기타 키워드 및 특수 항목 강조 =====
       // 단기, 중기, 장기 계획 키워드 강조
       content = content.replace(/단기\(1-2주\):/g, '**단기(1-2주):**');
       content = content.replace(/중기\(1-2개월\):/g, '**중기(1-2개월):**');
@@ -763,26 +685,26 @@ export default function AnalysisDetailPage() {
       keyItems.forEach(item => {
         // "항목:" 형식 (스페이스 없음)
         content = content.replace(new RegExp(`^(\\s*)${item}:(?![\\s\\S]*?<span)`, 'gm'), 
-          `$1<span style="color: #4338ca; font-weight: bold; font-family: 'Pretendard', sans-serif !important;">${item}:</span> `);
+          `$1<span style="color: #4338ca; font-weight: 400; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;">${item}:</span> `);
         
         // "항목: " 형식 (스페이스 있음)
         content = content.replace(new RegExp(`^(\\s*)${item}: (?![\\s\\S]*?<span)`, 'gm'), 
-          `$1<span style="color: #4338ca; font-weight: bold; font-family: 'Pretendard', sans-serif !important;">${item}:</span> `);
+          `$1<span style="color: #4338ca; font-weight: 400; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;">${item}:</span> `);
       });
       
-      // ===== 8. 실행 가능한 활동 제안 처리 개선 =====
+      // ===== 4. 실행 가능한 활동 제안 처리 개선 =====
       // "실행 가능한 활동 제안" 섹션 강조 
       content = content.replace(/^(실행 가능한 활동 제안|실행 가능한 활동|구체적 활동 제안)(\s*|:)/gm, 
-        '<div style="color: #4338ca; font-weight: bold; margin-top: 1rem; margin-bottom: 0.5rem;">실행 가능한 활동 제안</div>');
+        '<div style="color: #4338ca; font-weight: 400; margin-top: 1rem; margin-bottom: 0.5rem;">실행 가능한 활동 제안</div>');
       
       // 활동명 패턴 처리 (다양한 형식 포함)
       // 예: 1. **학급 안전감 규칙 만들기, 2. **아침 인사 루틴 등
       content = content.replace(/(\d+\.\s*)\*\*([^*\n]+)\*\*/g, 
-        '<div style="color: #4338ca; font-weight: bold; margin-top: 1rem;">$1$2</div>');
+        '<div style="color: #4338ca; font-weight: 400; margin-top: 1rem;">$1$2</div>');
       
       // 참고 자료 링크 처리 개선
       content = content.replace(/\*\*참고 자료 링크\*\*:\s*\[(.*?)\]\((https?:\/\/[^\s)]+)\)/g, 
-        '<div style="margin-top: 0.5rem;"><span style="color: #4338ca; font-weight: bold;">참고 자료:</span> <a href="$2" target="_blank" style="color: #2563eb; text-decoration: underline;">$1</a></div>');
+        '<div style="margin-top: 0.5rem;"><span style="color: #4338ca; font-weight: 400;">참고 자료:</span> <a href="$2" target="_blank" style="color: #2563eb; text-decoration: underline;">$1</a></div>');
       
       // 괄호 안의 URL 형식 처리 (https://www.edunet.net/... 형식)
       content = content.replace(/\((https?:\/\/[^\s)]+)\)/g, 
@@ -1076,9 +998,9 @@ export default function AnalysisDetailPage() {
                   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
                 }
                 
-                /* 본문 텍스트만 얇게 */
+                /* 본문 텍스트 일반 굵기로 */
                 .prose p {
-                  font-weight: 300 !important;
+                  font-weight: 400 !important;
                   margin-top: 0.75rem !important;
                   margin-bottom: 0.75rem !important;
                   line-height: 1.6 !important;
@@ -1088,11 +1010,16 @@ export default function AnalysisDetailPage() {
                 /* 모든 제목 크기와 스타일 통일 */
                 .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
                   font-size: 1rem !important;
-                  font-weight: 500 !important;
                   margin-top: 1.5rem !important;
                   margin-bottom: 0.5rem !important;
                   padding-bottom: 0.3rem !important;
                   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+                }
+                
+                /* H2, H3 제목 굵게 */
+                .prose h2, .prose h3 {
+                  font-weight: 700 !important;
+                  color: #4338ca !important;
                 }
                 
                 /* 제목 계층별 밑줄 스타일만 차별화 */
@@ -1167,7 +1094,7 @@ export default function AnalysisDetailPage() {
                 /* 하위 섹션 제목 스타일 통일 */
                 .prose p:has(strong:first-child) {
                   margin-top: 1rem !important;
-                  font-weight: 600 !important;
+                  font-weight: 400 !important;
                 }
                 
                 /* 심리적 특성 분석 등 주요 섹션 제목 강조 */
@@ -1185,13 +1112,13 @@ export default function AnalysisDetailPage() {
                   padding: 0.5rem 0.75rem !important;
                   border-radius: 0.25rem !important;
                   margin-top: 1.25rem !important;
-                  font-weight: 700 !important;
+                  font-weight: 400 !important;
                 }
                 
                 /* 볼드체 강조 일관성 */
                 .prose strong {
                   font-weight: 700 !important;
-                  color: #4338ca !important;
+                  color: black !important;
                   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
                 }
                 
@@ -1199,7 +1126,7 @@ export default function AnalysisDetailPage() {
                 .prose a {
                   color: #4338ca !important; /* 파란색(#2563eb)에서 보라색(#4338ca)으로 변경 */
                   text-decoration: underline !important;
-                  font-weight: 500 !important;
+                  font-weight: 400 !important;
                 }
                 
                 /* 구분선 스타일 */
@@ -1247,7 +1174,7 @@ export default function AnalysisDetailPage() {
                 /* 활동명, 목적 등의 키워드 스타일 */
                 .prose span[style*="color: #4338ca"] {
                   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-                  font-weight: bold !important;
+                  font-weight: 400 !important;
                   display: inline-block !important;
                 }
                 
@@ -1256,7 +1183,7 @@ export default function AnalysisDetailPage() {
                 span[style*="준비물"], span[style*="진행 방법"], span[style*="소요시간"],
                 span[style*="기대효과"], span[style*="참고자료"] {
                   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
-                  font-weight: bold !important;
+                  font-weight: 400 !important;
                   color: #4338ca !important;
                 }
                 
@@ -1285,21 +1212,6 @@ export default function AnalysisDetailPage() {
                     );
                   },
                   h2: ({ node, ...props }) => {
-                    const text = props.children?.toString() || '';
-                    // 숫자로 시작하는 타이틀인지 확인 (예: "1. 학급 전체 분석", "6.1 학급 환경 개선")
-                    if (/^\d+(\.\d+)?\./.test(text)) {
-                      return (
-                        <h2 style={{ 
-                          color: '#4338ca', 
-                          fontWeight: '500',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                          borderBottom: '1px solid #e5e7eb',
-                          marginTop: '1.5rem',
-                          marginBottom: '0.5rem',
-                          paddingBottom: '0.3rem'
-                        }} {...props} />
-                      );
-                    }
                     return <h2 {...props} />;
                   },
                   p: ({ node, ...props }) => {
@@ -1320,7 +1232,7 @@ export default function AnalysisDetailPage() {
                             <p>
                               <span style={{ 
                                 color: '#4338ca', 
-                                fontWeight: 'bold',
+                                fontWeight: '400',
                                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
                                 display: 'inline-block'
                               }}>
