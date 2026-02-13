@@ -1,9 +1,11 @@
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { Database } from './database.types'; // Database 타입을 가져옵니다.
+import { createBrowserClient } from '@supabase/ssr';
+import { Database } from './database.types';
 
-// createClient 대신 createClientComponentClient 사용
-// 클라이언트 컴포넌트에서 사용할 싱글톤 인스턴스 생성
-export const supabase = createClientComponentClient<Database>(); 
+// createBrowserClient 사용 (Next.js 15 호환성 및 SSR 패키지 통일)
+export const supabase = createBrowserClient<Database>(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export interface Student {
   id: string;
@@ -14,7 +16,7 @@ export interface Student {
   position_y?: number | null; // 노드 위치 저장용
   created_at?: string; // 스키마에 created_at 이 있으므로 추가 (선택적)
   display_order?: number;
-  
+
   // 새로운 상세 정보 필드들
   student_number?: number | null; // 학생 번호
   student_login_id?: string | null; // 학생 로그인 아이디
@@ -33,7 +35,7 @@ export interface Student {
 }
 
 // 클라이언트에서 사용할 Student 타입 (비밀번호 해시만 제외)
-export interface StudentForClient extends Omit<Student, 'student_password_hashed'> {}
+export interface StudentForClient extends Omit<Student, 'student_password_hashed'> { }
 
 // 학생 정보 업데이트용 타입 (평문 비밀번호 포함)
 export interface StudentUpdateData {
@@ -96,7 +98,7 @@ export interface Survey {
   description?: string;
   survey_date?: string; // YYYY-MM-DD 형식
   created_at: string;
-} 
+}
 
 // ✅ 학급 일지 관련 타입 정의 추가
 

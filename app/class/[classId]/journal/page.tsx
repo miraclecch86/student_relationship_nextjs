@@ -18,9 +18,9 @@ interface TodoItem {
 }
 import StudentDetailForm from '@/components/StudentDetailForm';
 import { motion } from 'framer-motion';
-import { 
-  ChevronLeftIcon, 
-  ChevronRightIcon, 
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
   MagnifyingGlassIcon,
   CalendarDaysIcon,
   PlusIcon,
@@ -41,7 +41,7 @@ import toast from 'react-hot-toast';
 // 한국 공휴일 데이터 (2025년 기준)
 const getKoreanHolidays = (year: number): { [key: string]: string } => {
   const holidays: { [key: string]: string } = {};
-  
+
   // 고정 공휴일
   holidays[`${year}-01-01`] = '신정';
   holidays[`${year}-03-01`] = '삼일절';
@@ -51,7 +51,7 @@ const getKoreanHolidays = (year: number): { [key: string]: string } => {
   holidays[`${year}-10-03`] = '개천절';
   holidays[`${year}-10-09`] = '한글날';
   holidays[`${year}-12-25`] = '크리스마스';
-  
+
   // 2025년 음력 공휴일 (매년 달라짐)
   if (year === 2025) {
     holidays['2025-01-28'] = '설날연휴';
@@ -64,7 +64,7 @@ const getKoreanHolidays = (year: number): { [key: string]: string } => {
     holidays['2025-08-16'] = '추석연휴';
     holidays['2025-08-18'] = '추석 대체휴일';
   }
-  
+
   // 2024년 음력 공휴일
   if (year === 2024) {
     holidays['2024-02-09'] = '설날연휴';
@@ -77,7 +77,7 @@ const getKoreanHolidays = (year: number): { [key: string]: string } => {
     holidays['2024-09-17'] = '추석';
     holidays['2024-09-18'] = '추석연휴';
   }
-  
+
   // 2026년 음력 공휴일 (예상)
   if (year === 2026) {
     holidays['2026-02-16'] = '설날연휴';
@@ -87,7 +87,7 @@ const getKoreanHolidays = (year: number): { [key: string]: string } => {
     holidays['2026-10-06'] = '추석';
     holidays['2026-10-07'] = '추석연휴';
   }
-  
+
   return holidays;
 };
 
@@ -99,17 +99,17 @@ const fetchRealTimeHolidays = async (year: number): Promise<{ [key: string]: str
       console.warn(`공휴일 데이터를 찾을 수 없습니다: ${year}년`);
       return getKoreanHolidays(year);
     }
-    
+
     const holidayData = await response.json();
-    
+
     // 빈 객체이거나 null인 경우 처리
     if (!holidayData || typeof holidayData !== 'object') {
       console.warn(`공휴일 데이터가 올바르지 않습니다: ${year}년`);
       return getKoreanHolidays(year);
     }
-    
+
     const holidays: { [key: string]: string } = {};
-    
+
     // JSON 데이터를 우리 형식으로 변환
     Object.entries(holidayData).forEach(([date, names]) => {
       try {
@@ -123,7 +123,7 @@ const fetchRealTimeHolidays = async (year: number): Promise<{ [key: string]: str
         console.warn(`공휴일 데이터 변환 오류: ${date}`, entryError);
       }
     });
-    
+
     return holidays;
   } catch (error) {
     console.warn(`실시간 공휴일 데이터 가져오기 실패 (${year}년):`, error);
@@ -151,12 +151,12 @@ const isSaturday = (date: Date): boolean => {
 // 공휴일 여부 확인 함수
 const getHolidayName = (date: Date, realTimeHolidays?: { [key: string]: string }): string | null => {
   const dateStr = format(date, 'yyyy-MM-dd');
-  
+
   // 실시간 데이터가 있으면 우선 사용
   if (realTimeHolidays && realTimeHolidays[dateStr]) {
     return realTimeHolidays[dateStr];
   }
-  
+
   // 없으면 기본 데이터 사용
   const holidays = getKoreanHolidays(date.getFullYear());
   return holidays[dateStr] || null;
@@ -169,12 +169,12 @@ async function fetchClassDetails(classId: string): Promise<Class | null> {
     .select('*')
     .eq('id', classId)
     .single();
-  
+
   if (error) {
     console.error('Error fetching class details:', error);
     return null;
   }
-  
+
   return data;
 }
 
@@ -226,7 +226,7 @@ async function fetchMonthlyJournals(year: number, month: number, classId: string
 async function searchJournals(searchTerm: string, classId: string): Promise<any[]> {
   try {
     const { data: { session } } = await (supabase as any).auth.getSession();
-    
+
     if (!session) {
       throw new Error('인증이 필요합니다.');
     }
@@ -252,9 +252,9 @@ async function searchJournals(searchTerm: string, classId: string): Promise<any[
     // 검색어와 매칭되는 결과 필터링
     const results = data?.filter((journal: any) => {
       const searchLower = searchTerm.toLowerCase();
-      
+
       // 알림장 내용 검색
-      const announcementMatch = journal.journal_announcements?.some((ann: any) => 
+      const announcementMatch = journal.journal_announcements?.some((ann: any) =>
         ann.keywords?.some((keyword: string) => keyword.toLowerCase().includes(searchLower)) ||
         ann.teacher_input_content?.toLowerCase().includes(searchLower) ||
         ann.ai_generated_content?.toLowerCase().includes(searchLower)
@@ -480,7 +480,7 @@ async function fetchClassStudentCount(classId: string): Promise<number> {
 }
 
 // 학생 생일 정보 조회 함수
-async function fetchStudentBirthdays(classId: string): Promise<Array<{id: string, name: string, birthday: string}>> {
+async function fetchStudentBirthdays(classId: string): Promise<Array<{ id: string, name: string, birthday: string }>> {
   const { data, error } = await (supabase as any)
     .from('students')
     .select('id, name, birthday')
@@ -567,7 +567,7 @@ export default function ClassJournalPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  
+
   // 일정 관련 상태
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -591,14 +591,14 @@ export default function ClassJournalPage() {
 
   // 실시간 공휴일 데이터 상태
   const [realTimeHolidays, setRealTimeHolidays] = useState<{ [key: string]: string }>({});
-  
+
   // 학생 상세정보 모달 상태
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [isStudentDetailOpen, setIsStudentDetailOpen] = useState(false);
-  
+
   // 선택된 날짜 상태 (일정 목록 표시용)
   const [selectedDateForSchedule, setSelectedDateForSchedule] = useState<Date>(new Date());
-  
+
   // TODO 모달 상태
   const [isTodoModalOpen, setIsTodoModalOpen] = useState(false);
   const [newTodo, setNewTodo] = useState({
@@ -633,15 +633,15 @@ export default function ClassJournalPage() {
   // 현재 월의 첫날과 마지막날
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
-  
+
   // 캘린더에서 실제 표시되는 첫 번째 날 (월의 첫째 주 일요일)
   const calendarStart = new Date(monthStart);
   calendarStart.setDate(monthStart.getDate() - monthStart.getDay());
-  
+
   // 캘린더를 항상 6주(42일)로 고정
   const calendarEnd = new Date(calendarStart);
   calendarEnd.setDate(calendarStart.getDate() + 41); // 42일째 (0부터 시작하므로 41을 더함)
-  
+
   // 캘린더 전체 날짜 (항상 42일 - 6주)
   const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
 
@@ -707,7 +707,7 @@ export default function ClassJournalPage() {
   });
 
   // 학생 생일 정보 조회
-  const { data: studentBirthdays } = useQuery<Array<{id: string, name: string, birthday: string}>, Error>({
+  const { data: studentBirthdays } = useQuery<Array<{ id: string, name: string, birthday: string }>, Error>({
     queryKey: ['student-birthdays', classId],
     queryFn: () => fetchStudentBirthdays(classId),
     enabled: !!classId,
@@ -777,13 +777,13 @@ export default function ClassJournalPage() {
     const dates: string[] = [];
     const startDate = new Date(schedule.schedule_date);
     const endDate = schedule.end_date ? new Date(schedule.end_date) : startDate;
-    
+
     const currentDate = new Date(startDate);
     while (currentDate <= endDate) {
       dates.push(format(currentDate, 'yyyy-MM-dd'));
       currentDate.setDate(currentDate.getDate() + 1);
     }
-    
+
     return dates;
   };
 
@@ -804,18 +804,18 @@ export default function ClassJournalPage() {
 
   // 날짜별 생일 학생 맵
   const birthdayMap = useMemo(() => {
-    const map = new Map<string, Array<{id: string, name: string, birthday: string}>>();
-    
+    const map = new Map<string, Array<{ id: string, name: string, birthday: string }>>();
+
     if (studentBirthdays) {
       const currentYear = currentDate.getFullYear();
-      
+
       studentBirthdays.forEach(student => {
         if (student.birthday) {
           // 생일을 현재 년도로 변환 (월-일만 사용)
           const birthdayDate = new Date(student.birthday);
           const birthdayThisYear = new Date(currentYear, birthdayDate.getMonth(), birthdayDate.getDate());
           const dateKey = format(birthdayThisYear, 'yyyy-MM-dd');
-          
+
           if (!map.has(dateKey)) {
             map.set(dateKey, []);
           }
@@ -823,7 +823,7 @@ export default function ClassJournalPage() {
         }
       });
     }
-    
+
     return map;
   }, [studentBirthdays, currentDate]);
 
@@ -838,7 +838,7 @@ export default function ClassJournalPage() {
     const selectedDateStr = format(selectedDateForSchedule, 'yyyy-MM-dd');
     const schedules = scheduleMap.get(selectedDateStr) || [];
     const birthdays = birthdayMap.get(selectedDateStr) || [];
-    
+
     // 일정 데이터 변환
     const scheduleItems = schedules.map(schedule => {
       let timeDisplay = '시간 미지정';
@@ -849,7 +849,7 @@ export default function ClassJournalPage() {
         const endTime = schedule.end_time ? schedule.end_time.slice(0, 5) : null;
         timeDisplay = endTime ? `${startTime} - ${endTime}` : startTime;
       }
-      
+
       return {
         type: 'schedule' as const,
         id: schedule.id,
@@ -862,7 +862,7 @@ export default function ClassJournalPage() {
         studentId: undefined
       };
     });
-    
+
     // 생일 데이터 변환
     const birthdayItems = birthdays.map(student => ({
       type: 'birthday' as const,
@@ -875,13 +875,13 @@ export default function ClassJournalPage() {
       sortTime: '00:00',
       studentId: student.id
     }));
-    
+
     // 통합하고 정렬 (생일을 맨 위에, 그 다음 시간순)
     return [...birthdayItems, ...scheduleItems].sort((a, b) => {
       // 생일을 항상 맨 위에
       if (a.type === 'birthday' && b.type !== 'birthday') return -1;
       if (a.type !== 'birthday' && b.type === 'birthday') return 1;
-      
+
       // 같은 타입일 때는 시간순 정렬
       if (a.isAllDay && !b.isAllDay) return -1;
       if (!a.isAllDay && b.isAllDay) return 1;
@@ -893,7 +893,7 @@ export default function ClassJournalPage() {
   const isAttendanceComplete = (dateStr: string): boolean => {
     const dayAttendance = attendanceMap.get(dateStr) || [];
     const totalStudents = classStudentCount || 0;
-    
+
     // 출석부가 작성되어 있고, 전체 학생 수와 출석 기록 수가 일치하면 완료
     return dayAttendance.length > 0 && dayAttendance.length === totalStudents && totalStudents > 0;
   };
@@ -1053,7 +1053,7 @@ export default function ClassJournalPage() {
       }
     }
   };
-  
+
   const goToNextMonth = () => {
     setCurrentDate(prev => addMonths(prev, 1));
     // 일정 관리 탭에서 선택된 날짜가 현재 월이 아니면 해당 월의 1일로 변경
@@ -1313,7 +1313,7 @@ export default function ClassJournalPage() {
         setRealTimeHolidays(fallbackHolidays);
       }
     };
-    
+
     loadHolidays();
   }, [currentDate.getFullYear()]);
 
@@ -1455,7 +1455,7 @@ export default function ClassJournalPage() {
                     </div>
                     <span className="text-sm font-medium text-gray-900">출석 통계</span>
                   </button>
-                  
+
                   <button
                     onClick={() => router.push(`/class/${classId}/students`)}
                     className="w-full text-left p-2 rounded-lg bg-white hover:bg-blue-50 hover:text-blue-600 transition-colors border border-gray-200 flex items-center space-x-2.5"
@@ -1470,15 +1470,15 @@ export default function ClassJournalPage() {
                 {/* 일정 목록 */}
                 {selectedDateSchedules.length > 0 && (
                   <div className="mt-6 bg-blue-50 rounded-xl p-4 border border-blue-200">
-                                          <h3 className="text-sm font-semibold text-blue-800 mb-3 flex items-center">
-                        <span className="mr-2">📅</span>
-                        {format(selectedDateForSchedule, 'M월 d일', { locale: ko })} 일정
-                        {isSameDay(selectedDateForSchedule, new Date()) && (
-                          <span className="ml-2 text-xs bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full">오늘</span>
-                        )}
-                      </h3>
-                      <div className="space-y-2">
-                        {selectedDateSchedules.map((item) => (
+                    <h3 className="text-sm font-semibold text-blue-800 mb-3 flex items-center">
+                      <span className="mr-2">📅</span>
+                      {format(selectedDateForSchedule, 'M월 d일', { locale: ko })} 일정
+                      {isSameDay(selectedDateForSchedule, new Date()) && (
+                        <span className="ml-2 text-xs bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full">오늘</span>
+                      )}
+                    </h3>
+                    <div className="space-y-2">
+                      {selectedDateSchedules.map((item) => (
                         <div
                           key={`${item.type}-${item.id}`}
                           onClick={(e) => {
@@ -1492,11 +1492,10 @@ export default function ClassJournalPage() {
                               }
                             }
                           }}
-                          className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors border ${
-                            item.type === 'birthday' 
-                              ? 'bg-blue-50 hover:bg-blue-100 border-blue-200' 
+                          className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors border ${item.type === 'birthday'
+                              ? 'bg-blue-50 hover:bg-blue-100 border-blue-200'
                               : 'bg-white hover:bg-gray-50 border-gray-200'
-                          }`}
+                            }`}
                         >
                           <div className="flex items-center space-x-2 flex-1 min-w-0">
                             {item.type === 'birthday' ? (
@@ -1510,9 +1509,8 @@ export default function ClassJournalPage() {
                               </div>
                             </div>
                           </div>
-                          <div className={`text-xs font-medium ml-2 flex-shrink-0 ${
-                            item.type === 'birthday' ? 'text-blue-600' : 'text-gray-600'
-                          }`}>
+                          <div className={`text-xs font-medium ml-2 flex-shrink-0 ${item.type === 'birthday' ? 'text-blue-600' : 'text-gray-600'
+                            }`}>
                             {item.time}
                           </div>
                         </div>
@@ -1520,7 +1518,7 @@ export default function ClassJournalPage() {
                     </div>
                   </div>
                 )}
-                
+
                 {/* 일정이 없는 경우 메시지 */}
                 {selectedDateSchedules.length === 0 && (
                   <div className="mt-6 bg-gray-50 rounded-xl p-4 border border-gray-200">
@@ -1540,7 +1538,7 @@ export default function ClassJournalPage() {
                 {/* TODO 리스트 */}
                 <div className="mt-6 bg-green-50 rounded-xl p-4 border border-green-200">
                   <div className="flex items-center justify-between mb-3">
-                    <h3 
+                    <h3
                       onClick={() => router.push(`/class/${classId}/todos`)}
                       className="text-sm font-semibold text-green-800 flex items-center cursor-pointer hover:text-green-900 transition-colors"
                     >
@@ -1554,7 +1552,7 @@ export default function ClassJournalPage() {
                       + 추가
                     </button>
                   </div>
-                  
+
                   <div className="space-y-2 max-h-64 overflow-y-auto">
                     {isTodosLoading ? (
                       <div className="text-center py-4">
@@ -1574,14 +1572,14 @@ export default function ClassJournalPage() {
                               onChange={() => handleToggleTodo(todo.id, todo.is_completed)}
                               className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
                             />
-                            
+
                             {/* 우선순위 점 (체크박스 하단) */}
                             <div className="mt-1">
                               {(() => {
                                 const today = new Date();
                                 const startDate = new Date(todo.start_date);
                                 const diffDays = Math.ceil((startDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
-                                
+
                                 if (diffDays < 0) {
                                   return <div className={`w-1.5 h-1.5 bg-red-500 rounded-full ${!todo.is_completed ? 'animate-pulse' : 'opacity-60'}`} title="지난 TODO"></div>;
                                 } else if (diffDays === 0) {
@@ -1594,13 +1592,12 @@ export default function ClassJournalPage() {
                               })()}
                             </div>
                           </div>
-                          
+
                           <div className="flex-1 min-w-0">
-                            <div className={`text-xs font-medium ${
-                              todo.is_completed 
-                                ? 'text-gray-500 line-through' 
+                            <div className={`text-xs font-medium ${todo.is_completed
+                                ? 'text-gray-500 line-through'
                                 : 'text-gray-800'
-                            } truncate`}>
+                              } truncate`}>
                               {todo.title}
                             </div>
                             <div className="text-xs text-gray-500 mt-0.5">
@@ -1639,11 +1636,10 @@ export default function ClassJournalPage() {
                       <button
                         key={tab.key}
                         onClick={() => setActiveTab(tab.key)}
-                        className={`px-4 py-2.5 text-sm font-medium transition-all duration-200 flex items-center space-x-2 rounded-lg relative ${
-                          activeTab === tab.key
+                        className={`px-4 py-2.5 text-sm font-medium transition-all duration-200 flex items-center space-x-2 rounded-lg relative ${activeTab === tab.key
                             ? 'text-white bg-gradient-to-r from-blue-500 to-blue-600 shadow-sm'
                             : 'text-gray-600 hover:text-gray-800 hover:bg-white/50'
-                        }`}
+                          }`}
                       >
                         <span className="text-base">{tab.icon}</span>
                         <span className="font-semibold">{tab.label}</span>
@@ -1699,11 +1695,11 @@ export default function ClassJournalPage() {
                     <span>오늘</span>
                   </button>
                 </div>
-                
+
                 <h2 className="absolute left-1/2 transform -translate-x-1/2 text-2xl font-bold text-gray-800">
                   {format(currentDate, 'yyyy년 M월', { locale: ko })}
                 </h2>
-                
+
                 <div className="flex items-center space-x-2">
                   {activeTab === 'schedule' && (
                     <button
@@ -1726,11 +1722,10 @@ export default function ClassJournalPage() {
               {/* 요일 헤더 */}
               <div className="grid grid-cols-7 gap-1 mb-2">
                 {['일', '월', '화', '수', '목', '금', '토'].map((day, index) => (
-                  <div 
-                    key={day} 
-                    className={`p-3 text-center text-sm font-medium ${
-                      index === 0 ? 'text-red-500' : index === 6 ? 'text-blue-500' : 'text-gray-500'
-                    }`}
+                  <div
+                    key={day}
+                    className={`p-3 text-center text-sm font-medium ${index === 0 ? 'text-red-500' : index === 6 ? 'text-blue-500' : 'text-gray-500'
+                      }`}
                   >
                     {day}
                   </div>
@@ -1804,7 +1799,7 @@ export default function ClassJournalPage() {
                     // 배경색 결정 로직
                     let backgroundColor = 'bg-white';
                     let borderColor = 'border-gray-200';
-                    
+
                     if (isToday) {
                       backgroundColor = 'bg-white';
                       borderColor = 'border-2 border-blue-500';
@@ -1831,7 +1826,7 @@ export default function ClassJournalPage() {
 
                     // 날짜 셀 스타일 결정
                     const dateInteractionClass = (activeTab === 'attendance' || activeTab === 'schedule')
-                      ? 'cursor-pointer hover:bg-gray-50' 
+                      ? 'cursor-pointer hover:bg-gray-50'
                       : '';
 
                     return (
@@ -1844,28 +1839,27 @@ export default function ClassJournalPage() {
                         onClick={(activeTab === 'attendance' || activeTab === 'schedule') ? handleDateClickForTab : undefined}
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <div className={`text-sm font-medium ${
-                            !isCurrentMonth
+                          <div className={`text-sm font-medium ${!isCurrentMonth
                               ? 'text-gray-300'
-                              : isHoliday 
-                                ? 'text-red-600 font-bold' 
+                              : isHoliday
+                                ? 'text-red-600 font-bold'
                                 : isSundayDay
                                   ? 'text-red-500'
-                                  : isSaturdayDay 
+                                  : isSaturdayDay
                                     ? 'text-blue-500'
                                     : 'text-gray-900'
-                          }`}>
+                            }`}>
                             {format(day, 'd')}
                           </div>
                         </div>
-                        
+
                         {/* 공휴일 표시 (현재 월만) */}
                         {isHoliday && isCurrentMonth && (
                           <div className="text-[10px] text-red-600 font-semibold mb-1 truncate">
                             {holidayName}
                           </div>
                         )}
-                        
+
                         {/* 생일 표시 (일정 관리 탭에서만, 현재 월만) */}
                         {activeTab === 'schedule' && dayBirthdays.length > 0 && isCurrentMonth && (
                           <div className="mb-1">
@@ -1890,13 +1884,13 @@ export default function ClassJournalPage() {
                             )}
                           </div>
                         )}
-                        
+
                         {/* 일정 표시 (일정 탭일 때만) */}
                         {activeTab === 'schedule' && daySchedules.length > 0 && isCurrentMonth && (
                           <div className="absolute bottom-1 left-1 right-1 flex flex-col-reverse space-y-reverse space-y-0.5">
                             {daySchedules.slice(0, 6).map((schedule) => {
                               const colorClasses = getColorClasses(schedule.color || 'blue');
-                              
+
                               return (
                                 <div
                                   key={`${schedule.id}-${dateStr}`}
@@ -1916,7 +1910,7 @@ export default function ClassJournalPage() {
                           <div className="absolute bottom-1 left-1 right-1 flex flex-col space-y-0.5">
                             {/* 누가 기록 표시 */}
                             {dayFeatures.hasDailyRecords && (
-                              <div 
+                              <div
                                 className="text-[10px] bg-teal-100 text-teal-800 px-1.5 py-0.5 rounded truncate cursor-pointer hover:bg-teal-200 transition-colors font-medium"
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1928,7 +1922,7 @@ export default function ClassJournalPage() {
                             )}
                             {/* 알림장 표시 */}
                             {announcementsMap.get(dateStr) && announcementsMap.get(dateStr)!.length > 0 && (
-                              <div 
+                              <div
                                 className="text-[10px] bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded truncate cursor-pointer hover:bg-yellow-200 transition-colors font-medium"
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -2034,7 +2028,7 @@ export default function ClassJournalPage() {
                     </div>
                   ))}
                 </div>
-                
+
                 {/* 전체 보기 안내 */}
                 {quickMemos.length > 5 && (
                   <div className="text-center pt-2 border-t border-gray-200">
@@ -2181,11 +2175,10 @@ export default function ClassJournalPage() {
                     <button
                       key={option.value}
                       onClick={() => setNewSchedule(prev => ({ ...prev, color: option.value }))}
-                      className={`w-8 h-8 rounded-full border-2 transition-all ${option.solid} ${
-                        newSchedule.color === option.value
+                      className={`w-8 h-8 rounded-full border-2 transition-all ${option.solid} ${newSchedule.color === option.value
                           ? 'border-gray-800 scale-110'
                           : 'border-gray-300 hover:border-gray-400'
-                      }`}
+                        }`}
                       title={option.label}
                     />
                   ))}

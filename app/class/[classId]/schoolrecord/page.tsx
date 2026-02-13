@@ -41,27 +41,33 @@ async function fetchClassDetails(classId: string): Promise<Class | null> {
     .select('*')
     .eq('id', classId)
     .single();
-  
+
   if (error) {
     console.error('Error fetching class details:', error);
     return null;
   }
-  
+
   return data;
 }
 
 // 생활기록부 목록 조회 함수
 async function fetchSchoolRecords(classId: string): Promise<SchoolRecord[]> {
   console.log(`생활기록부 목록 요청: classId=${classId}`);
-  
+
   try {
-    // API 엔드포인트에 요청
-    const response = await fetch(`/api/class/${classId}/schoolrecord`);
-    
+    // API 엔드포인트에 요청 (캐시 방지)
+    const response = await fetch(`/api/class/${classId}/schoolrecord`, {
+      cache: 'no-store',
+      headers: {
+        'Pragma': 'no-cache',
+        'Cache-Control': 'no-cache'
+      }
+    });
+
     if (!response.ok) {
       throw new Error(`생활기록부를 불러오는데 실패했습니다 (${response.status})`);
     }
-    
+
     const data = await response.json();
     console.log(`생활기록부 목록 수신 성공, ${data ? data.length : 0}개의 결과`);
     return data || [];
@@ -72,21 +78,22 @@ async function fetchSchoolRecords(classId: string): Promise<SchoolRecord[]> {
 }
 
 // 생활기록부 생성 함수
-async function generateSchoolRecord(classId: string): Promise<SchoolRecord> {
+async function generateSchoolRecord(classId: string, signal?: AbortSignal): Promise<SchoolRecord> {
   console.log(`생활기록부 생성 요청: classId=${classId}`);
-  
+
   try {
     const response = await fetch(`/api/class/${classId}/schoolrecord`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
+      signal,
     });
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       let errorMessage = '생활기록부를 생성하는데 실패했습니다.';
-      
+
       try {
         const errorData = JSON.parse(errorText);
         if (errorData.error) {
@@ -95,16 +102,19 @@ async function generateSchoolRecord(classId: string): Promise<SchoolRecord> {
       } catch (e) {
         console.error('오류 응답 파싱 실패:', e);
       }
-      
+
       console.error(`API 오류 (${response.status}):`, errorMessage);
       throw new Error(errorMessage);
     }
-    
+
     const data = await response.json();
     console.log('생활기록부 생성 성공, 결과 ID:', data.id);
     return data;
-  } catch (error) {
-    console.error('생활기록부 생성 요청 오류:', error);
+  } catch (error: any) {
+    // AbortError는 로그를 남기지 않고 상위로 전파 (의도된 중단)
+    if (error.name !== 'AbortError') {
+      console.error('생활기록부 생성 요청 오류:', error);
+    }
     throw error;
   }
 }
@@ -112,16 +122,16 @@ async function generateSchoolRecord(classId: string): Promise<SchoolRecord> {
 // 생활기록부 삭제 함수
 async function deleteSchoolRecord(classId: string, recordId: string): Promise<void> {
   console.log(`생활기록부 삭제 요청: classId=${classId}, recordId=${recordId}`);
-  
+
   try {
     const response = await fetch(`/api/class/${encodeURIComponent(classId)}/schoolrecord/${encodeURIComponent(recordId)}`, {
       method: 'DELETE',
     });
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       let errorMessage = '생활기록부를 삭제하는데 실패했습니다.';
-      
+
       try {
         const errorData = JSON.parse(errorText);
         if (errorData.error) {
@@ -130,11 +140,11 @@ async function deleteSchoolRecord(classId: string, recordId: string): Promise<vo
       } catch (e) {
         console.error('오류 응답 파싱 실패:', e);
       }
-      
+
       console.error(`API 오류 (${response.status}):`, errorMessage);
       throw new Error(errorMessage);
     }
-    
+
     console.log('생활기록부 삭제 성공');
   } catch (error) {
     console.error('생활기록부 삭제 요청 오류:', error);
@@ -145,16 +155,16 @@ async function deleteSchoolRecord(classId: string, recordId: string): Promise<vo
 // 모든 생활기록부 삭제 함수
 async function deleteAllSchoolRecords(classId: string): Promise<void> {
   console.log(`모든 생활기록부 삭제 요청: classId=${classId}`);
-  
+
   try {
     const response = await fetch(`/api/class/${encodeURIComponent(classId)}/schoolrecord?all=true`, {
       method: 'DELETE',
     });
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       let errorMessage = '모든 생활기록부를 삭제하는데 실패했습니다.';
-      
+
       try {
         const errorData = JSON.parse(errorText);
         if (errorData.error) {
@@ -163,11 +173,11 @@ async function deleteAllSchoolRecords(classId: string): Promise<void> {
       } catch (e) {
         console.error('오류 응답 파싱 실패:', e);
       }
-      
+
       console.error(`API 오류 (${response.status}):`, errorMessage);
       throw new Error(errorMessage);
     }
-    
+
     console.log('모든 생활기록부 삭제 성공');
   } catch (error) {
     console.error('모든 생활기록부 삭제 요청 오류:', error);
@@ -177,16 +187,16 @@ async function deleteAllSchoolRecords(classId: string): Promise<void> {
 
 // 생활기록부 설명 업데이트 함수
 async function updateSchoolRecordDescription(
-  classId: string, 
-  recordId: string, 
+  classId: string,
+  recordId: string,
   description: string
 ): Promise<void> {
   console.log(`생활기록부 설명 업데이트 요청: classId=${classId}, recordId=${recordId}, description=${description}`);
-  
+
   try {
     // description이 기본 텍스트인 경우 빈 문자열로 처리
     const summary = description === '편집 버튼을 눌러 설명을 입력하세요.' ? '' : description;
-    
+
     const response = await fetch(`/api/class/${encodeURIComponent(classId)}/schoolrecord/${encodeURIComponent(recordId)}`, {
       method: 'PATCH',
       headers: {
@@ -194,11 +204,11 @@ async function updateSchoolRecordDescription(
       },
       body: JSON.stringify({ summary }),
     });
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       let errorMessage = '생활기록부 설명을 업데이트하는데 실패했습니다.';
-      
+
       try {
         const errorData = JSON.parse(errorText);
         if (errorData.error) {
@@ -207,11 +217,11 @@ async function updateSchoolRecordDescription(
       } catch (e) {
         console.error('오류 응답 파싱 실패:', e);
       }
-      
+
       console.error(`API 오류 (${response.status}):`, errorMessage);
       throw new Error(errorMessage);
     }
-    
+
     console.log('생활기록부 설명 업데이트 성공');
   } catch (error) {
     console.error('생활기록부 설명 업데이트 요청 오류:', error);
@@ -223,31 +233,32 @@ async function updateSchoolRecordDescription(
 interface SchoolRecordCardProps {
   record: SchoolRecord;
   classDetails?: Class | null;
+  onRefresh: () => void;
 }
 
-function SchoolRecordCard({ record, classDetails }: SchoolRecordCardProps) {
+function SchoolRecordCard({ record, classDetails, onRefresh }: SchoolRecordCardProps) {
   const router = useRouter();
   const params = useParams();
   const classId = params.classId as string;
   const queryClient = useQueryClient();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  
+
   // 의미 있는 설명이 있는지 확인하고 없으면 기본 텍스트 사용
-  const hasValidSummary = record.summary && record.summary.trim().length > 0 && 
-                         !record.summary.includes("학생별 생활기록부") && 
-                         !record.summary.includes("생활기록부");
-  
+  const hasValidSummary = record.summary && record.summary.trim().length > 0 &&
+    !record.summary.includes("학생별 생활기록부") &&
+    !record.summary.includes("생활기록부");
+
   const [description, setDescription] = useState(hasValidSummary ? record.summary : '편집 버튼을 눌러 설명을 입력하세요.');
   const [isSaving, setIsSaving] = useState(false);
-  
+
   // 설명이 기본 텍스트인지 확인
   const isDefaultDescription = description === '편집 버튼을 눌러 설명을 입력하세요.';
-  
+
   const createdAt = new Date(record.created_at);
   const formattedDate = format(createdAt, 'yyyy년 MM월 dd일', { locale: ko });
   const formattedTime = format(createdAt, 'HH:mm', { locale: ko });
-  
+
   // 삭제 Mutation
   const deleteMutation = useMutation({
     mutationFn: async () => {
@@ -273,13 +284,10 @@ function SchoolRecordCard({ record, classDetails }: SchoolRecordCardProps) {
       return deleteSchoolRecord(classId, record.id);
     },
     onSuccess: () => {
-      // 🌟 데모 학급인 경우에는 쿼리 무효화나 상태 업데이트 안함
-      if (classDetails && isDemoClass(classDetails)) {
-        setIsDeleteDialogOpen(false);
-        return;
-      }
       toast.success('생활기록부가 삭제되었습니다.');
       queryClient.invalidateQueries({ queryKey: ['schoolRecords', classId] });
+      onRefresh(); // 부모 컴포넌트에서 전달받은 refetch 함수 실행
+      router.refresh(); // Next.js 데이터 갱신
       setIsDeleteDialogOpen(false);
     },
     onError: (error) => {
@@ -287,7 +295,7 @@ function SchoolRecordCard({ record, classDetails }: SchoolRecordCardProps) {
       toast.error(error instanceof Error ? error.message : '삭제 중 오류가 발생했습니다.');
     },
   });
-  
+
   // 설명 업데이트 Mutation
   const updateDescriptionMutation = useMutation({
     mutationFn: async () => {
@@ -313,12 +321,6 @@ function SchoolRecordCard({ record, classDetails }: SchoolRecordCardProps) {
       return updateSchoolRecordDescription(classId, record.id, description);
     },
     onSuccess: () => {
-      // 🌟 데모 학급인 경우에는 쿼리 무효화나 상태 업데이트 안함
-      if (classDetails && isDemoClass(classDetails)) {
-        setIsEditing(false);
-        setIsSaving(false);
-        return;
-      }
       toast.success('설명이 업데이트되었습니다.');
       queryClient.invalidateQueries({ queryKey: ['schoolRecords', classId] });
       setIsEditing(false);
@@ -330,33 +332,33 @@ function SchoolRecordCard({ record, classDetails }: SchoolRecordCardProps) {
       setIsSaving(false);
     },
   });
-  
+
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.stopPropagation(); // 카드 클릭 이벤트 전파 방지
     setIsDeleteDialogOpen(true);
   };
-  
+
   const confirmDelete = () => {
     deleteMutation.mutate();
   };
-  
+
   const handleEditClick = (e: React.MouseEvent) => {
     e.stopPropagation(); // 카드 클릭 이벤트 전파 방지
     setIsEditing(true);
   };
-  
+
   const handleSaveClick = (e: React.MouseEvent) => {
     e.stopPropagation(); // 카드 클릭 이벤트 전파 방지
     setIsSaving(true);
     updateDescriptionMutation.mutate();
   };
-  
+
   const handleCancelEdit = (e: React.MouseEvent) => {
     e.stopPropagation(); // 카드 클릭 이벤트 전파 방지
     setDescription(hasValidSummary ? record.summary : '편집 버튼을 눌러 설명을 입력하세요.');
     setIsEditing(false);
   };
-  
+
   return (
     <>
       <motion.div
@@ -364,7 +366,7 @@ function SchoolRecordCard({ record, classDetails }: SchoolRecordCardProps) {
         whileHover={{ scale: 1.02 }}
         layout
       >
-        <div 
+        <div
           className={`${isEditing ? '' : 'cursor-pointer'} pb-6`}
           onClick={isEditing ? undefined : () => router.push(`/class/${classId}/schoolrecord/${record.id}`)}
         >
@@ -396,7 +398,7 @@ function SchoolRecordCard({ record, classDetails }: SchoolRecordCardProps) {
             )}
           </div>
         </div>
-        
+
         {/* 버튼 영역 */}
         <div className={`absolute bottom-4 right-4 flex space-x-2 transition-opacity ${isEditing ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
           {isEditing ? (
@@ -446,7 +448,7 @@ function SchoolRecordCard({ record, classDetails }: SchoolRecordCardProps) {
           )}
         </div>
       </motion.div>
-      
+
       <ConfirmModal
         isOpen={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
@@ -469,6 +471,16 @@ export default function SchoolRecordPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState('');
   const [teacherName, setTeacherName] = useState<string | null>(null);
+  const [generationStartTime, setGenerationStartTime] = useState<number | null>(null);
+  const [elapsedTime, setElapsedTime] = useState<number>(0);
+  const abortControllerRef = React.useRef<AbortController | null>(null);
+
+  // 시간 포맷 함수
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   // 선생님 이름 가져오기
   React.useEffect(() => {
@@ -482,34 +494,54 @@ export default function SchoolRecordPage() {
 
     getTeacherName();
   }, []);
-  
+
+  // 초시계 업데이트
+  React.useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+
+    if (isGenerating && generationStartTime) {
+      interval = setInterval(() => {
+        setElapsedTime(Math.floor((Date.now() - generationStartTime) / 1000));
+      }, 1000);
+    } else {
+      setElapsedTime(0);
+    }
+
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [isGenerating, generationStartTime]);
+
   // 학급 정보 조회
-  const { 
-    data: classDetails, 
-    isLoading: isClassLoading, 
-    isError: isClassError, 
-    error: classError 
+  const {
+    data: classDetails,
+    isLoading: isClassLoading,
+    isError: isClassError,
+    error: classError
   } = useQuery({
     queryKey: ['classDetails', classId],
     queryFn: () => fetchClassDetails(classId),
     enabled: !!classId,
   });
-  
+
   // 생활기록부 목록 조회
   const {
     data: schoolRecords,
     isLoading: isRecordsLoading,
     isError: isRecordsError,
-    error: recordsError
+    error: recordsError,
+    refetch: refetchSchoolRecords,
   } = useQuery({
     queryKey: ['schoolRecords', classId],
     queryFn: () => fetchSchoolRecords(classId),
     enabled: !!classId,
   });
-  
+
   // 생활기록부 생성 mutation
   const generateMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (signal?: AbortSignal) => {
       // 🌟 데모 학급 권한 체크 - 먼저 체크하고 차단
       if (classDetails && isDemoClass(classDetails)) {
         const saveAttempt = handleDemoSaveAttempt(classDetails, "AI 생활기록부 생성");
@@ -529,25 +561,26 @@ export default function SchoolRecordPage() {
           return Promise.resolve({} as SchoolRecord);
         }
       }
-      return generateSchoolRecord(classId);
+      return generateSchoolRecord(classId, signal);
     },
     onSuccess: (data) => {
-      // 🌟 데모 학급인 경우에는 쿼리 무효화나 상태 업데이트 안함
-      if (classDetails && isDemoClass(classDetails)) {
-        setIsGenerating(false);
-        return;
-      }
       queryClient.invalidateQueries({ queryKey: ['schoolRecords', classId] });
+      refetchSchoolRecords(); // 명시적 refetch
+      router.refresh(); // Next.js 서버 컴포넌트 데이터 갱신
       toast.success('생활기록부가 생성되었습니다.');
       setIsGenerating(false);
     },
     onError: (error: any) => {
+      // AbortError는 에러 토스트를 띄우지 않음 (사용자 중단)
+      if (error.name === 'AbortError') {
+        return;
+      }
       console.error('생성 mutation 에러:', error);
       toast.error(`생성 실패: ${error.message}`);
       setIsGenerating(false);
     },
   });
-  
+
   // 모든 생활기록부 삭제 mutation
   const deleteAllMutation = useMutation({
     mutationFn: async () => {
@@ -573,11 +606,9 @@ export default function SchoolRecordPage() {
       return deleteAllSchoolRecords(classId);
     },
     onSuccess: () => {
-      // 🌟 데모 학급인 경우에는 쿼리 무효화나 상태 업데이트 안함
-      if (classDetails && isDemoClass(classDetails)) {
-        return;
-      }
       queryClient.invalidateQueries({ queryKey: ['schoolRecords', classId] });
+      refetchSchoolRecords(); // 명시적 refetch
+      router.refresh(); // Next.js 서버 컴포넌트 데이터 갱신
       toast.success('모든 생활기록부가 삭제되었습니다.');
     },
     onError: (error: any) => {
@@ -585,11 +616,11 @@ export default function SchoolRecordPage() {
       toast.error(`삭제 실패: ${error.message}`);
     },
   });
-  
+
   const handleDeleteAllClick = () => {
     setIsDeleteAllModalOpen(true);
   };
-  
+
   const confirmDeleteAll = () => {
     deleteAllMutation.mutate();
     setIsDeleteAllModalOpen(false);
@@ -597,10 +628,31 @@ export default function SchoolRecordPage() {
 
   const generateSchoolRecordWithProgress = () => {
     setIsGenerating(true);
-    setGenerationProgress('생활기록부 생성 중입니다...');
-    generateMutation.mutate();
+    setGenerationStartTime(Date.now());
+    setGenerationProgress('생활기록부 생성을 시작합니다...');
+
+    // AbortController 생성
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    generateMutation.mutate(controller.signal);
   };
-  
+
+  const handleStopGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsGenerating(false);
+    toast('생성이 중단되었습니다.', {
+      icon: '🛑',
+      style: {
+        background: '#FEF2F2',
+        color: '#991B1B',
+      }
+    });
+  };
+
   if (isClassLoading || isRecordsLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-gray-100">
@@ -637,7 +689,7 @@ export default function SchoolRecordPage() {
       {/* 생성 진행 중 팝업 */}
       {isGenerating && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/20 backdrop-blur-sm">
-          <div className="bg-white p-8 rounded-xl shadow-xl max-w-md text-center border border-gray-200">
+          <div className="bg-white p-8 rounded-xl shadow-xl max-w-lg text-center border border-gray-200">
             {/* AI 스타일 로딩 아이콘 */}
             <div className="flex justify-center items-center mb-6">
               <div className="relative w-16 h-16">
@@ -651,23 +703,60 @@ export default function SchoolRecordPage() {
                 </div>
               </div>
             </div>
-            <h3 className="text-xl font-semibold text-gray-800 mb-3">AI 생성 진행 중</h3>
+
+            <h3 className="text-xl font-semibold text-gray-800 mb-3">AI 생활기록부 생성 중</h3>
+
+            {/* 초시계 */}
+            <div className="mb-4">
+              <div className="inline-flex items-center px-4 py-2 bg-amber-50 rounded-lg border border-amber-200">
+                <svg className="w-5 h-5 text-amber-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-lg font-mono font-semibold text-amber-700">
+                  {formatTime(elapsedTime)}
+                </span>
+              </div>
+            </div>
+
             <p className="text-gray-600 mb-4 font-medium">{generationProgress}</p>
-            <p className="text-sm text-gray-500">생성에는 몇 분 정도 소요될 수 있습니다. 잠시만 기다려주세요.</p>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+              <p className="text-sm text-amber-800 leading-relaxed">
+                🤖 <strong>AI가 열심히 작성 중입니다!</strong><br />
+                학생들의 활동 및 관계 데이터를 종합적으로 분석하여<br />
+                개성 있는 생활기록부 문구를 생성하고 있어요.
+              </p>
+            </div>
+
+            <div className="mb-6">
+              <button
+                onClick={handleStopGeneration}
+                className="px-4 py-2 bg-white text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium flex items-center justify-center mx-auto"
+              >
+                <XCircleIcon className="w-4 h-4 mr-2" />
+                생성 중단하기
+              </button>
+            </div>
+
+            <div className="text-xs text-gray-500 space-y-1">
+              <p>⏱️ 학생 수에 따라 1-3분 정도 소요될 수 있습니다</p>
+              <p>📊 모든 학생의 데이터를 한 번에 처리합니다</p>
+              <p>💡 잠시만 기다려주시면 결과를 확인하실 수 있습니다</p>
+            </div>
           </div>
         </div>
       )}
-      
+
       <div className="max-w-7xl mx-auto p-6">
         {/* 헤더 */}
         <div className="flex items-center justify-between mb-6">
-                                <h1 className="text-2xl font-bold text-gray-800 flex items-center space-x-2">
-             <svg className="h-6 w-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-             </svg>
-             <span>쫑알쫑알</span>
-           </h1>
-         </div>
+          <h1 className="text-2xl font-bold text-gray-800 flex items-center space-x-2">
+            <svg className="h-6 w-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <span>쫑알쫑알</span>
+          </h1>
+        </div>
 
         {/* 학급 정보 카드 */}
         <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
@@ -683,7 +772,7 @@ export default function SchoolRecordPage() {
             </div>
           </div>
         </div>
-        
+
         {/* 생활기록부 생성 설명 카드 */}
         <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
           <div className="flex items-center justify-between">
@@ -722,7 +811,7 @@ export default function SchoolRecordPage() {
             </div>
           </div>
         </div>
-        
+
         {/* 생활기록부 목록 헤더 */}
         <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
           <div className="flex items-center justify-between">
@@ -751,7 +840,7 @@ export default function SchoolRecordPage() {
             )}
           </div>
         </div>
-        
+
         {/* 생활기록부 목록 */}
         <div className="space-y-4">
           {isRecordsLoading ? (
@@ -794,6 +883,7 @@ export default function SchoolRecordPage() {
                     key={record.id}
                     record={record}
                     classDetails={classDetails}
+                    onRefresh={refetchSchoolRecords}
                   />
                 ))}
               </AnimatePresence>
@@ -809,7 +899,7 @@ export default function SchoolRecordPage() {
             </div>
           )}
         </div>
-        
+
         {/* 모든 생활기록부 삭제 확인 모달 */}
         <ConfirmModal
           isOpen={isDeleteAllModalOpen}

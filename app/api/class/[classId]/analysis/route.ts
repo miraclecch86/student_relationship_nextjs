@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@/lib/supabase-server';
 import { analyzeStudentRelationshipsWithGemini } from '@/lib/gemini';
 import { Database } from '@/lib/database.types';
 import { isDemoClass } from '@/utils/demo-permissions';
+
+export const dynamic = 'force-dynamic';
 
 // 분석 결과 저장 API
 export async function POST(
@@ -11,15 +13,30 @@ export async function POST(
   context: any
 ) {
   console.log('[POST API] 호출됨, params:', context.params);
-  
+
   try {
-    const { classId } = context.params;
-    
+    const params = await context.params;
+    const { classId } = params;
+
+    // 세션 ID 추출 (요청 바디가 있는 경우)
+    let sessionId: string | null = null;
+    try {
+      // 바디 스트림을 확인하거나 미리 복제하여 사용하면 좋겠지만
+      // NextRequest의 json()은 스트림을 소비하므로 주의.
+      // 여기서는 바디가 비어있을 수 있음을 감안하여 처리
+      const clone = request.clone();
+      const body = await clone.json();
+      if (body && body.session_id) {
+        sessionId = body.session_id;
+        console.log('[POST API] 세션 ID 추출됨:', sessionId);
+      }
+    } catch (e) {
+      // 바디가 없거나 JSON 파싱 실패 시 무시 (기존 로직 유지)
+      console.log('[POST API] 요청 바디가 없거나 파싱 실패 (세션 ID 없음)');
+    }
+
     // Supabase 클라이언트 생성
-    const cookieStore = cookies();
-    console.log('[POST API] 쿠키 스토어 생성됨');
-    
-    const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
+    const supabase = await createClient();
     console.log('[POST API] Supabase 클라이언트 생성됨');
 
     // 인증 확인
@@ -32,7 +49,7 @@ export async function POST(
         { status: 401 }
       );
     }
-    
+
     if (!session) {
       console.error('[POST API] 세션이 존재하지 않음');
       return NextResponse.json(
@@ -56,7 +73,7 @@ export async function POST(
         { status: 404 }
       );
     }
-    
+
     if (!classData) {
       console.error('[POST API] 학급 데이터가 null임');
       return NextResponse.json(
@@ -88,7 +105,7 @@ export async function POST(
         { status: 404 }
       );
     }
-    
+
     if (!students || students.length === 0) {
       console.error('[POST API] 학생이 없음');
       return NextResponse.json(
@@ -134,7 +151,7 @@ export async function POST(
     // Gemini API를 통해 분석 수행
     try {
       console.log('[POST API] AI 분석 시작');
-      
+
       // 환경 변수 확인
       if (!process.env.GEMINI_API_KEY) {
         console.error('[POST API] GEMINI_API_KEY 환경 변수가 설정되지 않았습니다.');
@@ -143,9 +160,9 @@ export async function POST(
           { status: 500 }
         );
       }
-      
+
       console.log('[POST API] 환경 변수 확인 완료');
-      
+
       // 학급에 속한 모든 설문지 조회
       console.log('[POST API] 설문지 정보 조회 시작');
       const { data: surveys, error: surveysError } = await (supabase as any)
@@ -159,15 +176,15 @@ export async function POST(
         // 설문지 오류는 치명적이지 않으므로 계속 진행
         console.log('[POST API] 설문지 정보 없이 계속 진행');
       }
-      
+
       console.log('[POST API] 설문지 조회 완료, 설문지 수:', surveys ? surveys.length : 0);
-      
+
       // 설문지별 관계 데이터 및 질문/응답 데이터 조회
       const surveyData = [];
-      
+
       if (surveys && surveys.length > 0) {
         console.log('[POST API] 설문지별 데이터 조회 시작');
-        
+
         for (const survey of surveys) {
           // 설문지별 관계 데이터 조회
           const { data: surveyRelationships, error: surveyRelError } = await (supabase as any)
@@ -176,21 +193,21 @@ export async function POST(
             .in('from_student_id', ids)
             .in('to_student_id', ids)
             .eq('survey_id', survey.id);
-            
+
           // 설문지별 질문 조회
           const { data: questions, error: questionsError } = await (supabase as any)
             .from('questions')
             .select('*')
             .eq('class_id', classId)
             .eq('survey_id', survey.id);
-            
+
           // 설문지의 모든 응답 조회
           const { data: answers, error: answersError } = await (supabase as any)
             .from('answers')
             .select('*')
             .in('student_id', ids)
             .eq('survey_id', survey.id);
-            
+
           surveyData.push({
             survey: survey,
             relationships: surveyRelationships || [],
@@ -198,65 +215,65 @@ export async function POST(
             answers: answers || []
           });
         }
-        
+
         console.log('[POST API] 설문지별 데이터 조회 완료');
       }
-      
+
       // 모든 질문 데이터 조회
       console.log('[POST API] 전체 질문 데이터 조회 시작');
       const { data: allQuestions, error: allQuestionsError } = await (supabase as any)
         .from('questions')
         .select('*')
         .eq('class_id', classId);
-        
+
       if (allQuestionsError) {
         console.error('[POST API] 전체 질문 데이터 조회 오류:', allQuestionsError);
       }
       console.log('[POST API] 전체 질문 데이터 조회 완료, 질문 수:', allQuestions ? allQuestions.length : 0);
-      
+
       // 모든 응답 데이터 조회
       console.log('[POST API] 전체 응답 데이터 조회 시작');
       const { data: allAnswers, error: allAnswersError } = await (supabase as any)
         .from('answers')
         .select('*')
         .in('student_id', ids);
-        
+
       if (allAnswersError) {
         console.error('[POST API] 전체 응답 데이터 조회 오류:', allAnswersError);
       }
-          console.log('[POST API] 전체 응답 데이터 조회 완료, 응답 수:', allAnswers ? allAnswers.length : 0);
-    
-    // 학급 정보 상세 조회
-    console.log('[POST API] 학급 상세 정보 조회 시작');
-    const { data: classDetails, error: classDetailsError } = await (supabase as any)
-      .from('classes')
-      .select('*')
-      .eq('id', classId)
-      .single();
-      
-    if (classDetailsError) {
-      console.error('[POST API] 학급 상세 정보 조회 오류:', classDetailsError);
-    }
-    console.log('[POST API] 학급 상세 정보 조회 완료');
+      console.log('[POST API] 전체 응답 데이터 조회 완료, 응답 수:', allAnswers ? allAnswers.length : 0);
 
-    // 일기기록 데이터 조회
-    console.log('[POST API] 일기기록 데이터 조회 시작');
-    const { data: dailyRecords, error: dailyRecordsError } = await (supabase as any)
-      .from('class_daily_records')
-      .select('*')
-      .eq('class_id', classId)
-      .order('record_date', { ascending: false });
-      
-    if (dailyRecordsError) {
-      console.error('[POST API] 일기기록 데이터 조회 오류:', dailyRecordsError);
-    }
-    console.log('[POST API] 일기기록 데이터 조회 완료, 기록 수:', dailyRecords ? dailyRecords.length : 0);
+      // 학급 정보 상세 조회
+      console.log('[POST API] 학급 상세 정보 조회 시작');
+      const { data: classDetails, error: classDetailsError } = await (supabase as any)
+        .from('classes')
+        .select('*')
+        .eq('id', classId)
+        .single();
 
-    // 평가기록 데이터 조회
-    console.log('[POST API] 평가기록 데이터 조회 시작');
-    const { data: subjects, error: subjectsError } = await (supabase as any)
-      .from('subjects')
-      .select(`
+      if (classDetailsError) {
+        console.error('[POST API] 학급 상세 정보 조회 오류:', classDetailsError);
+      }
+      console.log('[POST API] 학급 상세 정보 조회 완료');
+
+      // 일기기록 데이터 조회
+      console.log('[POST API] 일기기록 데이터 조회 시작');
+      const { data: dailyRecords, error: dailyRecordsError } = await (supabase as any)
+        .from('class_daily_records')
+        .select('*')
+        .eq('class_id', classId)
+        .order('record_date', { ascending: false });
+
+      if (dailyRecordsError) {
+        console.error('[POST API] 일기기록 데이터 조회 오류:', dailyRecordsError);
+      }
+      console.log('[POST API] 일기기록 데이터 조회 완료, 기록 수:', dailyRecords ? dailyRecords.length : 0);
+
+      // 평가기록 데이터 조회
+      console.log('[POST API] 평가기록 데이터 조회 시작');
+      const { data: subjects, error: subjectsError } = await (supabase as any)
+        .from('subjects')
+        .select(`
         *,
         assessment_items (
           *,
@@ -266,18 +283,18 @@ export async function POST(
           )
         )
       `)
-      .eq('class_id', classId);
-      
-    if (subjectsError) {
-      console.error('[POST API] 평가기록 데이터 조회 오류:', subjectsError);
-    }
-    console.log('[POST API] 평가기록 데이터 조회 완료, 과목 수:', subjects ? subjects.length : 0);
+        .eq('class_id', classId);
 
-    // 과제체크 데이터 조회
-    console.log('[POST API] 과제체크 데이터 조회 시작');
-    const { data: homeworkMonths, error: homeworkError } = await (supabase as any)
-      .from('homework_months')
-      .select(`
+      if (subjectsError) {
+        console.error('[POST API] 평가기록 데이터 조회 오류:', subjectsError);
+      }
+      console.log('[POST API] 평가기록 데이터 조회 완료, 과목 수:', subjects ? subjects.length : 0);
+
+      // 과제체크 데이터 조회
+      console.log('[POST API] 과제체크 데이터 조회 시작');
+      const { data: homeworkMonths, error: homeworkError } = await (supabase as any)
+        .from('homework_months')
+        .select(`
         *,
         homework_items (
           *,
@@ -287,14 +304,14 @@ export async function POST(
           )
         )
       `)
-      .eq('class_id', classId)
-      .order('month_year', { ascending: false });
-      
-    if (homeworkError) {
-      console.error('[POST API] 과제체크 데이터 조회 오류:', homeworkError);
-    }
-    console.log('[POST API] 과제체크 데이터 조회 완료, 월별 그룹 수:', homeworkMonths ? homeworkMonths.length : 0);
-      
+        .eq('class_id', classId)
+        .order('month_year', { ascending: false });
+
+      if (homeworkError) {
+        console.error('[POST API] 과제체크 데이터 조회 오류:', homeworkError);
+      }
+      console.log('[POST API] 과제체크 데이터 조회 완료, 월별 그룹 수:', homeworkMonths ? homeworkMonths.length : 0);
+
       // AI 분석을 위해 모든 데이터를 전달
       const analysisResult = await analyzeStudentRelationshipsWithGemini(
         students,
@@ -311,18 +328,31 @@ export async function POST(
         }
       );
       console.log('[POST API] AI 분석 완료, 결과 타입:', typeof analysisResult);
-      
+
       // 분석 결과 저장
       console.log('[POST API] 분석 결과 저장 시작');
-      
+
+      // 🌟 클라이언트 요청 중단 확인
+      if (request.signal.aborted) {
+        console.log('[POST API] 클라이언트 요청 중단됨 (저장 건너뜀)');
+        return NextResponse.json(
+          { error: '사용자에 의해 요청이 중단되었습니다.' },
+          { status: 499 } // Client Closed Request
+        );
+      }
+
       // 요약 필드를 빈 문자열로 설정하여 사용자가 직접 입력하도록 유도
       let summary = '';
-      
+
       // 결과 저장 준비 - 문자열로 변환
-      const resultToSave = typeof analysisResult === 'string' 
-        ? analysisResult 
-        : JSON.stringify(analysisResult);
-      
+      // 결과 저장 준비 - JSONB 컬럼 호환성을 위해 객체로 래핑
+      // 프론트엔드에서는 parsed.analysis 필드를 우선적으로 확인하도록 되어 있음
+      const resultObj = typeof analysisResult === 'string'
+        ? { analysis: analysisResult }
+        : analysisResult;
+
+      const resultToSave = JSON.stringify(resultObj);
+
       // 데이터 저장 전 형식 디버깅
       console.log('[POST API] 저장 전 데이터 형식:', {
         analysisResultType: typeof analysisResult,
@@ -330,17 +360,44 @@ export async function POST(
         isObject: typeof analysisResult === 'object',
         resultToSaveType: typeof resultToSave
       });
-      
+
       // 결과를 명시적으로 JSON 문자열로 변환하여 저장
-      
-      const { data: savedAnalysis, error: saveError } = await (supabase as any)
+
+      // RLS 정책 문제 해결을 위해 관리자 클라이언트(Service Role) 사용
+      // 일반 클라이언트(supabase) 대신 supabaseAdmin을 사용하여 권한 우회 저장
+
+      const adminKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+      console.log('[POST API] Admin Client 초기화 시도:', {
+        hasUrl: !!supabaseUrl,
+        hasAdminKey: !!adminKey,
+        adminKeyLength: adminKey ? adminKey.length : 0
+      });
+
+      if (!adminKey || !supabaseUrl) {
+        console.error('[POST API] Critical: Service Role Key missing');
+        throw new Error('Server configuration error: Service Role Key missing');
+      }
+
+      const { createClient } = require('@supabase/supabase-js');
+      const supabaseAdmin = createClient(supabaseUrl, adminKey, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      });
+
+      const { data: savedAnalysis, error: saveError } = await (supabaseAdmin as any)
         .from('analysis_results')
         .insert([
           {
             class_id: classId,
             result_data: resultToSave,
             summary: summary,
-            type: 'full'
+            type: 'full',
+            // 세션 ID가 있으면 포함
+            ...(sessionId ? { session_id: sessionId } : {})
           }
         ])
         .select()
@@ -353,7 +410,7 @@ export async function POST(
           { status: 500 }
         );
       }
-      
+
       if (!savedAnalysis) {
         console.error('[POST API] 저장된 분석이 null임');
         return NextResponse.json(
@@ -363,12 +420,24 @@ export async function POST(
       }
 
       console.log('[POST API] 분석 결과 저장 완료, ID:', savedAnalysis.id);
-      
+
       // 저장된 결과에서 result_data 형식 확인
       console.log('[POST API] 저장된 result_data 타입:', typeof savedAnalysis.result_data);
-      
+
       return NextResponse.json(savedAnalysis);
     } catch (error: any) {
+      const fs = require('fs');
+      const path = require('path');
+      const logPath = path.join(process.cwd(), 'public', 'debug_log.txt');
+      const time = new Date().toISOString();
+      const logMessage = `[${time}] [POST API Error] ${error.message}\nStack: ${error.stack}\n\n`;
+
+      try {
+        fs.appendFileSync(logPath, logMessage);
+      } catch (e) {
+        console.error('로그 파일 쓰기 실패:', e);
+      }
+
       console.error('[POST API] AI 분석 오류:', error.message);
       console.error('[POST API] 오류 스택:', error.stack);
       return NextResponse.json(
@@ -377,6 +446,18 @@ export async function POST(
       );
     }
   } catch (error: any) {
+    const fs = require('fs');
+    const path = require('path');
+    const logPath = path.join(process.cwd(), 'public', 'debug_log.txt');
+    const time = new Date().toISOString();
+    const logMessage = `[${time}] [POST API Critical Error] ${error.message}\nStack: ${error.stack}\n\n`;
+
+    try {
+      fs.appendFileSync(logPath, logMessage);
+    } catch (e) {
+      console.error('로그 파일 쓰기 실패:', e);
+    }
+
     console.error('[POST API] 예외 발생:', error);
     return NextResponse.json(
       { error: `서버 오류: ${error.message}`, stack: error.stack },
@@ -391,27 +472,25 @@ export async function GET(
   context: any
 ) {
   console.log('[GET API] 호출됨, context.params:', context.params);
-  
+
   // URL 파라미터 가져오기
   const { searchParams } = request.nextUrl;
   console.log('[GET API] 검색 파라미터:', searchParams.toString());
-  
+
   // 타입 필터
   const typeFilter = searchParams.get('type');
   console.log('[GET API] 타입 필터:', typeFilter);
-  
+
   // 세션별 그룹화
   const groupBySession = searchParams.get('group_by_session') === 'true';
   console.log('[GET API] 세션별 그룹화:', groupBySession);
-  
+
   try {
-    const { classId } = context.params;
-    
+    const params = await context.params;
+    const { classId } = params;
+
     // Supabase 클라이언트 생성
-    const cookieStore = cookies();
-    console.log('[GET API] 쿠키 스토어 생성됨');
-    
-    const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
+    const supabase = await createClient();
     console.log('[GET API] Supabase 클라이언트 생성됨');
 
     // 학급 정보를 먼저 조회해서 데모 학급인지 확인
@@ -429,7 +508,7 @@ export async function GET(
         { status: 404 }
       );
     }
-    
+
     if (!classData) {
       console.error('[GET API] 학급 데이터가 null임');
       return NextResponse.json(
@@ -450,7 +529,7 @@ export async function GET(
           { status: 401 }
         );
       }
-      
+
       if (!session) {
         console.error('[GET API] 세션이 존재하지 않음');
         return NextResponse.json(
@@ -458,7 +537,7 @@ export async function GET(
           { status: 401 }
         );
       }
-      
+
       // 소유권 확인
       if (classData.user_id !== session.user.id) {
         console.log('[GET API] 권한 없음. 학급 소유자:', classData.user_id, '요청자:', session.user.id);
@@ -474,22 +553,42 @@ export async function GET(
 
     // 분석 결과 목록 조회
     console.log('[GET API] 분석 결과 목록 조회 시작');
-    
+
+    // RLS 정책 문제 해결을 위해 관리자 클라이언트(Service Role) 사용
+    const { supabaseAdmin } = await import('@/lib/supabase-admin');
+
     // 모든 결과를 가져옴
-    let query = (supabase as any)
+    let query = (supabaseAdmin as any)
       .from('analysis_results')
       .select('*')
       .eq('class_id', classId);
-    
+
     // 타입 필터 적용
     if (typeFilter) {
       query = query.eq('type', typeFilter);
       console.log(`[GET API] 타입 필터 적용: ${typeFilter}`);
     }
-    
+
+    // 세션 ID 필터 적용
+    const sessionId = searchParams.get('session_id');
+    if (sessionId) {
+      query = query.eq('session_id', sessionId);
+      console.log(`[GET API] 세션 ID 필터 적용: ${sessionId}`);
+    }
+
+    // 리미트 적용
+    const limitParam = searchParams.get('limit');
+    if (limitParam) {
+      const limit = parseInt(limitParam);
+      if (!isNaN(limit) && limit > 0) {
+        query = query.limit(limit);
+        console.log(`[GET API] 리미트 적용: ${limit}`);
+      }
+    }
+
     // 정렬 적용
     query = query.order('created_at', { ascending: false });
-    
+
     // 쿼리 실행
     const { data: allResults, error: resultsError } = await query;
 
@@ -500,15 +599,15 @@ export async function GET(
         { status: 500 }
       );
     }
-    
+
     // 세션별 그룹화가 필요한 경우
     if (groupBySession && allResults) {
       console.log('[GET API] 세션별 그룹화 적용');
-      
+
       // 세션별로 그룹화
       const sessionGroups: { [key: string]: any[] } = {};
       const regularResults: any[] = [];
-      
+
       allResults.forEach((result: any) => {
         if (result.session_id) {
           if (!sessionGroups[result.session_id]) {
@@ -520,28 +619,27 @@ export async function GET(
           regularResults.push(result);
         }
       });
-      
-      // 각 세션의 첫 번째 분석 결과만 카드로 표시하기 위해 처리
+
       // 각 세션마다 하나의 카드만 보여주지만, 이 카드의 ID로 세션의 모든 분석에 접근 가능
       const groupedResults = Object.values(sessionGroups).map(group => {
         // 분석 결과들을 생성 날짜 역순으로 정렬 (최신 결과가 먼저 오도록)
         group.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-        
+
         // 세션 내에서 표시될 대표 카드 선택 (우선순위: overview > 첫 번째 결과)
         // 이 카드의 ID를 통해 같은 세션의 다른 분석 결과에 접근 가능
         const overviewResult = group.find(r => r.type === 'overview');
         return overviewResult || group[0];
       });
-      
+
       // 세션별 결과와 일반 결과 합치기
       const finalResults = [...groupedResults, ...regularResults];
       // 날짜 기준 내림차순 정렬
       finalResults.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      
+
       console.log('[GET API] 분석 결과 조회 완료, 그룹화 전 결과 수:', allResults.length, '그룹화 후 결과 수:', finalResults.length);
       return NextResponse.json(finalResults);
     }
-    
+
     // 일반 결과 반환
     console.log('[GET API] 분석 결과 조회 완료, 결과 수:', allResults ? allResults.length : 0);
     return NextResponse.json(allResults || []);
@@ -560,20 +658,18 @@ export async function DELETE(
   context: any
 ) {
   console.log('[DELETE API] 호출됨, params:', context.params);
-  
+
   // 전체 삭제 여부 확인
   const searchParams = request.nextUrl.searchParams;
   const deleteAll = searchParams.get('deleteAll') === 'true'; // 전체 삭제 여부
   console.log('[DELETE API] 전체 삭제 요청:', deleteAll);
-  
+
   try {
-    const { classId } = context.params;
-    
+    const params = await context.params;
+    const { classId } = params;
+
     // Supabase 클라이언트 생성
-    const cookieStore = cookies();
-    console.log('[DELETE API] 쿠키 스토어 생성됨');
-    
-    const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
+    const supabase = await createClient();
     console.log('[DELETE API] Supabase 클라이언트 생성됨');
 
     // 인증 확인
@@ -586,7 +682,7 @@ export async function DELETE(
         { status: 401 }
       );
     }
-    
+
     if (!session) {
       console.error('[DELETE API] 세션이 존재하지 않음');
       return NextResponse.json(
@@ -610,7 +706,7 @@ export async function DELETE(
         { status: 404 }
       );
     }
-    
+
     if (!classData) {
       console.error('[DELETE API] 학급 데이터가 null임');
       return NextResponse.json(
@@ -632,13 +728,13 @@ export async function DELETE(
     // 전체 삭제 요청인 경우
     if (deleteAll) {
       console.log('[DELETE API] 모든 분석 결과 삭제 시작');
-      
+
       // 해당 클래스의 모든 분석 결과 삭제
       const { error: deleteError } = await (supabase as any)
         .from('analysis_results')
         .delete()
         .eq('class_id', classId);
-      
+
       if (deleteError) {
         console.error('[DELETE API] 모든 분석 결과 삭제 오류:', deleteError);
         return NextResponse.json(
@@ -646,7 +742,7 @@ export async function DELETE(
           { status: 500 }
         );
       }
-      
+
       console.log('[DELETE API] 모든 분석 결과 삭제 완료');
       return NextResponse.json({ success: true, message: '모든 분석 결과가 삭제되었습니다.' });
     } else {

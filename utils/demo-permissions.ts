@@ -58,7 +58,7 @@ export const canEditClass = (classData: ClassData, userId: string | null, userEm
     // 🔧 단, 관리자이거나 개발 모드에서는 편집 가능
     return isAdmin(userEmail) || isDevelopmentMode();
   }
-  
+
   // 일반 학급은 소유자만 편집 가능
   return classData.user_id === userId;
 };
@@ -71,7 +71,7 @@ export const canDeleteClass = (classData: ClassData, userId: string | null, user
   if (isDemoClass(classData)) {
     return false;
   }
-  
+
   // 일반 학급은 소유자만 삭제 가능
   return classData.user_id === userId;
 };
@@ -142,14 +142,22 @@ export const getDemoRelationEditMessage = (): string => {
 /**
  * 🆕 데모 학급에서 데이터 저장 시도를 차단하고 메시지를 반환하는 함수
  */
-export const handleDemoSaveAttempt = (classData: ClassData, action?: string): { 
-  canSave: boolean; 
+export const handleDemoSaveAttempt = (classData: ClassData, action?: string): {
+  canSave: boolean;
   message?: string;
   isDemo: boolean;
 } => {
   const isDemo = isDemoClass(classData);
-  
+
   if (isDemo) {
+    // 🔧 개발 모드에서는 저장 허용
+    if (isDevelopmentMode()) {
+      return {
+        canSave: true,
+        isDemo: true
+      };
+    }
+
     const actionText = action || "수정 내용";
     return {
       canSave: false,
@@ -157,7 +165,7 @@ export const handleDemoSaveAttempt = (classData: ClassData, action?: string): {
       isDemo: true
     };
   }
-  
+
   return {
     canSave: true,
     isDemo: false
@@ -179,7 +187,7 @@ export const isReadOnlyAccess = (classData: ClassData, userId: string | null, us
  * 액션 버튼 표시 여부 결정
  */
 export const shouldShowActionButtons = (
-  classData: ClassData, 
+  classData: ClassData,
   userId: string | null,
   action: 'edit' | 'delete' | 'add_student' | 'create_survey' | 'copy_demo',
   userEmail?: string | null
@@ -221,10 +229,10 @@ export const sortClassesWithDemoFirst = (classes: ClassData[]): ClassData[] => {
   return classes.sort((a, b) => {
     const aIsDemo = isDemoClass(a);
     const bIsDemo = isDemoClass(b);
-    
+
     if (aIsDemo && !bIsDemo) return -1;
     if (!aIsDemo && bIsDemo) return 1;
-    
+
     // 같은 타입이면 생성일 기준 정렬
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
@@ -238,11 +246,11 @@ export const getPermissionClasses = (classData: ClassData, userId: string | null
     const canEdit = canEditClass(classData, userId, userEmail);
     return canEdit ? "demo-class editable admin" : "demo-class read-only";
   }
-  
+
   if (canEditClass(classData, userId)) {
     return "user-class editable";
   }
-  
+
   return "other-class read-only";
 };
 
@@ -255,17 +263,17 @@ export const validateApiPermission = (
   operation: 'create' | 'read' | 'update' | 'delete' | 'copy',
   userEmail?: string | null
 ): { allowed: boolean; message?: string } => {
-  
+
   if (operation === 'read') {
     return { allowed: true };
   }
-  
+
   if (operation === 'copy' && isDemoClass(classData)) {
-    return canCopyDemoClass(userId) 
+    return canCopyDemoClass(userId)
       ? { allowed: true }
       : { allowed: false, message: "로그인이 필요합니다." };
   }
-  
+
   if (isDemoClass(classData)) {
     const canEdit = isAdmin(userEmail) || isDevelopmentMode();
     if (!canEdit) {
@@ -275,14 +283,14 @@ export const validateApiPermission = (
       };
     }
   }
-  
+
   if (classData.user_id !== userId && !isAdmin(userEmail)) {
     return {
       allowed: false,
       message: "이 학급을 수정할 권한이 없습니다."
     };
   }
-  
+
   return { allowed: true };
 };
 
@@ -290,8 +298,8 @@ export const validateApiPermission = (
  * 🆕 권한 상태 메시지 생성
  */
 export const getPermissionStatusMessage = (
-  classData: ClassData, 
-  userId: string | null, 
+  classData: ClassData,
+  userId: string | null,
   userEmail?: string | null
 ): string => {
   if (isDemoClass(classData)) {
@@ -303,11 +311,11 @@ export const getPermissionStatusMessage = (
     }
     return "👀 읽기 전용 모드입니다 (복사하여 편집 가능)";
   }
-  
+
   if (classData.user_id === userId) {
     return "✏️ 편집 가능한 내 학급입니다";
   }
-  
+
   return "👀 읽기 전용 학급입니다";
 };
 

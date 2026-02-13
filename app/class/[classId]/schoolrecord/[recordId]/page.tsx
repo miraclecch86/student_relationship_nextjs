@@ -35,12 +35,12 @@ async function fetchClassDetails(classId: string): Promise<Class | null> {
     .select('*')
     .eq('id', classId)
     .single();
-  
+
   if (error) {
     console.error('Error fetching class details:', error);
     return null;
   }
-  
+
   return data;
 }
 
@@ -52,29 +52,32 @@ async function fetchStudents(classId: string): Promise<Student[]> {
     .eq('class_id', classId)
     .order('display_order', { ascending: true })
     .order('created_at', { ascending: true });
-  
+
   if (error) {
     console.error('Error fetching students:', error);
     return [];
   }
-  
+
   return data;
 }
 
 // 생활기록부 조회 함수
-async function fetchSchoolRecord(recordId: string): Promise<SchoolRecord | null> {
-  const { data, error } = await (supabase as any)
-    .from('school_records')
-    .select('*')
-    .eq('id', recordId)
-    .single();
-  
-  if (error) {
+async function fetchSchoolRecord(classId: string, recordId: string): Promise<SchoolRecord | null> {
+  try {
+    const response = await fetch(`/api/class/${classId}/schoolrecord/${recordId}`);
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null;
+      }
+      throw new Error(`Error: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
     console.error('Error fetching school record:', error);
     return null;
   }
-  
-  return data;
 }
 
 export default function SchoolRecordDetailPage() {
@@ -82,34 +85,34 @@ export default function SchoolRecordDetailPage() {
   const router = useRouter();
   const classId = params.classId as string;
   const recordId = params.recordId as string;
-  
+
   // 학생별 표시 상태 관리
-  const [expandedStudents, setExpandedStudents] = useState<{[key: string]: boolean}>({});
-  
+  const [expandedStudents, setExpandedStudents] = useState<{ [key: string]: boolean }>({});
+
   // 복사된 학생 상태 관리
   const [copiedStudent, setCopiedStudent] = useState<string | null>(null);
-  
+
   // 학급 정보 조회
   const { data: classDetails, isLoading: isClassLoading } = useQuery({
     queryKey: ['classDetails', classId],
     queryFn: () => fetchClassDetails(classId),
     enabled: !!classId,
   });
-  
+
   // 학생 목록 조회
   const { data: students = [] } = useQuery({
     queryKey: ['students', classId],
     queryFn: () => fetchStudents(classId),
     enabled: !!classId,
   });
-  
+
   // 생활기록부 조회
   const { data: schoolRecord, isLoading: isRecordLoading } = useQuery({
-    queryKey: ['schoolRecord', recordId],
-    queryFn: () => fetchSchoolRecord(recordId),
-    enabled: !!recordId,
+    queryKey: ['schoolRecord', classId, recordId],
+    queryFn: () => fetchSchoolRecord(classId, recordId),
+    enabled: !!classId && !!recordId,
   });
-  
+
   // 생활기록부 내용 구문 분석 함수
   const parseSchoolRecord = (content: string) => {
     try {
@@ -120,19 +123,19 @@ export default function SchoolRecordDetailPage() {
       return '생활기록부 내용을 불러오는 중 오류가 발생했습니다.';
     }
   };
-  
+
   // 학생별 생활기록부 문구만 추출하는 함수
   const extractStudentRecords = (content: string) => {
-    const studentRecords: {[key: string]: string} = {};
-    
+    const studentRecords: { [key: string]: string } = {};
+
     try {
       const studentSections = content.split(/^## (.+?)$/gm);
-      
+
       // 첫 번째 요소는 헤더이므로 건너뜀
       for (let i = 1; i < studentSections.length; i += 2) {
         const studentName = studentSections[i].trim();
         const studentContent = studentSections[i + 1]?.trim() || '';
-        
+
         if (studentName && studentContent) {
           studentRecords[studentName] = studentContent;
         }
@@ -140,10 +143,10 @@ export default function SchoolRecordDetailPage() {
     } catch (error) {
       console.error('학생별 생활기록부 문구 추출 오류:', error);
     }
-    
+
     return studentRecords;
   };
-  
+
   // 학생 표시 상태 토글 함수
   const toggleStudent = (studentName: string) => {
     setExpandedStudents(prev => ({
@@ -151,18 +154,18 @@ export default function SchoolRecordDetailPage() {
       [studentName]: !prev[studentName]
     }));
   };
-  
+
   // 모든 학생 표시 상태 토글 함수
   const toggleAllStudents = (expand: boolean) => {
     const studentNames = Object.keys(extractStudentRecords(schoolRecord?.result_data || ''));
     const newState = studentNames.reduce((acc, name) => {
       acc[name] = expand;
       return acc;
-    }, {} as {[key: string]: boolean});
-    
+    }, {} as { [key: string]: boolean });
+
     setExpandedStudents(newState);
   };
-  
+
   // 학생별 문구 복사 함수
   const copyStudentRecord = (studentName: string, content: string) => {
     navigator.clipboard.writeText(content)
@@ -177,11 +180,11 @@ export default function SchoolRecordDetailPage() {
         toast.error('복사에 실패했습니다.');
       });
   };
-  
+
   // 전체 생활기록부 복사 함수
   const copyAllRecords = () => {
     if (!schoolRecord) return;
-    
+
     navigator.clipboard.writeText(schoolRecord.result_data)
       .then(() => {
         toast.success('전체 생활기록부 내용이 복사되었습니다.');
@@ -191,7 +194,7 @@ export default function SchoolRecordDetailPage() {
         toast.error('복사에 실패했습니다.');
       });
   };
-  
+
   if (isClassLoading || isRecordLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-gray-100">
@@ -225,15 +228,15 @@ export default function SchoolRecordDetailPage() {
         <header className="mb-8 bg-white p-4 rounded-lg shadow-md">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-2xl font-bold text-gray-900">{classDetails?.name} 생활기록부</h1>
-            
+
             <div className="flex items-center text-sm text-gray-500">
               <CalendarIcon className="w-4 h-4 mr-1" />
               {format(new Date(schoolRecord.created_at), 'yyyy년 MM월 dd일 HH:mm', { locale: ko })}
             </div>
           </div>
-          
+
           <p className="text-gray-600">{schoolRecord.summary || '학생별 생활기록부 문구입니다.'}</p>
-          
+
           <div className="mt-4 flex justify-end space-x-2">
             <button
               onClick={copyAllRecords}
@@ -262,12 +265,12 @@ export default function SchoolRecordDetailPage() {
         {/* 생활기록부 내용 */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-8">
           <h2 className="text-xl font-bold text-gray-900 mb-4">학생별 생활기록부 문구</h2>
-          
+
           {studentNames.length > 0 ? (
             <div className="space-y-4">
               {studentNames.map((studentName) => (
                 <div key={studentName} className="border border-gray-200 rounded-lg overflow-hidden">
-                  <div 
+                  <div
                     className="flex items-center justify-between p-4 bg-amber-50 cursor-pointer"
                     onClick={() => toggleStudent(studentName)}
                   >
@@ -297,7 +300,7 @@ export default function SchoolRecordDetailPage() {
                       )}
                     </div>
                   </div>
-                  
+
                   {expandedStudents[studentName] && (
                     <div className="p-4 bg-white">
                       <div className="prose max-w-none">
@@ -322,23 +325,23 @@ export default function SchoolRecordDetailPage() {
                         <ReactMarkdown
                           rehypePlugins={[rehypeRaw]}
                           components={{
-                            h1: ({node, ...props}) => <h1 className="text-2xl font-bold mb-4 text-gray-900" {...props} />,
-                            h2: ({node, ...props}) => <h2 className="text-xl font-bold mb-3 text-gray-800" {...props} />,
-                            h3: ({node, ...props}) => <h3 className="text-lg font-bold mb-2 text-gray-800" {...props} />,
-                            h4: ({node, ...props}) => <h4 className="text-base font-bold mb-2 text-gray-800" {...props} />,
-                            h5: ({node, ...props}) => <h5 className="text-sm font-bold mb-1 text-gray-800" {...props} />,
-                            p: ({node, ...props}) => <p className="mb-4 text-gray-700" {...props} />,
-                            ul: ({node, ...props}) => <ul className="list-disc ml-5 mb-4 text-gray-700" {...props} />,
-                            ol: ({node, ...props}) => <ol className="list-decimal ml-5 mb-4 text-gray-700" {...props} />,
-                            li: ({node, ...props}) => <li className="mb-1" {...props} />,
-                            a: ({node, ...props}) => <a className="text-amber-600 hover:underline" {...props} />,
-                            blockquote: ({node, ...props}) => <blockquote className="pl-4 border-l-4 border-gray-300 italic text-gray-700 mb-4" {...props} />,
-                            hr: ({node, ...props}) => <hr className="my-6 border-gray-300" {...props} />,
-                            code: ({node, ...props}) => <code className="bg-gray-100 px-1 rounded text-red-600" {...props} />,
-                            pre: ({node, ...props}) => <pre className="bg-gray-100 p-4 rounded overflow-x-auto mb-4" {...props} />,
-                            table: ({node, ...props}) => <div className="overflow-x-auto mb-4"><table className="min-w-full text-gray-700" {...props} /></div>,
-                            th: ({node, ...props}) => <th className="bg-gray-100 py-2 px-3 font-bold text-left" {...props} />,
-                            td: ({node, ...props}) => <td className="border-t border-gray-200 py-2 px-3" {...props} />,
+                            h1: ({ node, ...props }) => <h1 className="text-2xl font-bold mb-4 text-gray-900" {...props} />,
+                            h2: ({ node, ...props }) => <h2 className="text-xl font-bold mb-3 text-gray-800" {...props} />,
+                            h3: ({ node, ...props }) => <h3 className="text-lg font-bold mb-2 text-gray-800" {...props} />,
+                            h4: ({ node, ...props }) => <h4 className="text-base font-bold mb-2 text-gray-800" {...props} />,
+                            h5: ({ node, ...props }) => <h5 className="text-sm font-bold mb-1 text-gray-800" {...props} />,
+                            p: ({ node, ...props }) => <p className="mb-4 text-gray-700" {...props} />,
+                            ul: ({ node, ...props }) => <ul className="list-disc ml-5 mb-4 text-gray-700" {...props} />,
+                            ol: ({ node, ...props }) => <ol className="list-decimal ml-5 mb-4 text-gray-700" {...props} />,
+                            li: ({ node, ...props }) => <li className="mb-1" {...props} />,
+                            a: ({ node, ...props }) => <a className="text-amber-600 hover:underline" {...props} />,
+                            blockquote: ({ node, ...props }) => <blockquote className="pl-4 border-l-4 border-gray-300 italic text-gray-700 mb-4" {...props} />,
+                            hr: ({ node, ...props }) => <hr className="my-6 border-gray-300" {...props} />,
+                            code: ({ node, ...props }) => <code className="bg-gray-100 px-1 rounded text-red-600" {...props} />,
+                            pre: ({ node, ...props }) => <pre className="bg-gray-100 p-4 rounded overflow-x-auto mb-4" {...props} />,
+                            table: ({ node, ...props }) => <div className="overflow-x-auto mb-4"><table className="min-w-full text-gray-700" {...props} /></div>,
+                            th: ({ node, ...props }) => <th className="bg-gray-100 py-2 px-3 font-bold text-left" {...props} />,
+                            td: ({ node, ...props }) => <td className="border-t border-gray-200 py-2 px-3" {...props} />,
                           }}
                         >
                           {studentRecords[studentName]}

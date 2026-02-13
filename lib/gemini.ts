@@ -3,7 +3,8 @@ import { Student, Question, Answer, Relationship, Survey } from './supabase';
 
 // Gemini 모델 상수 정의
 const GEMINI_MODELS = {
-  'flash': 'gemini-2.5-flash-preview-05-20'
+  'flash': 'gemini-3-flash-preview',
+  'pro': 'gemini-3-pro-preview'
 } as const;
 
 // 공통 전문가 정체성 설정
@@ -278,11 +279,11 @@ const STUDENT_ANALYSIS_PROMPT = `${AI_EXPERT_IDENTITY}
 
 
 // Gemini API 호출을 위한 공통 함수
-async function callGemini(systemPrompt: string, userContent: string, modelType: 'flash' = 'flash', temperature: number = 0.1): Promise<string> {
+async function callGemini(systemPrompt: string, userContent: string, modelType: 'flash' | 'pro' = 'pro', temperature: number = 0.5): Promise<string> {
   try {
     // 환경 변수에서 API 키 가져오기
     const apiKey = process.env.GEMINI_API_KEY;
-    
+
     if (!apiKey) {
       console.error('Gemini API 키가 설정되지 않았습니다. 환경 변수를 확인해주세요.');
       console.error('환경 변수 GEMINI_API_KEY를 .env.local 파일과 Vercel 프로젝트 설정에 추가해야 합니다.');
@@ -294,10 +295,10 @@ async function callGemini(systemPrompt: string, userContent: string, modelType: 
     // GoogleGenerativeAI 클라이언트 생성
     const genAI = new GoogleGenerativeAI(apiKey);
     const selectedModel = GEMINI_MODELS[modelType];
-    
+
     console.log('사용할 모델:', selectedModel);
-    
-    const model = genAI.getGenerativeModel({ 
+
+    const model = genAI.getGenerativeModel({
       model: selectedModel,
       generationConfig: {
         temperature: temperature,
@@ -309,23 +310,23 @@ async function callGemini(systemPrompt: string, userContent: string, modelType: 
 
     // 시스템 프롬프트와 사용자 콘텐츠를 결합
     const prompt = `${systemPrompt}\n\n${userContent}`;
-    
+
     console.log('Gemini API 요청 시작...');
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
-    
+
     console.log('Gemini API 응답 성공');
     return text;
   } catch (error: any) {
     console.error('Gemini API 호출 상세 오류:', error);
-    
+
     // 403 에러 특별 처리
     if (error.message && error.message.includes('403')) {
       console.error('403 Forbidden 에러: API 키 권한 또는 모델 접근 권한 문제');
       throw new Error('API 접근 권한이 없습니다. API 키나 모델 권한을 확인해주세요.');
     }
-    
+
     // 기타 에러
     throw error;
   }
@@ -350,21 +351,21 @@ export async function analyzeStudentRelationshipsWithGemini(
     subjects?: any[],
     homeworkMonths?: any[]
   },
-  modelType: 'flash' = 'flash'
+  modelType: 'flash' | 'pro' = 'pro'
 ): Promise<string> {
   try {
     // 분석에 필요한 데이터 준비
     const analysisData = {
       // 학급 정보
       class: additionalData?.classDetails || { id: "unknown" },
-      
+
       // 학생 정보
       students: students.map(s => ({
         id: s.id,
         name: s.name,
         gender: s.gender
       })),
-      
+
       // 기본 관계 정보 (설문과 연결되지 않은)
       baseRelationships: relationships.map(r => ({
         선택한학생: students.find(s => s.id === r.from_student_id)?.name || r.from_student_id,
@@ -374,13 +375,13 @@ export async function analyzeStudentRelationshipsWithGemini(
         to: students.find(s => s.id === r.to_student_id)?.name || r.to_student_id,
         type: r.relation_type
       })),
-      
+
       // 기본 질문&응답 정보
       questions: questions ? questions.map(q => ({
         id: q.id,
         text: q.question_text
       })) : [],
-      
+
       answers: answers ? answers.map(a => {
         const question = questions?.find(q => q.id === a.question_id);
         const student = students.find(s => s.id === a.student_id);
@@ -390,7 +391,7 @@ export async function analyzeStudentRelationshipsWithGemini(
           answer: a.answer_text
         };
       }) : [],
-      
+
       // 설문 정보
       surveys: additionalData?.surveys?.map(survey => ({
         id: survey.id,
@@ -398,7 +399,7 @@ export async function analyzeStudentRelationshipsWithGemini(
         description: survey.description,
         created_at: survey.created_at
       })) || [],
-      
+
       // 설문별 상세 정보
       surveyDetails: additionalData?.surveyData?.map(sd => {
         return {
@@ -499,34 +500,34 @@ export async function analyzeClassOverviewWithGemini(
     subjects?: any[],
     homeworkMonths?: any[]
   },
-  modelType: 'flash' = 'flash'
+  modelType: 'flash' | 'pro' = 'pro'
 ): Promise<string> {
   try {
     // 분석에 필요한 데이터 준비 (기존 함수와 동일한 방식)
     const analysisData = {
       // 학급 정보
       class: additionalData?.classDetails || { id: "unknown" },
-      
+
       // 학생 정보
       students: students.map(s => ({
         id: s.id,
         name: s.name,
         gender: s.gender
       })),
-      
+
       // 기본 관계 정보 (설문과 연결되지 않은)
       baseRelationships: relationships.map(r => ({
         from: students.find(s => s.id === r.from_student_id)?.name || r.from_student_id,
         to: students.find(s => s.id === r.to_student_id)?.name || r.to_student_id,
         type: r.relation_type
       })),
-      
+
       // 기본 질문&응답 정보
       questions: questions ? questions.map(q => ({
         id: q.id,
         text: q.question_text
       })) : [],
-      
+
       answers: answers ? answers.map(a => {
         const question = questions?.find(q => q.id === a.question_id);
         const student = students.find(s => s.id === a.student_id);
@@ -536,7 +537,7 @@ export async function analyzeClassOverviewWithGemini(
           answer: a.answer_text
         };
       }) : [],
-      
+
       // 설문 정보
       surveys: additionalData?.surveys?.map(survey => ({
         id: survey.id,
@@ -544,7 +545,7 @@ export async function analyzeClassOverviewWithGemini(
         description: survey.description,
         created_at: survey.created_at
       })) || [],
-      
+
       // 설문별 상세 정보
       surveyDetails: additionalData?.surveyData?.map(sd => {
         return {
@@ -644,28 +645,28 @@ export async function analyzeStudentGroupWithGemini(
     subjects?: any[],
     homeworkMonths?: any[]
   },
-  modelType: 'flash' = 'flash'
+  modelType: 'flash' | 'pro' = 'pro'
 ): Promise<string> {
   try {
     // 분석에 필요한 데이터 준비
     const analysisData = {
       // 학급 정보
       class: additionalData?.classDetails || { id: "unknown" },
-      
+
       // 그룹 학생 정보
       groupStudents: students.map(s => ({
         id: s.id,
         name: s.name,
         gender: s.gender
       })),
-      
+
       // 전체 학생 정보 (참조용)
       allStudents: additionalData?.allStudents?.map(s => ({
         id: s.id,
         name: s.name,
         gender: s.gender
       })) || [],
-      
+
       // 그룹 내 관계 정보 (현재 그룹 학생들과 관련된 관계만 필터링)
       groupRelationships: relationships
         .filter(r => {
@@ -675,32 +676,32 @@ export async function analyzeStudentGroupWithGemini(
           return fromInGroup || toInGroup;
         })
         .map(r => ({
-          선택한학생: students.find(s => s.id === r.from_student_id)?.name || 
-                    additionalData?.allStudents?.find(s => s.id === r.from_student_id)?.name || 
-                    r.from_student_id,
-          선택받은학생: students.find(s => s.id === r.to_student_id)?.name || 
-                     additionalData?.allStudents?.find(s => s.id === r.to_student_id)?.name || 
-                     r.to_student_id,
+          선택한학생: students.find(s => s.id === r.from_student_id)?.name ||
+            additionalData?.allStudents?.find(s => s.id === r.from_student_id)?.name ||
+            r.from_student_id,
+          선택받은학생: students.find(s => s.id === r.to_student_id)?.name ||
+            additionalData?.allStudents?.find(s => s.id === r.to_student_id)?.name ||
+            r.to_student_id,
           관계유형: r.relation_type,
-          from: students.find(s => s.id === r.from_student_id)?.name || 
-                additionalData?.allStudents?.find(s => s.id === r.from_student_id)?.name || 
-                r.from_student_id,
-          to: students.find(s => s.id === r.to_student_id)?.name || 
-              additionalData?.allStudents?.find(s => s.id === r.to_student_id)?.name || 
-              r.to_student_id,
+          from: students.find(s => s.id === r.from_student_id)?.name ||
+            additionalData?.allStudents?.find(s => s.id === r.from_student_id)?.name ||
+            r.from_student_id,
+          to: students.find(s => s.id === r.to_student_id)?.name ||
+            additionalData?.allStudents?.find(s => s.id === r.to_student_id)?.name ||
+            r.to_student_id,
           type: r.relation_type,
           // 현재 그룹 학생이 관련된 관계인지 표시
           isGroupInternal: students.some(s => s.id === r.from_student_id) && students.some(s => s.id === r.to_student_id),
           isGroupOutgoing: students.some(s => s.id === r.from_student_id) && !students.some(s => s.id === r.to_student_id),
           isGroupIncoming: !students.some(s => s.id === r.from_student_id) && students.some(s => s.id === r.to_student_id)
         })),
-      
+
       // 기본 질문&응답 정보
       questions: questions ? questions.map(q => ({
         id: q.id,
         text: q.question_text
       })) : [],
-      
+
       answers: answers ? answers
         .filter(a => students.some(s => s.id === a.student_id)) // 현재 그룹 학생의 답변만 필터링
         .map(a => {
@@ -712,7 +713,7 @@ export async function analyzeStudentGroupWithGemini(
             answer: a.answer_text
           };
         }) : [],
-      
+
       // 설문 정보
       surveys: additionalData?.surveys?.map(survey => ({
         id: survey.id,
@@ -720,7 +721,7 @@ export async function analyzeStudentGroupWithGemini(
         description: survey.description,
         created_at: survey.created_at
       })) || [],
-      
+
       // 설문별 상세 정보
       surveyDetails: additionalData?.surveyData?.map(sd => {
         return {
@@ -738,19 +739,19 @@ export async function analyzeStudentGroupWithGemini(
               return fromInGroup || toInGroup;
             })
             .map(r => ({
-              선택한학생: students.find(s => s.id === r.from_student_id)?.name || 
-                        additionalData?.allStudents?.find(s => s.id === r.from_student_id)?.name || 
-                        r.from_student_id,
-              선택받은학생: students.find(s => s.id === r.to_student_id)?.name || 
-                         additionalData?.allStudents?.find(s => s.id === r.to_student_id)?.name || 
-                         r.to_student_id,
+              선택한학생: students.find(s => s.id === r.from_student_id)?.name ||
+                additionalData?.allStudents?.find(s => s.id === r.from_student_id)?.name ||
+                r.from_student_id,
+              선택받은학생: students.find(s => s.id === r.to_student_id)?.name ||
+                additionalData?.allStudents?.find(s => s.id === r.to_student_id)?.name ||
+                r.to_student_id,
               관계유형: r.relation_type,
-              from: students.find(s => s.id === r.from_student_id)?.name || 
-                    additionalData?.allStudents?.find(s => s.id === r.from_student_id)?.name || 
-                    r.from_student_id,
-              to: students.find(s => s.id === r.to_student_id)?.name || 
-                  additionalData?.allStudents?.find(s => s.id === r.to_student_id)?.name || 
-                  r.to_student_id,
+              from: students.find(s => s.id === r.from_student_id)?.name ||
+                additionalData?.allStudents?.find(s => s.id === r.from_student_id)?.name ||
+                r.from_student_id,
+              to: students.find(s => s.id === r.to_student_id)?.name ||
+                additionalData?.allStudents?.find(s => s.id === r.to_student_id)?.name ||
+                r.to_student_id,
               type: r.relation_type
             })),
           questions: sd.questions.map(q => ({
@@ -873,7 +874,7 @@ export async function generateSchoolRecordWithGemini(
     subjects?: any[],
     homeworkMonths?: any[]
   },
-  modelType: 'flash' = 'flash'
+  modelType: 'flash' | 'pro' = 'pro'
 ): Promise<string> {
   try {
     // 분석에 필요한 데이터를 더 체계적으로 준비
@@ -886,7 +887,7 @@ export async function generateSchoolRecordWithGemini(
         grade: additionalData?.classDetails?.grade || "알 수 없음",
         year: new Date().getFullYear()
       },
-      
+
       // 학생 정보 (개별 특성 포함)
       students: students.map((student: any) => {
         // 해당 학생과 관련된 모든 관계 정보 수집
@@ -895,7 +896,7 @@ export async function generateSchoolRecordWithGemini(
           outgoing: relationships.filter(r => r.from_student_id === student.id).map(r => ({
             target: students.find(s => s.id === r.to_student_id)?.name || r.to_student_id,
             type: r.relation_type,
-            surveyContext: additionalData?.surveyData?.find(sd => 
+            surveyContext: additionalData?.surveyData?.find(sd =>
               sd.relationships.some(sr => sr.id === r.id)
             )?.survey?.name || "기본 관계"
           })),
@@ -903,7 +904,7 @@ export async function generateSchoolRecordWithGemini(
           incoming: relationships.filter(r => r.to_student_id === student.id).map(r => ({
             from: students.find(s => s.id === r.from_student_id)?.name || r.from_student_id,
             type: r.relation_type,
-            surveyContext: additionalData?.surveyData?.find(sd => 
+            surveyContext: additionalData?.surveyData?.find(sd =>
               sd.relationships.some(sr => sr.id === r.id)
             )?.survey?.name || "기본 관계"
           }))
@@ -912,10 +913,10 @@ export async function generateSchoolRecordWithGemini(
         // 해당 학생의 모든 설문 답변 수집
         const studentAnswers = answers?.filter(a => a.student_id === student.id).map((answer: any) => {
           const question = questions?.find(q => q.id === answer.question_id);
-          const surveyContext = additionalData?.surveyData?.find(sd => 
+          const surveyContext = additionalData?.surveyData?.find(sd =>
             sd.answers.some(sa => sa.id === answer.id)
           );
-          
+
           return {
             question: question?.question_text || "알 수 없는 질문",
             answer: answer.answer_text,
@@ -934,19 +935,19 @@ export async function generateSchoolRecordWithGemini(
           relationshipSummary: {
             totalOutgoing: studentRelationships.outgoing.length,
             totalIncoming: studentRelationships.incoming.length,
-            popularityScore: studentRelationships.incoming.filter(r => 
+            popularityScore: studentRelationships.incoming.filter(r =>
               ['친한', '친해질래'].includes(r.type)
             ).length,
-            conflictIndicators: studentRelationships.incoming.filter(r => 
+            conflictIndicators: studentRelationships.incoming.filter(r =>
               r.type === '안친한'
             ).length,
-            outgoingPositive: studentRelationships.outgoing.filter(r => 
+            outgoingPositive: studentRelationships.outgoing.filter(r =>
               ['친한', '친해질래'].includes(r.type)
             ).length
           }
         };
       }),
-      
+
       // 시간대별 설문 정보 (변화 추적용)
       timelineData: additionalData?.surveys?.map(survey => ({
         surveyName: survey.name,
@@ -960,7 +961,7 @@ export async function generateSchoolRecordWithGemini(
         totalStudents: students.length,
         totalRelationships: relationships.length,
         averageRelationshipsPerStudent: relationships.length / students.length,
-        positiveRelationshipRatio: relationships.filter(r => 
+        positiveRelationshipRatio: relationships.filter(r =>
           ['친한', '친해질래'].includes(r.relation_type)
         ).length / relationships.length,
         surveyCount: additionalData?.surveys?.length || 0
@@ -1004,20 +1005,55 @@ export async function generateSchoolRecordWithGemini(
       })) || []
     };
 
-    const userContent = `다음 데이터를 기반으로 각 학생별 생활기록부 문구를 작성해주세요. 
+    // 생활기록부 문구 생성 전용 프롬프트 (다수 학생 일괄 처리용)
+    const SCHOOL_RECORD_PROMPT = `${AI_EXPERT_IDENTITY}
 
-**중요 지시사항:**
-1. 반드시 각 학생의 이름을 ### 헤더로 시작하세요
-2. 모든 학생에 대해 동일한 구조를 유지하세요  
-3. **핵심만 간결하게!** 각 섹션당 2-3줄, 활동 제안은 1-2줄로 제한
-4. 토큰 한계 내에서 모든 학생 분석을 완료하세요
-5. 학생 간 구분을 위해 "---" 사용하세요
-6. **중요**: 학생 이름 뒤에 (남), (여) 성별 표시를 절대 추가하지 마세요
+**🚨 필수 데이터 검증 및 품질 관리:**
+1. **학생 기본정보 정확성 확인**: 분석 전 반드시 각 학생의 성별(gender), 이름을 정확히 확인하세요.
+2. **모든 학생 분석 필수**: 제공된 학생 목록에 있는 **모든 학생**에 대해 분석을 생성해야 합니다. 중간에 멈추지 마세요.
+3. **학생 간 구분**: 각 학생의 분석은 반드시 \`## [학생명]\` 헤더로 시작해야 합니다.
+
+**📝 작성 가이드라인:**
+- **전체 학생 처리**: 한 번의 응답으로 리스트에 있는 **모든 학생**의 생활기록부 문구를 작성하세요.
+- **간결성**: 각 학생당 핵심적인 내용만 간결하게 작성하세요. (전체 400-500자 내외)
+- **어조**: 긍정적이고 교육적인 어조를 유지하며, 관찰된 사실을 바탕으로 발전 가능성을 언급하세요.
+- **형식 준수**: 아래 형식을 정확히 지켜주세요. 헤더는 반드시 \`##\` (H2)를 사용해야 프론트엔드에서 파싱할 수 있습니다.
+
+**✅ 필수 준수 형식:**
+
+## [학생명]
+
+### 🔍 관계 및 사회성
+교우 관계의 특징, 소통 스타일, 협력 태도 등을 2-3문장으로 요약.
+
+### 🧠 학습 및 행동 특성
+수업 태도, 과제 수행 능력, 자기 주도성, 규칙 준수 등을 2-3문장으로 요약.
+
+### ✨ 행동 발달 종합 의견
+학생의 강점과 잠재력, 교사의 따뜻한 격려가 담긴 종합 의견을 3-4문장으로 작성.
+
+---
+
+(이어서 다음 학생...)
+
+**❌ 절대 금지사항:**
+- 학생 이름 뒤에 (남), (여) 표시 금지
+- \`###\` 헤더 사용 금지 (반드시 \`##\` 사용)
+- 일부 학생만 작성하고 중단하는 것 금지
+- 마크다운 코드 블록(\`\`\`)으로 감싸지 말 것
+`;
+
+    const userContent = `다음 데이터를 기반으로 학급 내 **모든 학생**의 생활기록부 문구를 작성해주세요. 
+    
+    **중요 지시사항:**
+    1. **반드시 \`## [학생명]\` 헤더**를 사용하여 각 학생을 구분하세요. (파싱 로직이 \`##\`를 기준으로 작동함)
+    2. 제공된 리스트의 **모든 학생**을 빠짐없이 작성하세요.
+    3. 각 학생마다 관계/학습/종합의 3개 섹션을 포함하세요.
     
     데이터: 
     ${JSON.stringify(analysisData, null, 2)}`;
 
-    return await callGemini(STUDENT_ANALYSIS_PROMPT, userContent, modelType, 0.3);
+    return await callGemini(SCHOOL_RECORD_PROMPT, userContent, modelType, 0.3);
   } catch (error: any) {
     console.error('Gemini 생활기록부 생성 API 호출 오류:', error);
     throw error;
@@ -1070,10 +1106,10 @@ ${content}
 위 상황과 카테고리에 맞는 한 문장의 구체적이고 실용적인 안전 수칙을 생성해주세요.
 중요: 일반 텍스트로만 작성하고 마크다운 형식은 사용하지 마세요.`;
 
-    return await callGemini(systemPrompt, userContent, 'flash', 0.3);
+    return await callGemini(systemPrompt, userContent, 'pro', 0.3);
   } catch (error) {
     console.error('Gemini 안전 수칙 생성 오류:', error);
-    
+
     // 폴백 템플릿
     const fallbackMessages: { [key: string]: string[] } = {
       '교실안전': [
@@ -1095,7 +1131,7 @@ ${content}
 
     const messages = fallbackMessages[category] || ['안전에 주의하며 활동합니다.'];
     const selectedMessage = messages[Math.floor(Math.random() * messages.length)];
-    
+
     return `🔔 ${category} 안전 수칙: ${selectedMessage}`;
   }
 }
@@ -1139,11 +1175,11 @@ export async function generateAnnouncementWithGemini({
 
     // 키워드가 있는 경우와 없는 경우를 구분하여 처리
     const hasKeywords = keywords && keywords.trim().length > 0;
-    
+
     // 안전 카테고리인지 확인 (교실안전, 교통안전, 운동장안전)
     const safetyCategories = ['교실안전', '교통안전', '운동장안전'];
     const isSafetyKeyword = hasKeywords && safetyCategories.includes(keywords.trim());
-    
+
     const userContent = `**학급 정보:**
 - 학급명: ${className}
 
@@ -1153,18 +1189,18 @@ ${keywords}
 ` : ''}**활동 상세 내용:**
 ${details}
 
-${hasKeywords && !isSafetyKeyword ? 
-  '위 활동과 상세 내용을 바탕으로 내일 일정을 안내하는 따뜻하고 친근한 알림장을 작성해주세요.' : 
-  '상세 내용을 바탕으로 내일 일정을 안내하는 따뜻하고 친근한 알림장을 작성해주세요.'
-}
+${hasKeywords && !isSafetyKeyword ?
+        '위 활동과 상세 내용을 바탕으로 내일 일정을 안내하는 따뜻하고 친근한 알림장을 작성해주세요.' :
+        '상세 내용을 바탕으로 내일 일정을 안내하는 따뜻하고 친근한 알림장을 작성해주세요.'
+      }
 
 중요: 일반 텍스트로만 작성하고 마크다운 형식은 사용하지 마세요. 날짜나 요일, 안전 관련 내용은 포함하지 마세요. 
 **단락별로 빈 줄을 넣어 구분해주세요**: 1) 활동 소개 2) 시간 안내 3) 준비사항/협조 요청 4) 마무리 인사`;
 
-    return await callGemini(systemPrompt, userContent, 'flash', 0.3);
+    return await callGemini(systemPrompt, userContent, 'pro', 0.3);
   } catch (error) {
     console.error('Gemini AI 오류:', error);
-    
+
     // 기타 오류의 경우 폴백 템플릿 반환
     return generateFallbackAnnouncement({ keywords, details, className, date });
   }
@@ -1178,7 +1214,7 @@ function generateFallbackAnnouncement({
   date
 }: AnnouncementRequest): string {
   const hasKeywords = keywords && keywords.trim().length > 0;
-  
+
   return `내일 있을 활동에 대해 안내드립니다.
 
 ${hasKeywords ? `📅 내일의 주요 활동: ${keywords}

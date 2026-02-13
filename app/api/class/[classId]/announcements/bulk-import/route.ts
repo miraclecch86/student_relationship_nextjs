@@ -10,10 +10,10 @@ export async function POST(
     console.log('=== Announcement Bulk Import API 호출됨 ===');
     const { classId } = await context.params;
     console.log('Class ID:', classId);
-    
+
     const requestBody = await request.json();
     console.log('Request body keys:', Object.keys(requestBody));
-    
+
     const { announcements } = requestBody;
     console.log('Announcements count:', announcements?.length);
 
@@ -26,11 +26,12 @@ export async function POST(
     }
 
     console.log('Creating supabase client...');
-    const cookieStore = cookies();
+    console.log('Creating supabase client...');
+    const cookieStore = await cookies();
     const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
 
     console.log('Sample announcement structure:', announcements[0]);
-    
+
     // 각 알림장을 처리
     const savedAnnouncements = [];
     for (const announcement of announcements) {

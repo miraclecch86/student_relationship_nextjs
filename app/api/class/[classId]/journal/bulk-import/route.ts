@@ -10,10 +10,10 @@ export async function POST(
     console.log('=== Bulk Import API 호출됨 ===');
     const { classId } = await context.params;
     console.log('Class ID:', classId);
-    
+
     const requestBody = await request.json();
     console.log('Request body keys:', Object.keys(requestBody));
-    
+
     const { records } = requestBody;
     console.log('Records count:', records?.length);
 
@@ -26,11 +26,12 @@ export async function POST(
     }
 
     console.log('Creating supabase client...');
-    const cookieStore = cookies();
+    console.log('Creating supabase client...');
+    const cookieStore = await cookies();
     const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
 
     console.log('Sample record structure:', records[0]);
-    
+
     // 모든 기록을 한 번에 삽입
     console.log('Inserting records to database...');
     const { data, error } = await supabase

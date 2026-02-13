@@ -15,8 +15,9 @@ export async function GET(
 ) {
   try {
     const { classId, studentId } = await params;
-    const supabase = createRouteHandlerClient({ cookies });
-    
+    const cookieStore = await cookies();
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+
     // 사용자 인증 확인
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
@@ -69,7 +70,7 @@ export async function GET(
       return NextResponse.json({ error: '학생을 찾을 수 없습니다.' }, { status: 404 });
     }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       data: student as StudentForClient
     });
   } catch (error) {
@@ -85,8 +86,9 @@ export async function PATCH(
 ) {
   try {
     const { classId, studentId } = await params;
-    const supabase = createRouteHandlerClient({ cookies });
-    
+    const cookieStore = await cookies();
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+
     // 사용자 인증 확인
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
@@ -134,7 +136,7 @@ export async function PATCH(
     if (updateData.student_login_id !== undefined) {
       // 빈 문자열을 null로 변환
       const loginId = updateData.student_login_id === '' ? null : updateData.student_login_id;
-      
+
       // 로그인 ID 중복 확인 (다른 학생과 중복되지 않도록, null이 아닌 경우만)
       if (loginId) {
         const { data: duplicateCheck } = await (supabase as any)
@@ -226,7 +228,7 @@ export async function PATCH(
       return NextResponse.json({ error: '학생 정보 업데이트에 실패했습니다.' }, { status: 500 });
     }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       data: updatedStudent as StudentForClient,
       message: '학생 정보가 성공적으로 업데이트되었습니다.'
     });

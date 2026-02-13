@@ -39,12 +39,12 @@ async function fetchClassDetails(classId: string): Promise<Class | null> {
     .select('*')
     .eq('id', classId)
     .single();
-  
+
   if (error) {
     console.error('Error fetching class details:', error);
     return null;
   }
-  
+
   return data;
 }
 
@@ -56,54 +56,55 @@ async function fetchStudents(classId: string): Promise<Student[]> {
     .eq('class_id', classId)
     .order('display_order', { ascending: true })
     .order('created_at', { ascending: true });
-  
+
   if (error) {
     console.error('Error fetching students:', error);
     return [];
   }
-  
+
   return data;
 }
 
-// 분석 결과 조회 함수
-async function fetchAnalysisResult(analysisId: string): Promise<AnalysisResult | null> {
-  const { data, error } = await (supabase as any)
-    .from('analysis_results')
-    .select('*')
-    .eq('id', analysisId)
-    .single();
-  
-  if (error) {
+// 분석 결과 조회 함수 (API 사용)
+async function fetchAnalysisResult(classId: string, analysisId: string): Promise<AnalysisResult | null> {
+  try {
+    const response = await fetch(`/api/class/${classId}/analysis/${analysisId}`);
+
+    if (!response.ok) {
+      console.error(`Error fetching analysis result: ${response.status} ${response.statusText}`);
+      return null;
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
     console.error('Error fetching analysis result:', error);
     return null;
   }
-  
-  return data;
 }
 
 // 특정 타입의 최신 분석 결과 조회 함수
 async function fetchLatestAnalysisResultByType(classId: string, type: string): Promise<AnalysisResult | null> {
-  const { data, error } = await (supabase as any)
-    .from('analysis_results')
-    .select('*')
-    .eq('class_id', classId)
-    .eq('type', type)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
-  
-  if (error) {
+  try {
+    const response = await fetch(`/api/class/${classId}/analysis?type=${type}&limit=1`);
+
+    if (!response.ok) {
+      console.error(`Error fetching ${type} analysis result: ${response.status}`);
+      return null;
+    }
+
+    const data = await response.json();
+    return data && data.length > 0 ? data[0] : null;
+  } catch (error) {
     console.error(`Error fetching ${type} analysis result:`, error);
     return null;
   }
-  
-  return data;
 }
 
 // 직접 AI API를 호출하여 새 분석 실행하기
 async function runAnalysis(classId: string, type: string): Promise<AnalysisResult> {
   let url = '';
-  
+
   switch (type) {
     case 'overview':
       url = `/api/class/${classId}/analysis/overview`;
@@ -135,7 +136,7 @@ async function runAnalysis(classId: string, type: string): Promise<AnalysisResul
     default:
       url = `/api/class/${classId}/analysis`;
   }
-  
+
   try {
     const response = await fetch(url, {
       method: 'POST',
@@ -143,11 +144,11 @@ async function runAnalysis(classId: string, type: string): Promise<AnalysisResul
         'Content-Type': 'application/json',
       },
     });
-    
+
     if (!response.ok) {
       throw new Error(`API 요청 실패: ${response.status}`);
     }
-    
+
     const data = await response.json();
     return data;
   } catch (error) {
@@ -162,31 +163,31 @@ export default function AnalysisDetailPage() {
   const queryClient = useQueryClient();
   const classId = params.classId as string;
   const analysisId = params.analysisId as string;
-  
+
   // 활성 탭 상태
   const [activeTab, setActiveTab] = useState<string>('overview');
-  
+
   // 학급 정보 조회
   const { data: classDetails, isLoading: isClassLoading } = useQuery({
     queryKey: ['classDetails', classId],
     queryFn: () => fetchClassDetails(classId),
     enabled: !!classId,
   });
-  
+
   // 학생 목록 조회
   const { data: students = [] } = useQuery({
     queryKey: ['students', classId],
     queryFn: () => fetchStudents(classId),
     enabled: !!classId,
   });
-  
+
   // 현재 분석 결과 조회
   const { data: currentAnalysis, isLoading: isCurrentLoading } = useQuery({
     queryKey: ['analysisResult', analysisId],
-    queryFn: () => fetchAnalysisResult(analysisId),
-    enabled: !!analysisId,
+    queryFn: () => fetchAnalysisResult(classId, analysisId),
+    enabled: !!analysisId && !!classId,
   });
-  
+
   // 현재 분석 세션 ID 조회를 위한 쿼리
   const { data: analysisSession } = useQuery({
     queryKey: ['analysisSession', analysisId],
@@ -195,304 +196,250 @@ export default function AnalysisDetailPage() {
       if (currentAnalysis?.session_id) {
         return { sessionId: currentAnalysis.session_id };
       }
-      
+
       // 세션 ID가 없는 경우: 기본 동작 유지 (이전 버전 호환성)
       return { sessionId: null };
     },
     enabled: !!currentAnalysis,
   });
-  
+
   // 세션 ID 추출
   const sessionId = analysisSession?.sessionId;
-  
+
   // 종합 분석 결과 조회 - 세션 ID가 있으면 해당 세션의 결과, 없으면 최신 결과
-  const { 
-    data: overviewAnalysis, 
+  const {
+    data: overviewAnalysis,
     isLoading: isOverviewLoading,
     refetch: refetchOverview
   } = useQuery({
     queryKey: ['analysisResult', classId, 'overview', sessionId],
     queryFn: async () => {
       if (sessionId) {
-        // 같은 세션의 'overview' 타입 분석 조회
-        const { data, error } = await (supabase as any)
-          .from('analysis_results')
-          .select('*')
-          .eq('class_id', classId)
-          .eq('type', 'overview')
-          .eq('session_id', sessionId)
-          .single();
-          
-        if (error || !data) {
-          // 세션 결과가 없으면 최신 결과 조회
-          return fetchLatestAnalysisResultByType(classId, 'overview');
+        try {
+          const response = await fetch(`/api/class/${classId}/analysis?type=overview&session_id=${sessionId}&limit=1`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data && data.length > 0) return data[0];
+          }
+        } catch (e) {
+          console.error('Error fetching overview with session:', e);
         }
-        
-        return data;
+        return fetchLatestAnalysisResultByType(classId, 'overview');
       } else {
-        // 세션 ID가 없으면 기존 방식으로 최신 결과 조회
         return fetchLatestAnalysisResultByType(classId, 'overview');
       }
     },
     enabled: !!classId && activeTab === 'overview',
   });
-  
+
   // 학생 그룹1 분석 결과 조회 - 세션 ID 기반
-  const { 
-    data: students1Analysis, 
+  const {
+    data: students1Analysis,
     isLoading: isStudents1Loading,
     refetch: refetchStudents1
   } = useQuery({
     queryKey: ['analysisResult', classId, 'students-1', sessionId],
     queryFn: async () => {
       if (sessionId) {
-        // 같은 세션의 'students-1' 타입 분석 조회
-        const { data, error } = await (supabase as any)
-          .from('analysis_results')
-          .select('*')
-          .eq('class_id', classId)
-          .eq('type', 'students-1')
-          .eq('session_id', sessionId)
-          .single();
-          
-        if (error || !data) {
-          // 세션 결과가 없으면 최신 결과 조회
-          return fetchLatestAnalysisResultByType(classId, 'students-1');
+        try {
+          const response = await fetch(`/api/class/${classId}/analysis?type=students-1&session_id=${sessionId}&limit=1`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data && data.length > 0) return data[0];
+          }
+        } catch (e) {
+          console.error('Error fetching students-1 with session:', e);
         }
-        
-        return data;
+        return fetchLatestAnalysisResultByType(classId, 'students-1');
       } else {
-        // 세션 ID가 없으면 기존 방식으로 최신 결과 조회
         return fetchLatestAnalysisResultByType(classId, 'students-1');
       }
     },
     enabled: !!classId && activeTab === 'students-1',
   });
-  
+
   // 학생 그룹2 분석 결과 조회 - 세션 ID 기반
-  const { 
-    data: students2Analysis, 
+  const {
+    data: students2Analysis,
     isLoading: isStudents2Loading,
     refetch: refetchStudents2
   } = useQuery({
     queryKey: ['analysisResult', classId, 'students-2', sessionId],
     queryFn: async () => {
       if (sessionId) {
-        // 같은 세션의 'students-2' 타입 분석 조회
-        const { data, error } = await (supabase as any)
-          .from('analysis_results')
-          .select('*')
-          .eq('class_id', classId)
-          .eq('type', 'students-2')
-          .eq('session_id', sessionId)
-          .single();
-          
-        if (error || !data) {
-          // 세션 결과가 없으면 최신 결과 조회
-          return fetchLatestAnalysisResultByType(classId, 'students-2');
+        try {
+          const response = await fetch(`/api/class/${classId}/analysis?type=students-2&session_id=${sessionId}&limit=1`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data && data.length > 0) return data[0];
+          }
+        } catch (e) {
+          console.error('Error fetching students-2 with session:', e);
         }
-        
-        return data;
+        return fetchLatestAnalysisResultByType(classId, 'students-2');
       } else {
-        // 세션 ID가 없으면 기존 방식으로 최신 결과 조회
         return fetchLatestAnalysisResultByType(classId, 'students-2');
       }
     },
     enabled: !!classId && activeTab === 'students-2',
   });
-  
+
   // 학생 그룹3 분석 결과 조회 - 세션 ID 기반
-  const { 
-    data: students3Analysis, 
+  const {
+    data: students3Analysis,
     isLoading: isStudents3Loading,
     refetch: refetchStudents3
   } = useQuery({
     queryKey: ['analysisResult', classId, 'students-3', sessionId],
     queryFn: async () => {
       if (sessionId) {
-        // 같은 세션의 'students-3' 타입 분석 조회
-        const { data, error } = await (supabase as any)
-          .from('analysis_results')
-          .select('*')
-          .eq('class_id', classId)
-          .eq('type', 'students-3')
-          .eq('session_id', sessionId)
-          .single();
-          
-        if (error || !data) {
-          // 세션 결과가 없으면 최신 결과 조회
-          return fetchLatestAnalysisResultByType(classId, 'students-3');
+        try {
+          const response = await fetch(`/api/class/${classId}/analysis?type=students-3&session_id=${sessionId}&limit=1`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data && data.length > 0) return data[0];
+          }
+        } catch (e) {
+          console.error('Error fetching students-3 with session:', e);
         }
-        
-        return data;
+        return fetchLatestAnalysisResultByType(classId, 'students-3');
       } else {
-        // 세션 ID가 없으면 기존 방식으로 최신 결과 조회
         return fetchLatestAnalysisResultByType(classId, 'students-3');
       }
     },
     enabled: !!classId && activeTab === 'students-3',
   });
-  
+
   // 학생 그룹4 분석 결과 조회 - 세션 ID 기반
-  const { 
-    data: students4Analysis, 
+  const {
+    data: students4Analysis,
     isLoading: isStudents4Loading,
     refetch: refetchStudents4
   } = useQuery({
     queryKey: ['analysisResult', classId, 'students-4', sessionId],
     queryFn: async () => {
       if (sessionId) {
-        // 같은 세션의 'students-4' 타입 분석 조회
-        const { data, error } = await (supabase as any)
-          .from('analysis_results')
-          .select('*')
-          .eq('class_id', classId)
-          .eq('type', 'students-4')
-          .eq('session_id', sessionId)
-          .single();
-          
-        if (error || !data) {
-          // 세션 결과가 없으면 최신 결과 조회
-          return fetchLatestAnalysisResultByType(classId, 'students-4');
+        try {
+          const response = await fetch(`/api/class/${classId}/analysis?type=students-4&session_id=${sessionId}&limit=1`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data && data.length > 0) return data[0];
+          }
+        } catch (e) {
+          console.error('Error fetching students-4 with session:', e);
         }
-        
-        return data;
+        return fetchLatestAnalysisResultByType(classId, 'students-4');
       } else {
-        // 세션 ID가 없으면 기존 방식으로 최신 결과 조회
         return fetchLatestAnalysisResultByType(classId, 'students-4');
       }
     },
     enabled: !!classId && activeTab === 'students-4',
   });
-  
+
   // 학생 그룹5 분석 결과 조회 - 세션 ID 기반
-  const { 
-    data: students5Analysis, 
+  const {
+    data: students5Analysis,
     isLoading: isStudents5Loading,
     refetch: refetchStudents5
   } = useQuery({
     queryKey: ['analysisResult', classId, 'students-5', sessionId],
     queryFn: async () => {
       if (sessionId) {
-        // 같은 세션의 'students-5' 타입 분석 조회
-        const { data, error } = await (supabase as any)
-          .from('analysis_results')
-          .select('*')
-          .eq('class_id', classId)
-          .eq('type', 'students-5')
-          .eq('session_id', sessionId)
-          .single();
-          
-        if (error || !data) {
-          // 세션 결과가 없으면 최신 결과 조회
-          return fetchLatestAnalysisResultByType(classId, 'students-5');
+        try {
+          const response = await fetch(`/api/class/${classId}/analysis?type=students-5&session_id=${sessionId}&limit=1`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data && data.length > 0) return data[0];
+          }
+        } catch (e) {
+          console.error('Error fetching students-5 with session:', e);
         }
-        
-        return data;
+        return fetchLatestAnalysisResultByType(classId, 'students-5');
       } else {
-        // 세션 ID가 없으면 기존 방식으로 최신 결과 조회
         return fetchLatestAnalysisResultByType(classId, 'students-5');
       }
     },
     enabled: !!classId && activeTab === 'students-5',
   });
-  
+
   // 학생 그룹6 분석 결과 조회 - 세션 ID 기반
-  const { 
-    data: students6Analysis, 
+  const {
+    data: students6Analysis,
     isLoading: isStudents6Loading,
     refetch: refetchStudents6
   } = useQuery({
     queryKey: ['analysisResult', classId, 'students-6', sessionId],
     queryFn: async () => {
       if (sessionId) {
-        // 같은 세션의 'students-6' 타입 분석 조회
-        const { data, error } = await (supabase as any)
-          .from('analysis_results')
-          .select('*')
-          .eq('class_id', classId)
-          .eq('type', 'students-6')
-          .eq('session_id', sessionId)
-          .single();
-          
-        if (error || !data) {
-          // 세션 결과가 없으면 최신 결과 조회
-          return fetchLatestAnalysisResultByType(classId, 'students-6');
+        try {
+          const response = await fetch(`/api/class/${classId}/analysis?type=students-6&session_id=${sessionId}&limit=1`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data && data.length > 0) return data[0];
+          }
+        } catch (e) {
+          console.error('Error fetching students-6 with session:', e);
         }
-        
-        return data;
+        return fetchLatestAnalysisResultByType(classId, 'students-6');
       } else {
-        // 세션 ID가 없으면 기존 방식으로 최신 결과 조회
         return fetchLatestAnalysisResultByType(classId, 'students-6');
       }
     },
     enabled: !!classId && activeTab === 'students-6',
   });
-  
+
   // 학생 그룹7 분석 결과 조회 - 세션 ID 기반
-  const { 
-    data: students7Analysis, 
+  const {
+    data: students7Analysis,
     isLoading: isStudents7Loading,
     refetch: refetchStudents7
   } = useQuery({
     queryKey: ['analysisResult', classId, 'students-7', sessionId],
     queryFn: async () => {
       if (sessionId) {
-        // 같은 세션의 'students-7' 타입 분석 조회
-        const { data, error } = await (supabase as any)
-          .from('analysis_results')
-          .select('*')
-          .eq('class_id', classId)
-          .eq('type', 'students-7')
-          .eq('session_id', sessionId)
-          .single();
-          
-        if (error || !data) {
-          // 세션 결과가 없으면 최신 결과 조회
-          return fetchLatestAnalysisResultByType(classId, 'students-7');
+        try {
+          const response = await fetch(`/api/class/${classId}/analysis?type=students-7&session_id=${sessionId}&limit=1`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data && data.length > 0) return data[0];
+          }
+        } catch (e) {
+          console.error('Error fetching students-7 with session:', e);
         }
-        
-        return data;
+        return fetchLatestAnalysisResultByType(classId, 'students-7');
       } else {
-        // 세션 ID가 없으면 기존 방식으로 최신 결과 조회
         return fetchLatestAnalysisResultByType(classId, 'students-7');
       }
     },
     enabled: !!classId && activeTab === 'students-7',
   });
-  
+
   // 학생 그룹8 분석 결과 조회 - 세션 ID 기반
-  const { 
-    data: students8Analysis, 
+  const {
+    data: students8Analysis,
     isLoading: isStudents8Loading,
     refetch: refetchStudents8
   } = useQuery({
     queryKey: ['analysisResult', classId, 'students-8', sessionId],
     queryFn: async () => {
       if (sessionId) {
-        // 같은 세션의 'students-8' 타입 분석 조회
-        const { data, error } = await (supabase as any)
-          .from('analysis_results')
-          .select('*')
-          .eq('class_id', classId)
-          .eq('type', 'students-8')
-          .eq('session_id', sessionId)
-          .single();
-          
-        if (error || !data) {
-          // 세션 결과가 없으면 최신 결과 조회
-          return fetchLatestAnalysisResultByType(classId, 'students-8');
+        try {
+          const response = await fetch(`/api/class/${classId}/analysis?type=students-8&session_id=${sessionId}&limit=1`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data && data.length > 0) return data[0];
+          }
+        } catch (e) {
+          console.error('Error fetching students-8 with session:', e);
         }
-        
-        return data;
+        return fetchLatestAnalysisResultByType(classId, 'students-8');
       } else {
-        // 세션 ID가 없으면 기존 방식으로 최신 결과 조회
         return fetchLatestAnalysisResultByType(classId, 'students-8');
       }
     },
     enabled: !!classId && activeTab === 'students-8',
   });
-  
+
   // 새 분석 실행 Mutation
   const runAnalysisMutation = useMutation({
     mutationFn: (type: string) => runAnalysis(classId, type),
@@ -502,10 +449,10 @@ export default function AnalysisDetailPage() {
     onSuccess: (data, type) => {
       toast.dismiss();
       toast.success(`${getTabTitle(type)} 분석이 완료되었습니다.`);
-      
+
       // 분석 유형에 따라 쿼리 무효화 및 재조회
       queryClient.invalidateQueries({ queryKey: ['analysisResult', classId, type] });
-      
+
       // 해당 유형의 분석 결과 다시 조회
       switch (type) {
         case 'overview':
@@ -543,12 +490,12 @@ export default function AnalysisDetailPage() {
       console.error('분석 오류:', error);
     }
   });
-  
+
   // 새 분석 실행 핸들러
   const handleRunAnalysis = (type: string) => {
     runAnalysisMutation.mutate(type);
   };
-  
+
   // 현재 분석 타입에 맞는 탭 타이틀 가져오기
   const getTabTitle = (type: string): string => {
     switch (type) {
@@ -565,20 +512,20 @@ export default function AnalysisDetailPage() {
       default: return '분석 결과';
     }
   };
-  
+
   // 분석 결과 데이터 처리
   const getFormattedContent = (analysis: AnalysisResult | null) => {
     if (!analysis) return '';
-    
+
     let content = '';
-    
+
     try {
       // 결과가 JSON 문자열인지 확인
       if (typeof analysis.result_data === 'string') {
         try {
           // JSON 파싱 시도
           const parsed = JSON.parse(analysis.result_data);
-          
+
           // 통합 분석인 경우 (type='combined')
           if (analysis.type === 'combined') {
             // 현재 활성 탭에 따라 다른 내용 표시
@@ -610,13 +557,13 @@ export default function AnalysisDetailPage() {
         // 이미 객체인 경우 (드문 경우)
         content = JSON.stringify(analysis.result_data);
       }
-      
+
       // 필요없는 제목 제거 및 숫자 변환 
       content = content.replace(/# .*학급 .*보고서(\n|\r\n)?/g, '');
-      
 
-      
-            // ===== 특수 케이스: 학생분석 페이지 정리 =====
+
+
+      // ===== 특수 케이스: 학생분석 페이지 정리 =====
       if (activeTab.startsWith('students-')) {
         // 불필요한 제목 및 설명 제거
         content = content.replace(/# 학생 그룹 \d+ 개별 분석(\n|\r\n)?/g, '');
@@ -624,106 +571,106 @@ export default function AnalysisDetailPage() {
         content = content.replace(/# 학생 그룹 \d+ 분석(\n|\r\n)?/g, '');
         content = content.replace(/## 학생 그룹 \d+ 분석(\n|\r\n)?/g, '');
         content = content.replace(/그룹 \d+ 개별 학생 분석(\n|\r\n)?/g, '');
-        
+
         // 설명 텍스트 제거
         content = content.replace(/데이터를 기반으로 한 각 학생의 심리적, 사회적 분석과 발전적 제안을 제공합니다\.(\n|\r\n)?/g, '');
         content = content.replace(/이 분석에서는 그룹 \d+에 속한 학생들 각각에 대한 상세 분석을 제공합니다\.(\n|\r\n)?/g, '');
-        
+
         // 그룹에 관한 설명 제거
         content = content.replace(/이 그룹에 해당하는 학생이 없습니다\.(\n|\r\n)?/g, '분석할 학생이 없습니다.');
-        
+
         // 🔥 첫 번째 학생 누락 방지: 위험한 텍스트 자르기 로직 제거
         // 대신 필요없는 제목만 선별적으로 제거
         content = content.replace(/^# 개별 학생 심층 분석 보고서.*$/gm, '');
         content = content.replace(/^## ⚠️ 절대 준수 사항.*$/gm, '');
         content = content.replace(/^### 📝 각 학생별 표준 분석 구조.*$/gm, '');
-        
+
         // 학생이 없는 경우만 특별 처리
         if (content.includes('분석할 학생이 없습니다') || content.includes('이 그룹에 해당하는 학생이 없습니다')) {
           content = '# 분석할 학생이 없습니다\n\n이 그룹에는 분석할 학생이 없습니다.';
         }
-        
+
         // 구분선 형식 통일
         content = content.replace(/---+/g, '\n\n---\n\n');
-        
+
 
       }
-      
 
-      
-              // ===== 1. 하위 항목 제목 볼드체 처리 =====
+
+
+      // ===== 1. 하위 항목 제목 볼드체 처리 =====
       // 교실 활동, 교우 관계 전략 등
       const subSectionTitles = [
         '교실 활동', '교우 관계 전략', '그룹 활동 참여', '갈등 해결 및 의사소통 기술',
         '심리적 건강 지원', '자신감과 자아존중감 향상', '스트레스 관리', '동기 부여와 학습 탄력성'
       ];
-      
+
       subSectionTitles.forEach(title => {
         content = content.replace(new RegExp(`^\\s*(${title}):\\s*(.*)$`, 'gm'), `**${title}:** $2`);
       });
-      
+
       // ===== 2. 번호 매김 통일 =====
       // 번호가 있는 제안 항목 처리
       content = content.replace(/^(\d+\)\s*[^\n:]+)$/gm, '- **$1**');
       content = content.replace(/^(\d+\.\s*[^\n:]+)$/gm, '- **$1**');
-      
+
       // ===== 3. 기타 키워드 및 특수 항목 강조 =====
       // 단기, 중기, 장기 계획 키워드 강조
       content = content.replace(/단기\(1-2주\):/g, '**단기(1-2주):**');
       content = content.replace(/중기\(1-2개월\):/g, '**중기(1-2개월):**');
       content = content.replace(/장기\(학기 전체\):/g, '**장기(학기 전체):**');
-      
+
       // 활동 정보 강조
       const activityInfoItems = ['소요시간', '준비물', '진행 방법'];
       activityInfoItems.forEach(item => {
         content = content.replace(new RegExp(`${item}:`, 'g'), `**${item}:**`);
       });
-      
+
       // 목적, 방법, 기대효과, 참고자료 스타일 통일 및 보라색으로 변경
       const keyItems = ['목적', '방법', '기대효과', '참고자료', '활동명', '준비물', '진행 방법', '소요시간'];
-      
+
       keyItems.forEach(item => {
         // "항목:" 형식 (스페이스 없음)
-        content = content.replace(new RegExp(`^(\\s*)${item}:(?![\\s\\S]*?<span)`, 'gm'), 
+        content = content.replace(new RegExp(`^(\\s*)${item}:(?![\\s\\S]*?<span)`, 'gm'),
           `$1<span style="color: #4338ca; font-weight: 400; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;">${item}:</span> `);
-        
+
         // "항목: " 형식 (스페이스 있음)
-        content = content.replace(new RegExp(`^(\\s*)${item}: (?![\\s\\S]*?<span)`, 'gm'), 
+        content = content.replace(new RegExp(`^(\\s*)${item}: (?![\\s\\S]*?<span)`, 'gm'),
           `$1<span style="color: #4338ca; font-weight: 400; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;">${item}:</span> `);
       });
-      
+
       // ===== 4. 실행 가능한 활동 제안 처리 개선 =====
       // "실행 가능한 활동 제안" 섹션 강조 
-      content = content.replace(/^(실행 가능한 활동 제안|실행 가능한 활동|구체적 활동 제안)(\s*|:)/gm, 
+      content = content.replace(/^(실행 가능한 활동 제안|실행 가능한 활동|구체적 활동 제안)(\s*|:)/gm,
         '<div style="color: #4338ca; font-weight: 400; margin-top: 1rem; margin-bottom: 0.5rem;">실행 가능한 활동 제안</div>');
-      
+
       // 활동명 패턴 처리 (다양한 형식 포함)
       // 예: 1. **학급 안전감 규칙 만들기, 2. **아침 인사 루틴 등
-      content = content.replace(/(\d+\.\s*)\*\*([^*\n]+)\*\*/g, 
+      content = content.replace(/(\d+\.\s*)\*\*([^*\n]+)\*\*/g,
         '<div style="color: #4338ca; font-weight: 400; margin-top: 1rem;">$1$2</div>');
-      
+
       // 참고 자료 링크 처리 개선
-      content = content.replace(/\*\*참고 자료 링크\*\*:\s*\[(.*?)\]\((https?:\/\/[^\s)]+)\)/g, 
+      content = content.replace(/\*\*참고 자료 링크\*\*:\s*\[(.*?)\]\((https?:\/\/[^\s)]+)\)/g,
         '<div style="margin-top: 0.5rem;"><span style="color: #4338ca; font-weight: 400;">참고 자료:</span> <a href="$2" target="_blank" style="color: #2563eb; text-decoration: underline;">$1</a></div>');
-      
+
       // 괄호 안의 URL 형식 처리 (https://www.edunet.net/... 형식)
-      content = content.replace(/\((https?:\/\/[^\s)]+)\)/g, 
+      content = content.replace(/\((https?:\/\/[^\s)]+)\)/g,
         '<a href="$1" target="_blank" style="color: #2563eb; text-decoration: underline;">$1</a>');
-      
+
       return content;
     } catch (error) {
       console.error('분석 결과 포맷팅 오류:', error);
       return analysis?.result_data || '분석 결과를 불러오는 중 오류가 발생했습니다.';
     }
   }
-  
+
   // 현재 활성화된 탭에 대한 분석 결과 가져오기
   const getActiveAnalysis = () => {
     // 만약 currentAnalysis가 있고, 그 type이 현재 활성 탭과 일치하면 현재 분석 결과를 반환
     if (currentAnalysis && currentAnalysis.type === activeTab) {
       return currentAnalysis;
     }
-    
+
     // 그렇지 않으면 세션 기반으로 가져온 결과 반환
     switch (activeTab) {
       case 'overview': return overviewAnalysis;
@@ -738,7 +685,7 @@ export default function AnalysisDetailPage() {
       default: return overviewAnalysis;
     }
   };
-  
+
   // 현재 활성화된 탭의 로딩 상태 확인
   const isActiveTabLoading = () => {
     switch (activeTab) {
@@ -754,15 +701,15 @@ export default function AnalysisDetailPage() {
       default: return false;
     }
   };
-  
+
   // 현재 활성화된 탭의 실행 중 상태 확인
   const isActiveTabRunning = () => {
     return runAnalysisMutation.isPending && runAnalysisMutation.variables === activeTab;
   };
-  
+
   // 전체 로딩 상태 확인
   const isPageLoading = isCurrentLoading || isClassLoading;
-  
+
   if (isPageLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-gray-100">
@@ -771,7 +718,7 @@ export default function AnalysisDetailPage() {
       </div>
     );
   }
-  
+
   if (!currentAnalysis || !classDetails) {
     return (
       <div className="flex flex-col justify-center items-center min-h-screen bg-gray-100">
@@ -785,17 +732,17 @@ export default function AnalysisDetailPage() {
       </div>
     );
   }
-  
+
   // 날짜 포맷팅
   const createdAt = new Date(currentAnalysis.created_at);
   const formattedDate = format(createdAt, 'yyyy년 MM월 dd일', { locale: ko });
   const formattedTime = format(createdAt, 'HH:mm', { locale: ko });
-  
+
   // 현재 활성화된 탭의 분석 결과
   const activeAnalysis = getActiveAnalysis();
   const isLoading = isActiveTabLoading();
   const isRunning = isActiveTabRunning();
-  
+
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="max-w-6xl mx-auto px-4 py-8">
@@ -807,106 +754,97 @@ export default function AnalysisDetailPage() {
             <span>{formattedDate} {formattedTime} 생성</span>
           </div>
         </header>
-        
+
         {/* 탭 네비게이션 */}
         <div className="bg-white shadow-md rounded-lg p-5 mb-6">
           <h2 className="text-xl font-bold text-black mb-3">분석 결과</h2>
           <div className="flex flex-wrap border-b border-gray-200 gap-1">
             <button
               onClick={() => setActiveTab('overview')}
-              className={`px-3 py-2 font-medium text-sm rounded-t-lg flex items-center ${
-                activeTab === 'overview'
-                  ? 'text-indigo-700 font-bold border-b-2 border-indigo-500'
-                  : 'text-gray-500 hover:text-gray-800'
-              }`}
+              className={`px-3 py-2 font-medium text-sm rounded-t-lg flex items-center ${activeTab === 'overview'
+                ? 'text-indigo-700 font-bold border-b-2 border-indigo-500'
+                : 'text-gray-500 hover:text-gray-800'
+                }`}
             >
               <ChartBarIcon className="w-4 h-4 mr-1" />
               종합분석
             </button>
             <button
               onClick={() => setActiveTab('students-1')}
-              className={`px-3 py-2 font-medium text-sm rounded-t-lg flex items-center ${
-                activeTab === 'students-1'
-                  ? 'text-indigo-700 font-bold border-b-2 border-indigo-500'
-                  : 'text-gray-500 hover:text-gray-800'
-              }`}
+              className={`px-3 py-2 font-medium text-sm rounded-t-lg flex items-center ${activeTab === 'students-1'
+                ? 'text-indigo-700 font-bold border-b-2 border-indigo-500'
+                : 'text-gray-500 hover:text-gray-800'
+                }`}
             >
               <UserGroupIcon className="w-4 h-4 mr-1" />
               학생분석 1
             </button>
             <button
               onClick={() => setActiveTab('students-2')}
-              className={`px-3 py-2 font-medium text-sm rounded-t-lg flex items-center ${
-                activeTab === 'students-2'
-                  ? 'text-indigo-700 font-bold border-b-2 border-indigo-500'
-                  : 'text-gray-500 hover:text-gray-800'
-              }`}
+              className={`px-3 py-2 font-medium text-sm rounded-t-lg flex items-center ${activeTab === 'students-2'
+                ? 'text-indigo-700 font-bold border-b-2 border-indigo-500'
+                : 'text-gray-500 hover:text-gray-800'
+                }`}
             >
               <UserGroupIcon className="w-4 h-4 mr-1" />
               학생분석 2
             </button>
             <button
               onClick={() => setActiveTab('students-3')}
-              className={`px-3 py-2 font-medium text-sm rounded-t-lg flex items-center ${
-                activeTab === 'students-3'
-                  ? 'text-indigo-700 font-bold border-b-2 border-indigo-500'
-                  : 'text-gray-500 hover:text-gray-800'
-              }`}
+              className={`px-3 py-2 font-medium text-sm rounded-t-lg flex items-center ${activeTab === 'students-3'
+                ? 'text-indigo-700 font-bold border-b-2 border-indigo-500'
+                : 'text-gray-500 hover:text-gray-800'
+                }`}
             >
               <UserGroupIcon className="w-4 h-4 mr-1" />
               학생분석 3
             </button>
             <button
               onClick={() => setActiveTab('students-4')}
-              className={`px-3 py-2 font-medium text-sm rounded-t-lg flex items-center ${
-                activeTab === 'students-4'
-                  ? 'text-indigo-700 font-bold border-b-2 border-indigo-500'
-                  : 'text-gray-500 hover:text-gray-800'
-              }`}
+              className={`px-3 py-2 font-medium text-sm rounded-t-lg flex items-center ${activeTab === 'students-4'
+                ? 'text-indigo-700 font-bold border-b-2 border-indigo-500'
+                : 'text-gray-500 hover:text-gray-800'
+                }`}
             >
               <UserGroupIcon className="w-4 h-4 mr-1" />
               학생분석 4
             </button>
             <button
               onClick={() => setActiveTab('students-5')}
-              className={`px-3 py-2 font-medium text-sm rounded-t-lg flex items-center ${
-                activeTab === 'students-5'
-                  ? 'text-indigo-700 font-bold border-b-2 border-indigo-500'
-                  : 'text-gray-500 hover:text-gray-800'
-              }`}
+              className={`px-3 py-2 font-medium text-sm rounded-t-lg flex items-center ${activeTab === 'students-5'
+                ? 'text-indigo-700 font-bold border-b-2 border-indigo-500'
+                : 'text-gray-500 hover:text-gray-800'
+                }`}
             >
               <UserGroupIcon className="w-4 h-4 mr-1" />
               학생분석 5
             </button>
             <button
               onClick={() => setActiveTab('students-6')}
-              className={`px-3 py-2 font-medium text-sm rounded-t-lg flex items-center ${
-                activeTab === 'students-6'
-                  ? 'text-indigo-700 font-bold border-b-2 border-indigo-500'
-                  : 'text-gray-500 hover:text-gray-800'
-              }`}
+              className={`px-3 py-2 font-medium text-sm rounded-t-lg flex items-center ${activeTab === 'students-6'
+                ? 'text-indigo-700 font-bold border-b-2 border-indigo-500'
+                : 'text-gray-500 hover:text-gray-800'
+                }`}
             >
               <UserGroupIcon className="w-4 h-4 mr-1" />
               학생분석 6
             </button>
             <button
               onClick={() => setActiveTab('students-7')}
-              className={`px-3 py-2 font-medium text-sm rounded-t-lg flex items-center ${
-                activeTab === 'students-7'
-                  ? 'text-indigo-700 font-bold border-b-2 border-indigo-500'
-                  : 'text-gray-500 hover:text-gray-800'
-              }`}
+              className={`px-3 py-2 font-medium text-sm rounded-t-lg flex items-center ${activeTab === 'students-7'
+                ? 'text-indigo-700 font-bold border-b-2 border-indigo-500'
+                : 'text-gray-500 hover:text-gray-800'
+                }`}
             >
               <UserGroupIcon className="w-4 h-4 mr-1" />
               학생분석 7
             </button>
             <button
               onClick={() => setActiveTab('students-8')}
-              className={`px-3 py-2 font-medium text-sm rounded-t-lg flex items-center ${
-                activeTab === 'students-8'
-                  ? 'text-indigo-700 font-bold border-b-2 border-indigo-500'
-                  : 'text-gray-500 hover:text-gray-800'
-              }`}
+              className={`px-3 py-2 font-medium text-sm rounded-t-lg flex items-center ${activeTab === 'students-8'
+                ? 'text-indigo-700 font-bold border-b-2 border-indigo-500'
+                : 'text-gray-500 hover:text-gray-800'
+                }`}
             >
               <UserGroupIcon className="w-4 h-4 mr-1" />
               학생분석 8
@@ -923,19 +861,19 @@ export default function AnalysisDetailPage() {
               )}
               <p className="text-sm font-medium">
                 {activeTab === 'overview' ? '전체 학급에 대한 종합 분석 결과를 확인합니다. 학급 내 관계 패턴, 네트워크 구조, 그리고 사회적 역학에 대한 통찰을 제공합니다.' :
-                activeTab === 'students-1' ? '학생 그룹 1에 대한 개별 분석 결과를 확인합니다. 각 학생의 관계 현황, 강점 및 개선 가능한 영역을 확인할 수 있습니다.' :
-                activeTab === 'students-2' ? '학생 그룹 2에 대한 개별 분석 결과를 확인합니다. 각 학생의 관계 현황, 강점 및 개선 가능한 영역을 확인할 수 있습니다.' :
-                activeTab === 'students-3' ? '학생 그룹 3에 대한 개별 분석 결과를 확인합니다. 각 학생의 관계 현황, 강점 및 개선 가능한 영역을 확인할 수 있습니다.' :
-                activeTab === 'students-4' ? '학생 그룹 4에 대한 개별 분석 결과를 확인합니다. 각 학생의 관계 현황, 강점 및 개선 가능한 영역을 확인할 수 있습니다.' :
-                activeTab === 'students-5' ? '학생 그룹 5에 대한 개별 분석 결과를 확인합니다. 각 학생의 관계 현황, 강점 및 개선 가능한 영역을 확인할 수 있습니다.' :
-                activeTab === 'students-6' ? '학생 그룹 6에 대한 개별 분석 결과를 확인합니다. 각 학생의 관계 현황, 강점 및 개선 가능한 영역을 확인할 수 있습니다.' :
-                activeTab === 'students-7' ? '학생 그룹 7에 대한 개별 분석 결과를 확인합니다. 각 학생의 관계 현황, 강점 및 개선 가능한 영역을 확인할 수 있습니다.' :
-                '학생 그룹 8에 대한 개별 분석 결과를 확인합니다. 각 학생의 관계 현황, 강점 및 개선 가능한 영역을 확인할 수 있습니다.'}
+                  activeTab === 'students-1' ? '학생 그룹 1에 대한 개별 분석 결과를 확인합니다. 각 학생의 관계 현황, 강점 및 개선 가능한 영역을 확인할 수 있습니다.' :
+                    activeTab === 'students-2' ? '학생 그룹 2에 대한 개별 분석 결과를 확인합니다. 각 학생의 관계 현황, 강점 및 개선 가능한 영역을 확인할 수 있습니다.' :
+                      activeTab === 'students-3' ? '학생 그룹 3에 대한 개별 분석 결과를 확인합니다. 각 학생의 관계 현황, 강점 및 개선 가능한 영역을 확인할 수 있습니다.' :
+                        activeTab === 'students-4' ? '학생 그룹 4에 대한 개별 분석 결과를 확인합니다. 각 학생의 관계 현황, 강점 및 개선 가능한 영역을 확인할 수 있습니다.' :
+                          activeTab === 'students-5' ? '학생 그룹 5에 대한 개별 분석 결과를 확인합니다. 각 학생의 관계 현황, 강점 및 개선 가능한 영역을 확인할 수 있습니다.' :
+                            activeTab === 'students-6' ? '학생 그룹 6에 대한 개별 분석 결과를 확인합니다. 각 학생의 관계 현황, 강점 및 개선 가능한 영역을 확인할 수 있습니다.' :
+                              activeTab === 'students-7' ? '학생 그룹 7에 대한 개별 분석 결과를 확인합니다. 각 학생의 관계 현황, 강점 및 개선 가능한 영역을 확인할 수 있습니다.' :
+                                '학생 그룹 8에 대한 개별 분석 결과를 확인합니다. 각 학생의 관계 현황, 강점 및 개선 가능한 영역을 확인할 수 있습니다.'}
               </p>
             </div>
           </div>
         </div>
-        
+
         {/* 분석 결과 내용 */}
         {isLoading || isRunning ? (
           <div className="bg-white rounded-lg shadow-md p-6 flex flex-col justify-center items-center min-h-[400px] border border-gray-200">
@@ -949,8 +887,8 @@ export default function AnalysisDetailPage() {
               {isRunning ? 'AI 분석을 실행 중입니다...' : '분석 결과 로딩 중...'}
             </div>
             <div className="text-sm text-gray-600 text-center max-w-md">
-              {isRunning ? 
-                '분석에는 약 1~2분이 소요됩니다. 대량의 학생 데이터를 처리하는 과정이라 시간이 다소 걸리니 잠시만 기다려주세요.' : 
+              {isRunning ?
+                '분석에는 약 1~2분이 소요됩니다. 대량의 학생 데이터를 처리하는 과정이라 시간이 다소 걸리니 잠시만 기다려주세요.' :
                 `${getTabTitle(activeTab)} 결과를 불러오고 있습니다...`}
             </div>
             <div className="mt-8 relative w-full max-w-md h-2 bg-gray-100 rounded-full overflow-hidden">
@@ -970,7 +908,7 @@ export default function AnalysisDetailPage() {
           </div>
         ) : activeAnalysis ? (
           <div className="bg-white rounded-lg shadow-md p-6 relative">
-            <button 
+            <button
               onClick={() => {
                 if (activeAnalysis) {
                   const content = getFormattedContent(activeAnalysis);
@@ -1199,8 +1137,8 @@ export default function AnalysisDetailPage() {
                     const text = props.children?.toString() || '';
                     // 학생 이름을 위한 특별 스타일링 (모든 h1 태그 적용)
                     return (
-                      <h1 style={{ 
-                        color: '#4338ca', 
+                      <h1 style={{
+                        color: '#4338ca',
                         fontWeight: '500',
                         fontSize: '1.5rem',
                         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
@@ -1216,7 +1154,7 @@ export default function AnalysisDetailPage() {
                   },
                   p: ({ node, ...props }) => {
                     const text = props.children?.toString() || '';
-                    
+
                     // 목적, 방법, 기대효과, 참고자료가 포함된 텍스트를 찾아 스타일 적용
                     const keyItems = ['목적', '방법', '기대효과', '참고자료', '활동명', '준비물', '진행 방법', '소요시간'];
                     for (const item of keyItems) {
@@ -1226,12 +1164,12 @@ export default function AnalysisDetailPage() {
                         if (colonIndex !== -1) {
                           const label = text.substring(0, colonIndex + 1);
                           const content = text.substring(colonIndex + 1);
-                          
+
                           // 스타일이 적용된 라벨과 내용을 결합해 반환
                           return (
                             <p>
-                              <span style={{ 
-                                color: '#4338ca', 
+                              <span style={{
+                                color: '#4338ca',
                                 fontWeight: '400',
                                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
                                 display: 'inline-block'
@@ -1244,7 +1182,7 @@ export default function AnalysisDetailPage() {
                         }
                       }
                     }
-                    
+
                     // 일반 텍스트는 그대로 반환
                     return <p {...props} />;
                   },
