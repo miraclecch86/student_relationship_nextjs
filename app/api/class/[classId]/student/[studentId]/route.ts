@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { createClient } from '@/lib/supabase-server';
 import bcrypt from 'bcryptjs';
 import { StudentUpdateData, StudentForClient } from '@/lib/supabase';
 
@@ -15,8 +14,7 @@ export async function GET(
 ) {
   try {
     const { classId, studentId } = await params;
-    const cookieStore = await cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    const supabase = await createClient();
 
     // 사용자 인증 확인
     const { data: { session } } = await supabase.auth.getSession();
@@ -86,8 +84,7 @@ export async function PATCH(
 ) {
   try {
     const { classId, studentId } = await params;
-    const cookieStore = await cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    const supabase = await createClient();
 
     // 사용자 인증 확인
     const { data: { session } } = await supabase.auth.getSession();

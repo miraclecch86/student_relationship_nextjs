@@ -1,5 +1,4 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { createClient } from '@/lib/supabase-server';
 import { NextRequest, NextResponse } from 'next/server';
 
 // Demo 학급 체크 함수 (utils에서 가져오는 대신 여기서 정의)
@@ -16,8 +15,7 @@ export async function POST(
   context: any
 ) {
   try {
-    const cookieStore = await cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    const supabase = await createClient();
     const params = await context.params;
     const classId = params.id;
 

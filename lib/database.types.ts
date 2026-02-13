@@ -461,6 +461,49 @@ export interface Database {
           }
         ]
       }
+      class_daily_records: {
+        Row: {
+          id: string
+          class_id: string
+          record_date: string
+          actual_date: string
+          title: string
+          content: string
+          hashtags: string[] | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          class_id: string
+          record_date: string
+          actual_date: string
+          title: string
+          content: string
+          hashtags?: string[] | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          class_id?: string
+          record_date?: string
+          actual_date?: string
+          title?: string
+          content?: string
+          hashtags?: string[] | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "class_daily_records_class_id_fkey"
+            columns: ["class_id"]
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never

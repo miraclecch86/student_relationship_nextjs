@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@/lib/supabase-server';
 
 export async function POST(
   request: NextRequest,
@@ -26,9 +25,7 @@ export async function POST(
     }
 
     console.log('Creating supabase client...');
-    console.log('Creating supabase client...');
-    const cookieStore = await cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    const supabase = await createClient();
 
     console.log('Sample record structure:', records[0]);
 
