@@ -11,9 +11,11 @@ export default function LoginPage() {
     setError(null);
     setIsLoading(true);
 
-    const redirectUrl = process.env.NODE_ENV === 'development' 
-      ? 'http://localhost:3000/auth/callback'
-      : 'https://student-relationship.vercel.app/auth/callback';
+    // 현재 브라우저의 origin을 사용하여 리다이렉트 URL 생성
+    // 이렇게 하면 localhost, Vercel 프리뷰, 프로덕션 모두에서 올바르게 작동합니다.
+    const redirectUrl = `${window.location.origin}/auth/callback`;
+
+    console.log('Login attempt with redirectUrl:', redirectUrl);
 
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider,
@@ -52,10 +54,10 @@ export default function LoginPage() {
               className="w-full bg-white text-gray-800 border border-gray-300 rounded-md px-4 py-2 shadow-sm hover:bg-gray-100 flex items-center justify-center space-x-2 transition duration-150 ease-in-out disabled:opacity-50"
             >
               {isLoading ? (
-                 <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                 </svg>
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
               ) : (
                 <svg
                   className="w-5 h-5"
@@ -89,11 +91,11 @@ export default function LoginPage() {
               disabled={isLoading}
               className="w-full bg-[#FEE500] text-black font-bold rounded-md px-4 py-2 shadow-sm hover:brightness-95 flex items-center justify-center space-x-2 transition duration-150 ease-in-out disabled:opacity-50 disabled:brightness-75"
             >
-             {isLoading ? (
-                 <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                 </svg>
+              {isLoading ? (
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
               ) : (
                 <svg
                   className="w-5 h-5"
