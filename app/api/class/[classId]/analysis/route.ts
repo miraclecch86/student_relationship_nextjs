@@ -6,6 +6,7 @@ import { Database } from '@/lib/database.types';
 import { isDemoClass } from '@/utils/demo-permissions';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60; // Add Vercel timeout limit
 
 // 분석 결과 저장 API
 export async function POST(
