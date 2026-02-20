@@ -2,28 +2,28 @@
 
 import { useRouter } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { supabase } from '@/lib/supabase';
 import { useEffect, useState, Suspense } from 'react';
 
 // 선생님 이름 입력 컴포넌트
 function TeacherNameInputContent({ resetParam }: { resetParam: string | null }) {
   const router = useRouter();
-  const supabase = createClientComponentClient();
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [teacherName, setTeacherName] = useState('');
-  
+
   // 페이지 진입 시 세션 완전 초기화 및 갱신
   useEffect(() => {
     const refreshAuthState = async () => {
       const wasReset = resetParam === 'true';
-      
+
       if (wasReset) {
         // 브라우저 스토리지 초기화
         sessionStorage.clear();
         localStorage.removeItem('supabase.auth.token');
       }
-      
+
       try {
         // Supabase 세션 명시적 갱신
         const { error } = await supabase.auth.refreshSession();
@@ -34,13 +34,13 @@ function TeacherNameInputContent({ resetParam }: { resetParam: string | null }) 
         console.log('세션 갱신 중 오류:', err);
       }
     };
-    
+
     refreshAuthState();
   }, [supabase.auth, resetParam]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!teacherName.trim()) {
       setError('선생님 이름을 입력해주세요.');
       return;
@@ -68,7 +68,7 @@ function TeacherNameInputContent({ resetParam }: { resetParam: string | null }) 
 
       // 사용자 메타데이터에 선생님 이름과 역할 저장
       const { error: metadataError } = await supabase.auth.updateUser({
-        data: { 
+        data: {
           role: 'teacher',
           teacher_name: teacherName.trim(),
           role_verified: true
@@ -84,7 +84,7 @@ function TeacherNameInputContent({ resetParam }: { resetParam: string | null }) 
 
       // 세션 강제 갱신하여 메타데이터 즉시 반영
       await supabase.auth.refreshSession();
-      
+
       // 선생님 페이지로 이동
       router.replace('/teacher');
 
@@ -113,7 +113,7 @@ function TeacherNameInputContent({ resetParam }: { resetParam: string | null }) 
           <h1 className="text-2xl font-bold text-gray-900 mb-2">환영합니다!</h1>
           <p className="text-gray-600">선생님 이름을 입력해 주세요</p>
         </div>
-        
+
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label htmlFor="teacherName" className="block text-sm font-medium text-gray-700 mb-2">
@@ -130,7 +130,7 @@ function TeacherNameInputContent({ resetParam }: { resetParam: string | null }) 
               autoFocus
             />
           </div>
-          
+
           <button
             type="submit"
             disabled={isLoading || !teacherName.trim()}
@@ -158,7 +158,7 @@ function TeacherNameInputContent({ resetParam }: { resetParam: string | null }) 
 function TeacherNameInputWithParams() {
   const searchParams = useSearchParams();
   const resetParam = searchParams.get('reset');
-  
+
   return <TeacherNameInputContent resetParam={resetParam} />;
 }
 

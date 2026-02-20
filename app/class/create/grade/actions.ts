@@ -1,8 +1,6 @@
 "use server";
 
-import { cookies } from 'next/headers';
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
-import { Database } from '@/lib/database.types';
+import { createClient } from '@/lib/supabase-server';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
@@ -12,26 +10,26 @@ export async function createClass(formData: {
   grade: number;
   classNum: number;
 }) {
-  const supabase = createServerComponentClient<Database>({ cookies });
-  
+  const supabase = await createClient();
+
   let newClassId: string | null = null;
-  
+
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
+
     if (userError || !user) {
       throw new Error(userError?.message || '로그인이 필요합니다.');
     }
-    
+
     console.log('[Action: createClass] User retrieved successfully, User ID:', user.id);
 
     const className = `${formData.year} ${formData.school} ${formData.grade}학년 ${formData.classNum}반`;
-    
+
     console.log('[Action: createClass] Attempting to insert class', className, 'with user_id:', user.id);
-    
+
     const { data: insertedData, error: insertError } = await (supabase as any)
       .from('classes')
-      .insert([{ 
+      .insert([{
         name: className,
         user_id: user.id,
       } as any])
@@ -42,7 +40,7 @@ export async function createClass(formData: {
       console.error('[Action: createClass] Insert Error or ID missing:', insertError, insertedData);
       throw new Error(insertError?.message || '학급 생성 후 ID를 반환받지 못했습니다.');
     }
-    
+
     newClassId = insertedData.id;
     console.log('[Action: createClass] Class created successfully with ID:', newClassId);
 
@@ -62,8 +60,8 @@ export async function createClass(formData: {
     params.set('error', errorMessage);
     redirect(`/class/create/grade?${params.toString()}`);
   }
-  
+
   if (newClassId) {
-     redirect(`/class/create/students?classId=${newClassId}`);
+    redirect(`/class/create/students?classId=${newClassId}`);
   }
 }

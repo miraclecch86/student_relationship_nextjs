@@ -82,10 +82,10 @@ async function fetchClasses(): Promise<ClassWithCount[]> {
   const sortedClasses = classesWithCounts.sort((a, b) => {
     const aIsDemo = a.is_demo && a.is_public;
     const bIsDemo = b.is_demo && b.is_public;
-    
+
     if (aIsDemo && !bIsDemo) return -1;
     if (!aIsDemo && bIsDemo) return 1;
-    
+
     // 같은 타입이면 생성일 기준 정렬
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
@@ -104,9 +104,9 @@ async function addClass(name: string): Promise<BaseClass> {
 
   const { data, error } = await (supabase as any)
     .from('classes')
-    .insert([{ 
+    .insert([{
       name: name.trim(),
-      user_id: user.id 
+      user_id: user.id
     }])
     .select('id, name, created_at, user_id')
     .single();
@@ -128,14 +128,15 @@ async function updateClass(id: string, newName: string): Promise<BaseClass | nul
   return data;
 }
 
-// 학급 삭제 함수 (RPC 호출로 변경)
+// 학급 삭제 함수 (API 호출로 변경)
 async function deleteClass(id: string): Promise<void> {
-  // RPC 함수 호출로 변경: 학급 및 하위 데이터(학생, 관계, 질문, 답변) 삭제
-  const { error } = await (supabase as any).rpc('delete_class', { class_id_to_delete: id });
+  const response = await fetch(`/api/classes/${id}`, {
+    method: 'DELETE',
+  });
 
-  if (error) {
-    console.error('RPC delete_class error:', error);
-    throw new Error(`학급 삭제 실패: ${error.message}`);
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || response.statusText);
   }
 }
 
@@ -199,15 +200,15 @@ export default function TeacherPage() {
         console.log('[TeacherPage Auth] SIGNED_OUT event. State will be handled by middleware.');
         // setIsAuthenticated(false); // 미들웨어가 리다이렉트
       } else if (event === 'SIGNED_IN') {
-         console.log('[TeacherPage Auth] SIGNED_IN event. Invalidating queries.');
-         // setIsAuthenticated(true); // 미들웨어가 접근을 보장
-         queryClient.invalidateQueries({ queryKey: ['classes'] }); // 데이터 갱신
-         // 선생님 이름도 다시 가져오기
-         getTeacherName();
+        console.log('[TeacherPage Auth] SIGNED_IN event. Invalidating queries.');
+        // setIsAuthenticated(true); // 미들웨어가 접근을 보장
+        queryClient.invalidateQueries({ queryKey: ['classes'] }); // 데이터 갱신
+        // 선생님 이름도 다시 가져오기
+        getTeacherName();
       } else if (event === 'USER_UPDATED' && session?.user) {
-         // 사용자 메타데이터 업데이트 시 선생님 이름 즉시 반영
-         const teacherName = session.user.user_metadata?.teacher_name;
-         setTeacherName(teacherName || null);
+        // 사용자 메타데이터 업데이트 시 선생님 이름 즉시 반영
+        const teacherName = session.user.user_metadata?.teacher_name;
+        setTeacherName(teacherName || null);
       }
     });
 
@@ -216,7 +217,7 @@ export default function TeacherPage() {
       isMounted = false;
       subscription?.unsubscribe();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queryClient]); // 의존성 정리
 
   // 데이터 로딩 상태는 useQuery 사용
@@ -347,7 +348,7 @@ export default function TeacherPage() {
 
   // 로딩 및 에러 처리 (useQuery 상태 사용)
   if (isClassesLoading) {
-      return <div className="flex justify-center items-center h-screen text-primary">학급 목록 로딩 중...</div>;
+    return <div className="flex justify-center items-center h-screen text-primary">학급 목록 로딩 중...</div>;
   }
 
   if (isError) return <div className="text-red-500 text-center mt-10">데이터 로딩 중 오류 발생: {(error as any)?.message ?? '알 수 없는 오류'}</div>;
@@ -355,7 +356,7 @@ export default function TeacherPage() {
   return (
     <div className="min-h-screen bg-gray-100">
       {/* CarouselBanner와 하단 콘텐츠를 모두 감싸는 단일 div */}
-      <div className="max-w-7xl mx-auto px-6 pb-10 pt-5"> 
+      <div className="max-w-7xl mx-auto px-6 pb-10 pt-5">
         <CarouselBanner slides={bannerSlides} autoPlayInterval={5000} />
         <header className="flex justify-between items-center mt-5 mb-5 bg-white p-5 rounded-lg shadow-md">
           <div>
@@ -387,9 +388,9 @@ export default function TeacherPage() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3 }}
                 >
-                  <ClassCard 
-                    classData={cls} 
-                    onEdit={handleEditClass} 
+                  <ClassCard
+                    classData={cls}
+                    onEdit={handleEditClass}
                     onDelete={handleDeleteClass}
                   />
                 </motion.div>
