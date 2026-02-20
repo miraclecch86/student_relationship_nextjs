@@ -988,6 +988,16 @@ export default function ClassAnalysisPage() {
 
   // 전체 분석 순차 실행 함수 수정 - 모든 분석 완료 후에도 이동하지 않음
   const runFullAnalysisSequentially = async () => {
+    // 🌟 데모 학급 권한 체크 - 시작 전에 확인하여 불필요한 알림 방지
+    if (classDetails && isDemoClass(classDetails)) {
+      const saveAttempt = handleDemoSaveAttempt(classDetails, "AI 학급 관계 분석");
+      if (!saveAttempt.canSave) {
+        setDemoModalMessage(saveAttempt.message || "체험판에서는 저장되지 않습니다.");
+        setIsDemoModalOpen(true);
+        return;
+      }
+    }
+
     try {
       // 분석 상태 시작
       setIsAnalyzing(true);

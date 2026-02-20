@@ -595,6 +595,16 @@ export default function SchoolRecordPage() {
   };
 
   const generateSchoolRecordWithProgress = () => {
+    // 🌟 데모 학급 권한 체크 - 시작 전에 확인하여 불필요한 알림 방지
+    if (classDetails && isDemoClass(classDetails)) {
+      const saveAttempt = handleDemoSaveAttempt(classDetails, "AI 생활기록부 생성");
+      if (!saveAttempt.canSave) {
+        setDemoModalMessage(saveAttempt.message || "체험판에서는 저장되지 않습니다.");
+        setIsDemoModalOpen(true);
+        return;
+      }
+    }
+
     setIsGenerating(true);
     setGenerationStartTime(Date.now());
     setGenerationProgress('생활기록부 생성을 시작합니다...');
