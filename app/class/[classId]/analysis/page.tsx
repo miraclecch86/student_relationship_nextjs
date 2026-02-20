@@ -21,6 +21,7 @@ import { ko } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import ConfirmModal from '@/components/ConfirmModal';
+import DemoModal from '@/components/DemoModal';
 import { handleDemoSaveAttempt, isDemoClass } from '@/utils/demo-permissions';
 
 // 분석 결과 타입 정의
@@ -332,9 +333,10 @@ const getAnalysisBadge = (type: string) => {
 interface AnalysisCardProps {
   analysis: AnalysisResult;
   classDetails?: Class | null;
+  onDemoAction: (message: string) => void;
 }
 
-function AnalysisCard({ analysis, classDetails }: AnalysisCardProps) {
+function AnalysisCard({ analysis, classDetails, onDemoAction }: AnalysisCardProps) {
   const router = useRouter();
   const params = useParams();
   const queryClient = useQueryClient();
@@ -367,17 +369,7 @@ function AnalysisCard({ analysis, classDetails }: AnalysisCardProps) {
       if (classDetails && isDemoClass(classDetails)) {
         const saveAttempt = handleDemoSaveAttempt(classDetails, "분석 결과 삭제");
         if (!saveAttempt.canSave) {
-          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
-            duration: 4000,
-            style: {
-              background: '#3B82F6',
-              color: 'white',
-              padding: '16px',
-              fontSize: '14px',
-              lineHeight: '1.5',
-              whiteSpace: 'pre-line'
-            }
-          });
+          onDemoAction(saveAttempt.message || "체험판에서는 저장되지 않습니다.");
           throw new Error("DEMO_BLOCKED");
         }
       }
@@ -418,17 +410,7 @@ function AnalysisCard({ analysis, classDetails }: AnalysisCardProps) {
       if (classDetails && isDemoClass(classDetails)) {
         const saveAttempt = handleDemoSaveAttempt(classDetails, "분석 결과 설명 수정");
         if (!saveAttempt.canSave) {
-          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
-            duration: 4000,
-            style: {
-              background: '#3B82F6',
-              color: 'white',
-              padding: '16px',
-              fontSize: '14px',
-              lineHeight: '1.5',
-              whiteSpace: 'pre-line'
-            }
-          });
+          onDemoAction(saveAttempt.message || "체험판에서는 저장되지 않습니다.");
           throw new Error("DEMO_BLOCKED");
         }
       }
@@ -670,6 +652,11 @@ export default function ClassAnalysisPage() {
   const queryClient = useQueryClient();
   const classId = params.classId as string;
   const [isDeleteAllDialogOpen, setIsDeleteAllDialogOpen] = useState(false);
+
+  // Demo Modal State
+  const [isDemoModalOpen, setIsDemoModalOpen] = useState(false);
+  const [demoModalMessage, setDemoModalMessage] = useState("");
+
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState('');
   const [analysisStartTime, setAnalysisStartTime] = useState<number | null>(null);
@@ -743,17 +730,8 @@ export default function ClassAnalysisPage() {
       if (classDetails && isDemoClass(classDetails)) {
         const saveAttempt = handleDemoSaveAttempt(classDetails, "AI 학급 관계 분석");
         if (!saveAttempt.canSave) {
-          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
-            duration: 4000,
-            style: {
-              background: '#3B82F6',
-              color: 'white',
-              padding: '16px',
-              fontSize: '14px',
-              lineHeight: '1.5',
-              whiteSpace: 'pre-line'
-            }
-          });
+          setDemoModalMessage(saveAttempt.message || "AI 학급 관계 분석은 저장되지 않습니다.");
+          setIsDemoModalOpen(true);
           // 실제 API 호출 없이 바로 리턴
           return Promise.resolve({} as AnalysisResult);
         }
@@ -783,17 +761,8 @@ export default function ClassAnalysisPage() {
       if (classDetails && isDemoClass(classDetails)) {
         const saveAttempt = handleDemoSaveAttempt(classDetails, "학생 그룹 분석");
         if (!saveAttempt.canSave) {
-          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
-            duration: 4000,
-            style: {
-              background: '#3B82F6',
-              color: 'white',
-              padding: '16px',
-              fontSize: '14px',
-              lineHeight: '1.5',
-              whiteSpace: 'pre-line'
-            }
-          });
+          setDemoModalMessage(saveAttempt.message || "학생 그룹 분석은 저장되지 않습니다.");
+          setIsDemoModalOpen(true);
           throw new Error("DEMO_BLOCKED");
         }
       }
@@ -821,17 +790,8 @@ export default function ClassAnalysisPage() {
       if (classDetails && isDemoClass(classDetails)) {
         const saveAttempt = handleDemoSaveAttempt(classDetails, "학생 그룹 분석");
         if (!saveAttempt.canSave) {
-          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
-            duration: 4000,
-            style: {
-              background: '#3B82F6',
-              color: 'white',
-              padding: '16px',
-              fontSize: '14px',
-              lineHeight: '1.5',
-              whiteSpace: 'pre-line'
-            }
-          });
+          setDemoModalMessage(saveAttempt.message || "학생 그룹 분석은 저장되지 않습니다.");
+          setIsDemoModalOpen(true);
           throw new Error("DEMO_BLOCKED");
         }
       }
@@ -859,17 +819,8 @@ export default function ClassAnalysisPage() {
       if (classDetails && isDemoClass(classDetails)) {
         const saveAttempt = handleDemoSaveAttempt(classDetails, "학생 그룹 분석");
         if (!saveAttempt.canSave) {
-          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
-            duration: 4000,
-            style: {
-              background: '#3B82F6',
-              color: 'white',
-              padding: '16px',
-              fontSize: '14px',
-              lineHeight: '1.5',
-              whiteSpace: 'pre-line'
-            }
-          });
+          setDemoModalMessage(saveAttempt.message || "학생 그룹 분석은 저장되지 않습니다.");
+          setIsDemoModalOpen(true);
           throw new Error("DEMO_BLOCKED");
         }
       }
@@ -897,17 +848,8 @@ export default function ClassAnalysisPage() {
       if (classDetails && isDemoClass(classDetails)) {
         const saveAttempt = handleDemoSaveAttempt(classDetails, "학생 그룹 분석");
         if (!saveAttempt.canSave) {
-          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
-            duration: 4000,
-            style: {
-              background: '#3B82F6',
-              color: 'white',
-              padding: '16px',
-              fontSize: '14px',
-              lineHeight: '1.5',
-              whiteSpace: 'pre-line'
-            }
-          });
+          setDemoModalMessage(saveAttempt.message || "학생 그룹 분석은 저장되지 않습니다.");
+          setIsDemoModalOpen(true);
           throw new Error("DEMO_BLOCKED");
         }
       }
@@ -935,17 +877,8 @@ export default function ClassAnalysisPage() {
       if (classDetails && isDemoClass(classDetails)) {
         const saveAttempt = handleDemoSaveAttempt(classDetails, "학생 그룹 분석");
         if (!saveAttempt.canSave) {
-          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
-            duration: 4000,
-            style: {
-              background: '#3B82F6',
-              color: 'white',
-              padding: '16px',
-              fontSize: '14px',
-              lineHeight: '1.5',
-              whiteSpace: 'pre-line'
-            }
-          });
+          setDemoModalMessage(saveAttempt.message || "학생 그룹 분석은 저장되지 않습니다.");
+          setIsDemoModalOpen(true);
           throw new Error("DEMO_BLOCKED");
         }
       }
@@ -973,17 +906,8 @@ export default function ClassAnalysisPage() {
       if (classDetails && isDemoClass(classDetails)) {
         const saveAttempt = handleDemoSaveAttempt(classDetails, "학생 그룹 분석");
         if (!saveAttempt.canSave) {
-          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
-            duration: 4000,
-            style: {
-              background: '#3B82F6',
-              color: 'white',
-              padding: '16px',
-              fontSize: '14px',
-              lineHeight: '1.5',
-              whiteSpace: 'pre-line'
-            }
-          });
+          setDemoModalMessage(saveAttempt.message || "학생 그룹 분석은 저장되지 않습니다.");
+          setIsDemoModalOpen(true);
           throw new Error("DEMO_BLOCKED");
         }
       }
@@ -1011,17 +935,8 @@ export default function ClassAnalysisPage() {
       if (classDetails && isDemoClass(classDetails)) {
         const saveAttempt = handleDemoSaveAttempt(classDetails, "학생 그룹 분석");
         if (!saveAttempt.canSave) {
-          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
-            duration: 4000,
-            style: {
-              background: '#3B82F6',
-              color: 'white',
-              padding: '16px',
-              fontSize: '14px',
-              lineHeight: '1.5',
-              whiteSpace: 'pre-line'
-            }
-          });
+          setDemoModalMessage(saveAttempt.message || "학생 그룹 분석은 저장되지 않습니다.");
+          setIsDemoModalOpen(true);
           throw new Error("DEMO_BLOCKED");
         }
       }
@@ -1049,17 +964,8 @@ export default function ClassAnalysisPage() {
       if (classDetails && isDemoClass(classDetails)) {
         const saveAttempt = handleDemoSaveAttempt(classDetails, "학생 그룹 분석");
         if (!saveAttempt.canSave) {
-          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
-            duration: 4000,
-            style: {
-              background: '#3B82F6',
-              color: 'white',
-              padding: '16px',
-              fontSize: '14px',
-              lineHeight: '1.5',
-              whiteSpace: 'pre-line'
-            }
-          });
+          setDemoModalMessage(saveAttempt.message || "학생 그룹 분석은 저장되지 않습니다.");
+          setIsDemoModalOpen(true);
           throw new Error("DEMO_BLOCKED");
         }
       }
@@ -1190,17 +1096,8 @@ export default function ClassAnalysisPage() {
       if (classDetails && isDemoClass(classDetails)) {
         const saveAttempt = handleDemoSaveAttempt(classDetails, "모든 분석 결과 삭제");
         if (!saveAttempt.canSave) {
-          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
-            duration: 4000,
-            style: {
-              background: '#3B82F6',
-              color: 'white',
-              padding: '16px',
-              fontSize: '14px',
-              lineHeight: '1.5',
-              whiteSpace: 'pre-line'
-            }
-          });
+          setDemoModalMessage(saveAttempt.message || "분석 결과 삭제 기능은 지원되지 않습니다.");
+          setIsDemoModalOpen(true);
           throw new Error("DEMO_BLOCKED");
         }
       }
@@ -1466,6 +1363,10 @@ export default function ClassAnalysisPage() {
                     key={analysis.id}
                     analysis={analysis}
                     classDetails={classDetails}
+                    onDemoAction={(msg) => {
+                      setDemoModalMessage(msg);
+                      setIsDemoModalOpen(true);
+                    }}
                   />
                 ))}
               </AnimatePresence>
@@ -1491,6 +1392,12 @@ export default function ClassAnalysisPage() {
           message="정말 모든 분석 결과를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다."
           confirmText="모두 삭제"
           isLoading={deleteAllAnalysisMutation.isPending}
+        />
+        {/* 체험판 제한 안내 모달 */}
+        <DemoModal
+          isOpen={isDemoModalOpen}
+          onClose={() => setIsDemoModalOpen(false)}
+          message={demoModalMessage}
         />
       </div>
     </div>

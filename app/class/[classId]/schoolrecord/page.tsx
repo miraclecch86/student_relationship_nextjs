@@ -21,6 +21,7 @@ import { ko } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import ConfirmModal from '@/components/ConfirmModal';
+import DemoModal from '@/components/DemoModal';
 import { handleDemoSaveAttempt, isDemoClass } from '@/utils/demo-permissions';
 
 // 생활기록부 결과 타입 정의
@@ -234,9 +235,10 @@ interface SchoolRecordCardProps {
   record: SchoolRecord;
   classDetails?: Class | null;
   onRefresh: () => void;
+  onDemoAction: (message: string) => void;
 }
 
-function SchoolRecordCard({ record, classDetails, onRefresh }: SchoolRecordCardProps) {
+function SchoolRecordCard({ record, classDetails, onRefresh, onDemoAction }: SchoolRecordCardProps) {
   const router = useRouter();
   const params = useParams();
   const classId = params.classId as string;
@@ -266,17 +268,7 @@ function SchoolRecordCard({ record, classDetails, onRefresh }: SchoolRecordCardP
       if (classDetails && isDemoClass(classDetails)) {
         const saveAttempt = handleDemoSaveAttempt(classDetails, "생활기록부 삭제");
         if (!saveAttempt.canSave) {
-          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
-            duration: 4000,
-            style: {
-              background: '#3B82F6',
-              color: 'white',
-              padding: '16px',
-              fontSize: '14px',
-              lineHeight: '1.5',
-              whiteSpace: 'pre-line'
-            }
-          });
+          onDemoAction(saveAttempt.message || "체험판에서는 저장되지 않습니다.");
           // 실제 API 호출 없이 바로 리턴
           return Promise.resolve();
         }
@@ -303,17 +295,7 @@ function SchoolRecordCard({ record, classDetails, onRefresh }: SchoolRecordCardP
       if (classDetails && isDemoClass(classDetails)) {
         const saveAttempt = handleDemoSaveAttempt(classDetails, "생활기록부 설명 수정");
         if (!saveAttempt.canSave) {
-          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
-            duration: 4000,
-            style: {
-              background: '#3B82F6',
-              color: 'white',
-              padding: '16px',
-              fontSize: '14px',
-              lineHeight: '1.5',
-              whiteSpace: 'pre-line'
-            }
-          });
+          onDemoAction(saveAttempt.message || "체험판에서는 저장되지 않습니다.");
           // 실제 API 호출 없이 바로 리턴
           return Promise.resolve();
         }
@@ -475,6 +457,10 @@ export default function SchoolRecordPage() {
   const [elapsedTime, setElapsedTime] = useState<number>(0);
   const abortControllerRef = React.useRef<AbortController | null>(null);
 
+  // Demo Modal State
+  const [isDemoModalOpen, setIsDemoModalOpen] = useState(false);
+  const [demoModalMessage, setDemoModalMessage] = useState("");
+
   // 시간 포맷 함수
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -546,17 +532,8 @@ export default function SchoolRecordPage() {
       if (classDetails && isDemoClass(classDetails)) {
         const saveAttempt = handleDemoSaveAttempt(classDetails, "AI 생활기록부 생성");
         if (!saveAttempt.canSave) {
-          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
-            duration: 4000,
-            style: {
-              background: '#3B82F6',
-              color: 'white',
-              padding: '16px',
-              fontSize: '14px',
-              lineHeight: '1.5',
-              whiteSpace: 'pre-line'
-            }
-          });
+          setDemoModalMessage(saveAttempt.message || "체험판에서는 저장되지 않습니다.");
+          setIsDemoModalOpen(true);
           // 실제 API 호출 없이 바로 리턴
           return Promise.resolve({} as SchoolRecord);
         }
@@ -588,17 +565,8 @@ export default function SchoolRecordPage() {
       if (classDetails && isDemoClass(classDetails)) {
         const saveAttempt = handleDemoSaveAttempt(classDetails, "모든 생활기록부 삭제");
         if (!saveAttempt.canSave) {
-          toast.success(saveAttempt.message || "체험판에서는 저장되지 않습니다.", {
-            duration: 4000,
-            style: {
-              background: '#3B82F6',
-              color: 'white',
-              padding: '16px',
-              fontSize: '14px',
-              lineHeight: '1.5',
-              whiteSpace: 'pre-line'
-            }
-          });
+          setDemoModalMessage(saveAttempt.message || "분석 결과 삭제 기능은 지원되지 않습니다.");
+          setIsDemoModalOpen(true);
           // 실제 API 호출 없이 바로 리턴
           return Promise.resolve();
         }
@@ -884,6 +852,10 @@ export default function SchoolRecordPage() {
                     record={record}
                     classDetails={classDetails}
                     onRefresh={refetchSchoolRecords}
+                    onDemoAction={(msg) => {
+                      setDemoModalMessage(msg);
+                      setIsDemoModalOpen(true);
+                    }}
                   />
                 ))}
               </AnimatePresence>
@@ -909,6 +881,13 @@ export default function SchoolRecordPage() {
           message="정말 모든 생활기록부를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다."
           confirmText="모두 삭제"
           isLoading={deleteAllMutation.isPending}
+        />
+
+        {/* 체험판 제한 안내 모달 */}
+        <DemoModal
+          isOpen={isDemoModalOpen}
+          onClose={() => setIsDemoModalOpen(false)}
+          message={demoModalMessage}
         />
       </div>
     </div>
