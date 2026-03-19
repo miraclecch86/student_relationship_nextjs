@@ -251,12 +251,12 @@ COMMENT ON COLUMN public.classes.is_public IS 'True if this demo class should be
 CREATE INDEX IF NOT EXISTS idx_classes_demo_public ON public.classes(is_demo, is_public) WHERE is_demo = true;
 
 -- 10. 데모 학급임을 식별하는 뷰 생성 (선택사항)
-CREATE OR REPLACE VIEW public.demo_classes AS
+CREATE OR REPLACE VIEW public.demo_classes WITH (security_invoker = true) AS
 SELECT * FROM public.classes 
 WHERE is_demo = true AND is_public = true;
 
 -- 🔍 11. 관리자용 뷰 (데모 데이터 관리용)
-CREATE OR REPLACE VIEW public.demo_class_stats AS
+CREATE OR REPLACE VIEW public.demo_class_stats WITH (security_invoker = true) AS
 SELECT 
   c.name as class_name,
   c.created_at,

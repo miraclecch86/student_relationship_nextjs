@@ -28,3 +28,51 @@ BEGIN
   AND completed_at < NOW() - INTERVAL '24 hours';
 END;
 $$ LANGUAGE plpgsql; 
+
+-- RLS 활성화 및 강제 적용
+ALTER TABLE public.analysis_queue ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.analysis_queue FORCE ROW LEVEL SECURITY;
+
+-- 조회 정책
+CREATE POLICY "Users can view their own analysis queue"
+ON public.analysis_queue FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1 FROM public.classes
+    WHERE classes.id = analysis_queue.class_id
+    AND classes.user_id = auth.uid()
+  )
+);
+
+-- 추가 정책
+CREATE POLICY "Users can insert their own analysis queue"
+ON public.analysis_queue FOR INSERT
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.classes
+    WHERE classes.id = class_id
+    AND classes.user_id = auth.uid()
+  )
+);
+
+-- 수정 정책
+CREATE POLICY "Users can update their own analysis queue"
+ON public.analysis_queue FOR UPDATE
+USING (
+  EXISTS (
+    SELECT 1 FROM public.classes
+    WHERE classes.id = analysis_queue.class_id
+    AND classes.user_id = auth.uid()
+  )
+);
+
+-- 삭제 정책
+CREATE POLICY "Users can delete their own analysis queue"
+ON public.analysis_queue FOR DELETE
+USING (
+  EXISTS (
+    SELECT 1 FROM public.classes
+    WHERE classes.id = analysis_queue.class_id
+    AND classes.user_id = auth.uid()
+  )
+);
