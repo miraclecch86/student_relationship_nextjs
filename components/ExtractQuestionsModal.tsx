@@ -5,6 +5,48 @@ import { Dialog, Transition } from '@headlessui/react';
 import { PhotoIcon, XMarkIcon, SparklesIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, PlusIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
+// 이미지 압축 헬퍼 (Vercel 4.5MB 용량 제한 및 속도 개선)
+const compressImageFile = async (file: File): Promise<File> => {
+  if (!file.type.startsWith('image/')) return file;
+  
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (e) => {
+      const img = new Image();
+      img.src = e.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let { width, height } = img;
+        const MAX_DIM = 2400;
+
+        if (width > height && width > MAX_DIM) {
+          height = Math.round((height * MAX_DIM) / width);
+          width = MAX_DIM;
+        } else if (height > MAX_DIM) {
+          width = Math.round((width * MAX_DIM) / height);
+          height = MAX_DIM;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        canvas.toBlob((blob) => {
+          if (blob) {
+            resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+          } else {
+            resolve(file);
+          }
+        }, 'image/jpeg', 0.8);
+      };
+      img.onerror = () => resolve(file);
+    };
+    reader.onerror = () => resolve(file);
+  });
+};
+
 interface ExtractQuestionsModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -87,7 +129,10 @@ export default function ExtractQuestionsModal({ isOpen, onClose, onConfirm }: Ex
     
     try {
       const formData = new FormData();
-      files.forEach(f => formData.append('files', f));
+      
+      // 병렬로 모든 이미지 압축 처리
+      const compressedFiles = await Promise.all(files.map(f => compressImageFile(f)));
+      compressedFiles.forEach(f => formData.append('files', f));
 
       const res = await fetch('/api/extract/questions', {
         method: 'POST',
