@@ -92,8 +92,9 @@ export default function ExtractAnswersModal({ isOpen, onClose, onConfirm, studen
           if (data && !error) {
               const existing: Record<string, string> = {};
               data.forEach(ans => {
-                  existing[ans.question_id] = ans.answer_text;
-                  initialAnswers[ans.question_id] = ans.answer_text; // 기본값을 기존 답변으로 채우기
+                  const text = ans.answer_text || '';
+                  existing[ans.question_id] = text;
+                  initialAnswers[ans.question_id] = text; // 기본값을 기존 답변으로 채우기
               });
               setExistingAnswers(existing);
               setExtractedAnswers({ ...initialAnswers });
