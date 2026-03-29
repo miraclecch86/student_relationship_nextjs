@@ -4,23 +4,33 @@ import { extractQuestionsFromImage } from '@/lib/gemini-vision';
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
-    const file = formData.get('file') as File | null;
+    const files = formData.getAll('files') as File[];
 
-    if (!file) {
-       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+    if (!files || files.length === 0) {
+       return NextResponse.json({ error: 'No files provided' }, { status: 400 });
     }
 
-    const buffer = await file.arrayBuffer();
-    const base64Data = Buffer.from(buffer).toString('base64');
-    const mimeType = file.type;
+    try {
+        const fileParts = await Promise.all(files.map(async (file) => {
+            const buffer = await file.arrayBuffer();
+            const base64Data = Buffer.from(buffer).toString('base64');
+            let mimeType = file.type;
+            
+            if (file.name.toLowerCase().endsWith('.hwp')) mimeType = 'application/x-hwp';
+            if (file.name.toLowerCase().endsWith('.hwpx')) mimeType = 'application/hwp+zip';
 
-    if (!mimeType.startsWith('image/') && mimeType !== 'application/pdf') {
-       return NextResponse.json({ error: 'Only image and PDF files are supported.' }, { status: 400 });
+            if (!mimeType.startsWith('image/') && mimeType !== 'application/pdf' && !mimeType.includes('hwp')) {
+                throw new Error(`지원하지 않는 파일 형식입니다: ${file.name}`);
+            }
+            return { data: base64Data, mimeType };
+        }));
+
+        const questions = await extractQuestionsFromImage(fileParts, 'flash');
+
+        return NextResponse.json({ questions });
+    } catch (validationError: any) {
+        return NextResponse.json({ error: validationError.message }, { status: 400 });
     }
-
-    const questions = await extractQuestionsFromImage(base64Data, mimeType, 'pro');
-
-    return NextResponse.json({ questions });
   } catch (error: any) {
     console.error('Error extracting questions:', error);
     return NextResponse.json(

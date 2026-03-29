@@ -5,9 +5,13 @@ const GEMINI_MODELS = {
   'pro': 'gemini-3.1-pro-preview'
 } as const;
 
+export interface FilePart {
+  data: string; // base64
+  mimeType: string;
+}
+
 export async function extractQuestionsFromImage(
-  base64Image: string,
-  mimeType: string,
+  files: FilePart[],
   modelType: 'flash' | 'pro' = 'flash'
 ): Promise<string[]> {
   try {
@@ -23,15 +27,17 @@ Do not include numbering like '1.', '2.', etc. in the strings.
 
 Example: ["What is your favorite subject?", "Who are you closest to?"]`;
 
-    const result = await model.generateContent([
-      prompt,
-      {
+    const parts: any[] = [
+      { text: prompt },
+      ...files.map(f => ({
         inlineData: {
-          data: base64Image,
-          mimeType: mimeType
+          data: f.data,
+          mimeType: f.mimeType
         }
-      }
-    ]);
+      }))
+    ];
+
+    const result = await model.generateContent(parts);
     
     const response = await result.response;
     const text = response.text();
@@ -59,8 +65,7 @@ Example: ["What is your favorite subject?", "Who are you closest to?"]`;
 }
 
 export async function extractAnswersFromImage(
-  base64Image: string,
-  mimeType: string,
+  files: FilePart[],
   questions: { id: string, text: string }[],
   modelType: 'flash' | 'pro' = 'flash'
 ): Promise<Record<string, string>> {
@@ -92,15 +97,17 @@ Example format:
   "question-id-2": ""
 }`;
 
-    const result = await model.generateContent([
-      prompt,
-      {
+    const parts: any[] = [
+      { text: prompt },
+      ...files.map(f => ({
         inlineData: {
-          data: base64Image,
-          mimeType: mimeType
+          data: f.data,
+          mimeType: f.mimeType
         }
-      }
-    ]);
+      }))
+    ];
+
+    const result = await model.generateContent(parts);
     
     const response = await result.response;
     const text = response.text();
