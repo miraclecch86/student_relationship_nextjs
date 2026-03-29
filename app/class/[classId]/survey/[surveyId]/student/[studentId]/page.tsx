@@ -6,7 +6,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase, Student, Relationship, Question, Answer } from "@/lib/supabase";
 import { RELATIONSHIP_TYPES, RELATIONSHIP_COLORS } from "@/lib/constants";
 import ConfirmModal from "@/components/ConfirmModal";
-import { PlusIcon, TrashIcon, ExclamationCircleIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
+import ExtractQuestionsModal from "@/components/ExtractQuestionsModal";
+import { PlusIcon, TrashIcon, ExclamationCircleIcon, ArrowPathIcon, SparklesIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { handleDemoSaveAttempt, isDemoClass } from "@/utils/demo-permissions";
 import { useAutoSave } from "@/hooks/useAutoSave";
@@ -199,6 +200,7 @@ export default function SurveyStudentDetailPage() {
     const [initialRelationshipsData, setInitialRelationshipsData] = useState<RelationshipSetting>({});
     const [selectedGender, setSelectedGender] = useState<'male' | 'female' | null>(null);
     const [initialGender, setInitialGender] = useState<'male' | 'female' | null>(null);
+    const [isExtractModalOpen, setIsExtractModalOpen] = useState(false);
 
     // --- 데이터 조회 Queries ---
     
@@ -438,6 +440,20 @@ export default function SurveyStudentDetailPage() {
         deleteQuestionMutation.mutate(questionToDelete.id);
     };
 
+    const handleExtractQuestionsConfirm = async (extractedQs: string[]) => {
+        setIsExtractModalOpen(false);
+        try {
+            // Sequential adding
+            for (const q of extractedQs) {
+                await addQuestion(classId, surveyId, q);
+            }
+            queryClient.invalidateQueries({ queryKey: ['questions', classId, surveyId] });
+            toast.success(`총 ${extractedQs.length}개의 질문이 추가되었습니다.`);
+        } catch (error: any) {
+            toast.error(`질문 추가 중 오류 발생: ${error.message}`);
+        }
+    };
+
     // --- 로딩 / 에러 처리 ---
     const isLoading = isLoadingStudent || isLoadingAllStudents || isLoadingRels || isLoadingQuestions || isLoadingAnswers || saveSettingsMutation.isPending || addQuestionMutation.isPending || deleteQuestionMutation.isPending || updateStudentGenderMutation.isPending;
     if (!studentId || !classId || !surveyId) {
@@ -527,7 +543,16 @@ export default function SurveyStudentDetailPage() {
                     )}
                 </div>
                 <div className="mb-8 bg-white p-4 rounded-xl shadow-md">
-                    <h2 className="text-lg font-semibold mb-3 text-[#6366f1] border-b pb-2">주관식 질문 추가</h2>
+                    <div className="flex justify-between items-center mb-3 text-[#6366f1] border-b pb-2">
+                        <h2 className="text-lg font-semibold">주관식 질문 추가</h2>
+                        <button 
+                            onClick={() => setIsExtractModalOpen(true)}
+                            className="flex items-center gap-1.5 text-sm px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-md font-medium transition-colors"
+                        >
+                            <SparklesIcon className="w-4 h-4" />
+                            사진/PDF로 질문 가져오기
+                        </button>
+                    </div>
                     <div className="flex gap-2">
                         <input
                             type="text"
@@ -591,6 +616,11 @@ export default function SurveyStudentDetailPage() {
                         confirmText="삭제"
                     />
                 )}
+                <ExtractQuestionsModal
+                    isOpen={isExtractModalOpen}
+                    onClose={() => setIsExtractModalOpen(false)}
+                    onConfirm={handleExtractQuestionsConfirm}
+                />
             </div>
         </div>
     );

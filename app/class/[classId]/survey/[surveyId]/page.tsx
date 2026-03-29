@@ -9,6 +9,7 @@ import ConfirmModal from '@/components/ConfirmModal';
 import StudentListPanel from '@/components/StudentListPanel';
 import RelationshipTypeRankBox from '@/components/RelationshipTypeRankBox';
 import WeeklyAnswersBox from '@/components/WeeklyAnswersBox';
+import ExtractAnswersModal from '@/components/ExtractAnswersModal';
 import { RELATIONSHIP_TYPES, RELATIONSHIP_COLORS } from '@/lib/constants';
 import { ArrowPathIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
@@ -89,6 +90,9 @@ export default function SurveyRelationshipPage() {
 
   const [selectedStudent, setSelectedStudent] = useState<NodeData | null>(null);
   const [filterType, setFilterType] = useState<keyof typeof RELATIONSHIP_TYPES | 'ALL'>('ALL');
+  
+  const [isExtractAnswersOpen, setIsExtractAnswersOpen] = useState(false);
+  const [extractTargetStudent, setExtractTargetStudent] = useState<{ id: string, name: string } | null>(null);
 
   const { data: classDetails, isLoading: isLoadingClass, isError: isErrorClass } = useQuery({
     queryKey: ['classDetails', classId],
@@ -369,6 +373,10 @@ export default function SurveyRelationshipPage() {
               onStudentSelect={(studentId) => {
                 router.push(`/class/${classId}/survey/${surveyId}/student/${studentId}`);
               }}
+              onUploadClick={(studentId, studentName) => {
+                setExtractTargetStudent({ id: studentId, name: studentName });
+                setIsExtractAnswersOpen(true);
+              }}
             />
           </div>
 
@@ -439,6 +447,41 @@ export default function SurveyRelationshipPage() {
           </div>
         </div>
       </div>
+
+      {extractTargetStudent && (
+        <ExtractAnswersModal
+          isOpen={isExtractAnswersOpen}
+          onClose={() => {
+            setIsExtractAnswersOpen(false);
+            setExtractTargetStudent(null);
+          }}
+          onConfirm={async (answers) => {
+            setIsExtractAnswersOpen(false);
+            try {
+              const answerUpserts = Object.entries(answers).map(([questionId, text]) => ({
+                  student_id: extractTargetStudent.id,
+                  question_id: questionId,
+                  answer_text: text,
+                  survey_id: surveyId,
+              }));
+              if (answerUpserts.length > 0) {
+                  const { error: ansError } = await (supabase as any).from('answers').upsert(answerUpserts, {
+                      onConflict: 'student_id, question_id, survey_id',
+                  });
+                  if (ansError) throw new Error(`답변 저장 실패: ${ansError.message}`);
+              }
+              queryClient.invalidateQueries({ queryKey: ['answers'] });
+              toast.success(`${extractTargetStudent.name} 학생의 답변이 저장되었습니다.`);
+            } catch (error: any) {
+              toast.error(error.message || "답변 저장 중 오류가 발생했습니다.");
+            } finally {
+              setExtractTargetStudent(null);
+            }
+          }}
+          studentName={extractTargetStudent.name}
+          questions={questions || []}
+        />
+      )}
     </div>
   );
 } 

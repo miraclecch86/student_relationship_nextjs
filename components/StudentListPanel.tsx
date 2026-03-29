@@ -115,10 +115,11 @@ function SortableStudentItem(props: {
   isSelected: boolean;
   onUpdateStudent: (id: string, newName: string) => Promise<void>;
   onDeleteStudent: (id: string) => Promise<void>;
-  onClick: (studentId: string) => void; // 선택 상태 관리를 위한 onClick 추가
+  onClick: (studentId: string) => void;
   disabled: boolean;
+  onUploadClick?: (studentId: string, studentName: string) => void;
 }) {
-  const { student, classId, isSelected, onUpdateStudent, onDeleteStudent, onClick, disabled } = props;
+  const { student, classId, isSelected, onUpdateStudent, onDeleteStudent, onClick, disabled, onUploadClick } = props;
   const {
     attributes,
     listeners,
@@ -147,13 +148,14 @@ function SortableStudentItem(props: {
       <StudentListItem
         student={student}
         classId={classId}
-        onSelect={() => onClick(student.id)} // 클릭 시 ID 전달 (페이지 이동 X)
+        onSelect={() => onClick(student.id)}
         isSelected={isSelected}
         onUpdateStudent={onUpdateStudent}
         onDeleteStudent={onDeleteStudent}
         listeners={listeners}
         isDragging={isDragging}
         disabled={disabled}
+        onUploadClick={onUploadClick}
       />
     </div>
   );
@@ -163,9 +165,10 @@ function SortableStudentItem(props: {
 interface StudentListPanelProps {
   classId: string;
   onStudentSelect?: (studentId: string) => void;
+  onUploadClick?: (studentId: string, studentName: string) => void;
 }
 
-export default function StudentListPanel({ classId, onStudentSelect }: StudentListPanelProps) {
+export default function StudentListPanel({ classId, onStudentSelect, onUploadClick }: StudentListPanelProps) {
   const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
@@ -382,11 +385,12 @@ export default function StudentListPanel({ classId, onStudentSelect }: StudentLi
                     key={student.id}
                     student={student}
                     classId={classId}
-                    isSelected={selectedStudentId === student.id} // 선택 상태 전달
+                    isSelected={selectedStudentId === student.id}
                     onUpdateStudent={handleUpdateStudent}
                     onDeleteStudent={handleDeleteStudent}
-                    onClick={handleStudentClick} // 클릭 핸들러 전달
-                    disabled={false} // 드래그 항상 활성화
+                    onClick={handleStudentClick}
+                    disabled={false}
+                    onUploadClick={onUploadClick}
                   />
                 ))}
               </SortableContext>

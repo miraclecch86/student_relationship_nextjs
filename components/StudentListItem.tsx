@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { NodeData } from '@/app/class/[classId]/page';
-import { PencilIcon, TrashIcon, CheckIcon, XMarkIcon, Bars3Icon } from '@heroicons/react/24/outline';
+import { PencilIcon, TrashIcon, CheckIcon, XMarkIcon, Bars3Icon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import ConfirmModal from './ConfirmModal';
 import { DraggableSyntheticListeners } from '@dnd-kit/core';
 
@@ -17,6 +17,7 @@ interface StudentListItemProps {
   listeners?: DraggableSyntheticListeners;
   isDragging?: boolean;
   disabled?: boolean;
+  onUploadClick?: (studentId: string, studentName: string) => void;
 }
 
 export default function StudentListItem({
@@ -29,6 +30,7 @@ export default function StudentListItem({
   listeners,
   isDragging = false,
   disabled = false,
+  onUploadClick,
 }: StudentListItemProps) {
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
@@ -155,6 +157,15 @@ export default function StudentListItem({
             </>
       ) : (
             <div className={`flex items-center gap-1 transition-opacity duration-150 ${isHovering ? 'opacity-100' : 'opacity-0'}`}>
+        {onUploadClick && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onUploadClick(student.id, student.name); }}
+            className="p-1 rounded-full hover:bg-gray-200 text-gray-700 hover:text-indigo-600"
+            title="학생 답변 인식"
+          >
+            <DocumentTextIcon className="w-4 h-4" />
+          </button>
+        )}
         <button
           onClick={handleEditClick}
                 className="p-1 rounded-full hover:bg-gray-200 text-gray-700 hover:text-blue-600"
