@@ -4,7 +4,7 @@ import { Student, Question, Answer, Relationship, Survey } from './supabase';
 // Gemini 모델 상수 정의
 const GEMINI_MODELS = {
   'flash': 'gemini-3-flash-preview',
-  'pro': 'gemini-3-pro-preview'
+  'pro': 'gemini-3.1-pro-preview'
 } as const;
 
 // 공통 전문가 정체성 설정

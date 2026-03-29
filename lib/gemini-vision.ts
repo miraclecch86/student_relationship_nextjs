@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const GEMINI_MODELS = {
   'flash': 'gemini-3-flash-preview',
-  'pro': 'gemini-3-pro-preview'
+  'pro': 'gemini-3.1-pro-preview'
 } as const;
 
 export async function extractQuestionsFromImage(
