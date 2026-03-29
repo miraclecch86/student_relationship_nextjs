@@ -4,13 +4,15 @@ import React, { Fragment, useState, useRef, useEffect } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { DocumentTextIcon, XMarkIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
-import { Question } from '@/lib/supabase';
+import { supabase, Question } from '@/lib/supabase';
 
 interface ExtractAnswersModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: (answers: Record<string, string>) => void;
   studentName: string;
+  studentId: string;
+  surveyId: string;
   questions: Question[];
 }
 
@@ -56,12 +58,13 @@ const compressImageFile = async (file: File): Promise<File> => {
   });
 };
 
-export default function ExtractAnswersModal({ isOpen, onClose, onConfirm, studentName, questions }: ExtractAnswersModalProps) {
+export default function ExtractAnswersModal({ isOpen, onClose, onConfirm, studentName, studentId, surveyId, questions }: ExtractAnswersModalProps) {
   const [files, setFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [extractedAnswers, setExtractedAnswers] = useState<Record<string, string>>({});
+  const [existingAnswers, setExistingAnswers] = useState<Record<string, string>>({});
   const [step, setStep] = useState<'upload' | 'edit'>('upload');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -72,15 +75,36 @@ export default function ExtractAnswersModal({ isOpen, onClose, onConfirm, studen
       setIsExtracting(false);
       setIsDragging(false);
       setExtractedAnswers({});
+      setExistingAnswers({});
       setStep('upload');
       
       const initialAnswers: Record<string, string> = {};
       questions.forEach(q => initialAnswers[q.id] = '');
       setExtractedAnswers(initialAnswers);
+
+      const fetchExisting = async () => {
+          const { data, error } = await supabase
+             .from('answers')
+             .select('*')
+             .eq('student_id', studentId)
+             .eq('survey_id', surveyId);
+          
+          if (data && !error) {
+              const existing: Record<string, string> = {};
+              data.forEach(ans => {
+                  existing[ans.question_id] = ans.answer_text;
+                  initialAnswers[ans.question_id] = ans.answer_text; // 기본값을 기존 답변으로 채우기
+              });
+              setExistingAnswers(existing);
+              setExtractedAnswers({ ...initialAnswers });
+          }
+      };
+      
+      fetchExisting();
     } else {
       previewUrls.forEach(url => URL.revokeObjectURL(url));
     }
-  }, [isOpen, questions]);
+  }, [isOpen, questions, studentId, surveyId]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.length) processFiles(Array.from(e.target.files));
@@ -159,7 +183,23 @@ export default function ExtractAnswersModal({ isOpen, onClose, onConfirm, studen
 
       const data = await res.json();
       if (data.answers && typeof data.answers === 'object') {
-          const mergedAnswers = { ...extractedAnswers, ...data.answers };
+          // 1. 기존 답변의 복사본을 베이스로 시작
+          const mergedAnswers = { ...existingAnswers }; 
+          
+          // 2. 새로 추출된 답변에서 빈 값이 아닌 것들만 덮어쓰기
+          Object.entries(data.answers as Record<string, string>).forEach(([qId, text]) => {
+              if (text && text.trim().length > 0) {
+                  mergedAnswers[qId] = text;
+              }
+          });
+          
+          // 3. 기존에도 없었고 새로 추출도 안된 항목은 빈 문자열로 보장
+          questions.forEach(q => {
+              if (!mergedAnswers[q.id]) {
+                  mergedAnswers[q.id] = '';
+              }
+          });
+
           setExtractedAnswers(mergedAnswers);
           setStep('edit');
       } else {

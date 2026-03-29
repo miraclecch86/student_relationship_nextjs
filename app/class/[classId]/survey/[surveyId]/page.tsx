@@ -479,6 +479,8 @@ export default function SurveyRelationshipPage() {
             }
           }}
           studentName={extractTargetStudent.name}
+          studentId={extractTargetStudent.id}
+          surveyId={surveyId}
           questions={questions || []}
         />
       )}
